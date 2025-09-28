@@ -1,0 +1,17 @@
+{
+  "name": "symbiont-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter guutz-blog dev",
+    "build:package": "pnpm --filter symbiont-cms build"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "svelte": "5.39.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

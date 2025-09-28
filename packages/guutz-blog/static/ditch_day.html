@@ -1,0 +1,72 @@
+<html>
+  <head>
+    <title>Is Ditch Day Tomorrow</title>
+    <link rel="stylesheet" href="https://emiletimothy.github.io/Projects/isitditchday.css">
+  </head>
+  
+  <body>
+    <div id="container">
+      <h2 id="titlething"></h2>
+      <div id="quoteContainer"></div>
+    </div>
+  </body>
+</html>
+
+
+<script type = 'text/javascript' src="https://code.jquery.com/jquery-latest.min.js"></script>
+
+<script>
+    function converter(date) {
+        let newDate = new Date(date.getTime() + 60 * 60 * 24 * 1000);
+        let months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        return months[newDate.getMonth()] + " " + newDate.getDate();
+      }
+      
+      var now = new Date();
+      var day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24)); // Calculate the day of the year
+      var mean = 500;
+      var std = 30;
+      var chancenum = 100 * (1 - Math.abs(day - mean) / std);
+      if (chancenum < 0) {
+        chancenum = 0;
+      }
+      var chance = chancenum.toFixed(2) + "%";
+      
+      var title = "NO";
+      if (chancenum > 0) {
+        if (chancenum < 20) {
+          title = "VERY LIKELY NO";
+        } else if (chancenum < 40) {
+          title = "PROBABLY NOT";
+        } else if (chancenum < 60) {
+          title = "POSSIBLY";
+        } else if (chancenum < 80) {
+          title = "LIKELY";
+        } else {
+          title = "VERY LIKELY YES";
+        }
+      }
+      
+
+  var timeAnimation = 500;
+  var quoteContainer = $('#quoteContainer');
+
+  $("body").toggleClass();
+  quoteContainer.fadeOut(timeAnimation, function(){
+    quoteContainer.html('');
+    quoteContainer.append(
+      '<p style="font-size:60px">' + title + '</p>' +
+      '<p id="quoteGenius">' +
+      'Based on historical data from 2003-2023, the chance that Ditch Day is tomorrow, ' +
+      converter(now) + ', is <b style="font-size:20px">~ ' + chance + '</b></p>' +
+      '<hr style="border-color:black"/>' +
+      '<p><b>If someone tells you "Ditch day is tomorrow, go to bed frosh!", feel free to respond with "ok boomer."</b></p>' +
+      '<hr style="border-color:black"/>' +
+      '<br><br><p style="font-size:12px; color:gray;">Forked from <a href="https://github.com/emiletimothy/emiletimothy.github.io/tree/main/Projects" target="_blank">https://github.com/emiletimothy/emiletimothy.github.io/tree/main/Projects</a></p>'
+    );
+    quoteContainer.fadeIn(timeAnimation);
+  });
+  
+  
+
+</script>

@@ -1,0 +1,189 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "basics": {
+    "name": "Michael Gutierrez",
+    "label": "Astrophysics @ Caltech",
+    "image": "mike_labcoat.jpg",
+    "email": "magutier@caltech.edu",
+    "phone": "(941) 330-4460",
+    "url": "https://guutz.com",
+    "summary": "I'm a recent graduate from the Caltech Astrophysics program. I have a passion for learning how the universe works and pushing the bounds of human achievement. My dream job is one where I can do exactly that—I love to get my hands dirty and dive deep into rabbit holes (figuratively or literally), and I'm not coming back up until I've cleared a path to Wonderland!",
+    "location": {
+      "city": "Pasadena",
+      "countryCode": "US",
+      "region": "California"
+    },
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "username": "michaelguutz",
+        "url": "https://www.linkedin.com/in/michaelguutz/"
+      },
+      {
+        "network": "GitHub",
+        "username": "guutz",
+        "url": "https://www.github.com/guutz"
+      },
+      {
+        "network": "Tumblr",
+        "username": "guutzprojects",
+        "url": "https://blog.guutz.com/"
+      }
+    ]
+  },
+  "work": [
+    {
+      "name": "Caltech All Sky All The Time Array (CASATTA)",
+      "url": "https://guutz.notion.site/Lab-Notebook-CASATTA-Summer-2024-d418e12c020c475792ef8bf28eed7d4a?pvs=4",
+      "location": "Pasadena, CA",
+      "position": "Analog Front End Engineer",
+      "startDate": "2024-06",
+      "endDate": "2025-06",
+      "highlights": [
+        "Created and tested the first prototype of a 500MHz dipole antenna array for radio astronomy and Fast Radio Burst (FRB) detection",
+        "Simulated and optimized antenna performance with Ansys HFSS software",
+        "Designed and fabricated a low-noise amplifier (LNA) circuit board using KiCad and Keysight Advanced Design System (ADS)",
+        "3D modeled and printed mechanical supports for the antennas using OnShape",
+        "For my Senior Thesis, collaborated with RF engineer colleagues to scale up the design for a 256-element array to be deployed at Owens Valley Radio Observatory"
+      ]
+    },
+    {
+      "name": "Caltech CubeSat Club",
+      "location": "Pasadena, CA",
+      "position": "Communications Lead",
+      "url": "https://smallsats.caltech.edu",
+      "startDate": "2022-03",
+      "highlights": [
+        "Prototyping and testing of LoRa-based radio communications for (short term) high-altitude balloon payloads and (long term) an orbital CubeSat",
+        "Restoring Moore Lab's 6m radio antenna for astronomy and satcom applications (Receiver calibration, signal pathway component selection, RFI hunting)",
+        "Mentor junior members (mechanical, electrical, comp sci principles)"
+      ]
+    },
+    {
+      "name": "Cosmic DAWN Center",
+      "location": "Copenhagen, Denmark",
+      "position": "Summer Undergraduate Research Fellowship",
+      "url": "https://guutz.com/Gutierrez_SURF_Report_2023.pdf",
+      "startDate": "2023-06",
+      "endDate": "2023-09",
+      "highlights": [
+        "Analyzed \"waterfall\" data of Fast Radio Bursts (FRBs) from the CHIME/FRB Public Database utilizing unsupervised machine learning tools (UMAP, t-SNE, k-means)",
+        "Created interactive plots to visualize how the algorithms categorized individual FRBs",
+        "Arrived at evidence for a single astrophysical origin of FRBs"
+      ]
+    },
+    {
+      "name": "MIT Haystack Observatory",
+      "location": "Westford, MA",
+      "position": "Research Experience for Undergraduates",
+      "url": "https://events.gnuradio.org/event/18/contributions/284/attachments/91/172/Haystack%20GSI%20GRCon%202022.pdf",
+      "startDate": "2022-06",
+      "endDate": "2022-09",
+      "highlights": [
+        "Integration and testing for flight models of AERO/VISTA CubeSats",
+        "Developed an open-source ground station interface with GNU Radio to automate satcom operations for Westford Radio Antenna UHF uplink/downlink"
+      ]
+    },
+    {
+      "name": "XOS Trucks",
+      "url": "https://xostrucks.com",
+      "location": "Glendale, CA",
+      "position": "Engineering Intern",
+      "startDate": "2021-06",
+      "endDate": "2021-09",
+      "highlights": [
+        "Prototyping and manufacturing design for electric vehicle battery packs",
+        "Used CATIA/3DEXPERIENCE software to design parts/assemblies",
+        "Ran environmental tests (vibration and ingress) on high voltage & structural battery components for integration into vehicles"
+      ]
+    },
+    {
+      "name": "H2Ok Innovations",
+      "location": "Boston, MA",
+      "position": "Hardware Engineering Intern",
+      "url": "https://h2okinnovations.com",
+      "startDate": "2020-09",
+      "endDate": "2021-05",
+      "highlights": [
+        "Led hardware team and collaborated with software engineers; organized and integrated efforts to develop a suite of novel, low-cost, and patentable remote water sensors",
+        "Identified and resolved water analysis needs of industrial customers for process improvement and cost savings, e.g. in-situ water chemistry measurement, real-time data analytics, etc.",
+        "Designed plug-and-play sensor frameworks using 3-D CAD and simulation programs",
+        "Fabricated, tested, and deployed sensing solutions; ran on-site beta tests with customers"
+      ]
+    }
+  ],
+  "volunteer": [],
+  "education": [
+    {
+      "institution": "Caltech",
+      "area": "Astrophysics",
+      "studyType": "B.S.",
+      "startDate": "2021-09",
+      "endDate": "2025-06",
+      "courses": [
+        "Advanced Classical, Quantum, Statistical Mechanics",
+        "Electricity + Magnetism",
+        "Cosmology",
+        "Stellar Structure and Thermodynamics",
+        "CAD Design and Prototype Fabrication",
+        "Robotics (Mechanical, Electrical, and Software)",
+        "Space Frames and Structures",
+        "Complex Analysis",
+        "Storytelling for Scientists"
+      ]
+    }
+  ],
+  "awards": [],
+  "publications": [],
+  "skills": [
+    {
+      "name": "Software",
+      "keywords": [
+        "SOLIDWORKS",
+        "OnShape",
+        "Ansys Electronics Desktop (HFSS)",
+        "KiCad PCB Design",
+        "Keysight Advanced Design System (ADS)",
+        "Cadence Microwave Office",
+        "Python",
+        "Neovim",
+        "GNU Radio",
+        "Data Visualization (Bokeh, Manim)",
+        "Blender"
+      ]
+    },
+    {
+      "name": "Hardware",
+      "keywords": [
+        "Embedded Systems",
+        "CNC Machining",
+        "Prototyping",
+        "3D Printing",
+        "Surface Mount Soldering",
+        "PCB Fabrication",
+        "Design for Manufacturing"
+      ]
+    }
+  ],
+  "languages": [],
+  "interests": [
+    {
+      "name": "Values",
+      "keywords": [
+        "Open communication",
+        "Collaboration",
+        "Work-life balance",
+        "Perseverance",
+        "Sense of humor"
+      ]
+    }
+  ],
+  "references": [],
+  "projects": [],
+  "meta": {
+    "canonical": "https://github.com/guutz/guutz.com/blob/svelte-makeover/resume.json",
+    "version": "v1.0.0",
+    "lastModified": "2025-04-17",
+    "theme": "https://github.com/guutz/jsonresume-theme-stackoverflow"
+  }
+}
