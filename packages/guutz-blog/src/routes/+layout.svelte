@@ -163,5 +163,10 @@
 		footer {
 			display: none
 		}
+
+		:global([id*="kofi-widget-overlay-"]) {
+			display: none;
+		}
+		
 	}
 </style>
