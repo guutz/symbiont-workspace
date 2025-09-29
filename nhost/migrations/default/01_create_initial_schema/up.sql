@@ -38,7 +38,8 @@ ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 -- This is the rule that allows the public to read published posts.
 CREATE POLICY "Allow public read access to published posts"
 ON public.posts FOR SELECT -- This rule only applies to SELECT (read) queries
+TO public -- Explicitly specify this applies to the public role
 USING (
   -- The condition for allowing access:
-  publish_at IS NOT NULL AND publish_at <= NOW()
+  publish_at IS NOT NULL AND publish_at <= CURRENT_TIMESTAMP
 );
