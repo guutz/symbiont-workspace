@@ -1,5 +1,5 @@
 import { GraphQLClient, gql } from 'graphql-request';
-import type { Post } from './types';
+import type { Post } from './types.ts';
 
 export const GET_POST_BY_SLUG = gql`
 	query GetPostBySlug($slug: String!) {

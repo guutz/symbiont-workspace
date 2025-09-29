@@ -43,5 +43,13 @@
 	},
 	"keywords": [
 		"svelte"
-	]
+	],
+	"dependencies": {
+		"@notionhq/client": "5.1.0",
+		"graphql": "16.11.0",
+		"graphql-request": "7.2.0",
+		"gray-matter": "4.0.3",
+		"markdown-it": "14.1.0",
+		"slugify": "1.6.6"
+	}
 }

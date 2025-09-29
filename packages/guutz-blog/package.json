@@ -12,7 +12,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"lint": "prettier --check ."
+		"lint": "prettier --check .",
+		"test-sync": "node ./scripts/test-notion.js"
 	},
 	"devDependencies": {
 		"@jsonresume/schema": "1.2.1",
@@ -40,6 +41,8 @@
 		"@types/markdown-it": "14.1.2",
 		"@vercel/analytics": "1.5.0",
 		"@vercel/speed-insights": "1.2.0",
+		"d3-geo": "3.1.0",
+		"dotenv": "^17.2.2",
 		"graphql": "16.11.0",
 		"graphql-request": "7.2.0",
 		"handlebars": "4.7.8",
@@ -50,7 +53,6 @@
 		"slugify": "1.6.6",
 		"three": "0.180.0",
 		"three-globe": "2.44.0",
-		"d3-geo": "3.1.0",
 		"topojson-client": "3.1.0"
 	}
 }

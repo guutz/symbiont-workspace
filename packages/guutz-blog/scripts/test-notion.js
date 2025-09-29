@@ -8,11 +8,11 @@ import 'dotenv/config';
 async function testNotionContent() {
   console.log('--- Notion Content Test Script ---');
 
-  const notionKey = process.env.NOTION_SECRET;
-  const databaseId = process.env.NOTION_PAGE_ID;
+  const notionKey = process.env.NOTION_API_KEY;
+  const databaseId = process.env.NOTION_BLOG_DATABASE_ID;
 
   if (!notionKey || !databaseId) {
-    console.error('❌ Error: Missing NOTION_KEY or NOTION_PAGE_ID in your .env file.');
+    console.error('❌ Error: Missing NOTION_API_KEY or NOTION_BLOG_DATABASE_ID in your .env file.');
     return;
   }
 

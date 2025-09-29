@@ -1,4 +1,4 @@
-import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
+import type { PageObjectResponse } from '@notionhq/client';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -107,4 +107,22 @@ export interface HydratedSymbiontConfig {
 export function defineSymbiontConfig<T extends SymbiontConfig>(config: T): T {
     return config;
 }
+
+/**
+ * Represents the result of a sync operation for a single database
+ */
+export type SyncSummary = {
+    /** The configured ID for this database */
+    id: string;
+    /** The actual Notion database ID */
+    databaseId: string;
+    /** Number of pages processed */
+    processed: number;
+    /** Number of pages skipped */
+    skipped: number;
+    /** Status of the sync operation */
+    status: 'ok' | 'error' | 'no-changes';
+    /** Additional details, especially for errors */
+    details?: string;
+};
 

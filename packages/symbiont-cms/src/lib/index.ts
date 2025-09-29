@@ -9,37 +9,42 @@ export { default as Editor } from './Editor.svelte';
 export type {
 	ClassMap,
 	Post,
+	SyncSummary,
 	SymbiontConfig,
 	DatabaseBlueprint,
 	HydratedDatabaseConfig,
-	HydratedSymbiontConfig
-} from './types.ts';
+	HydratedSymbiontConfig,
+	PageObjectResponse
+} from './types.js';
+
+// Export the config helper function
+export { defineSymbiontConfig } from './types.js';
 
 // Export the config loader function
-export { loadConfig } from './config-loader.ts';
+export { loadConfig } from './config-loader.js';
 
 // Export the poll blog handler
-export { handlePollBlogRequest } from './handlers';
+export { handlePollBlogRequest, syncFromNotion } from './handlers.js';
 
 export {
 	GET_POST_BY_SLUG,
 	createSymbiontGraphQLClient,
 	getPostBySlug
-} from './blog-client.ts';
+} from './blog-client.js';
 
 export type {
 	GetPostBySlugResult,
 	SymbiontGraphQLClientOptions
-} from './blog-client.ts';
+} from './blog-client.js';
 
 export {
 	createBlogLoad,
 	load as blogLoad
-} from './blog';
+} from './blog/server.js';
 
 export type {
 	BlogServerLoad,
 	BlogLoadOptions
-} from './blog';
+} from './blog/server.js';
 
-export { BlogPostPage } from './blog';
+export { default as BlogPostPage } from './blog/BlogPostPage.svelte';
