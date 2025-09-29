@@ -1,6 +1,6 @@
 <script lang="ts">
 	import MarkdownIt from 'markdown-it';
-	import type { ClassMap } from './types.ts';
+	import type { ClassMap } from './types.js';
 
 	/**
 	 * The raw Markdown string to be rendered.
@@ -15,7 +15,14 @@
 	export let classMap: ClassMap = {};
 
 	// Instantiate markdown-it once.
-	const md = new MarkdownIt();
+	const md = new MarkdownIt({
+		html: true, // Enable HTML tags in source
+		xhtmlOut: false, // Use '/' to close single tags (<br />)
+		breaks: false, // Convert '\n' in paragraphs into <br>
+		langPrefix: 'language-', // CSS language prefix for fenced blocks
+		linkify: false, // Autoconvert URL-like text to links
+		typographer: false // Enable some language-neutral replacement + quotes beautification
+	});
 
 	// --- Custom Renderer Rules ---
 	// We save the original rendering rules and then wrap them with our custom logic.
@@ -24,52 +31,52 @@
 	const defaultRenderers = {
 		heading_open:
 			md.renderer.rules.heading_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		paragraph_open:
 			md.renderer.rules.paragraph_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		link_open:
 			md.renderer.rules.link_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		bullet_list_open:
 			md.renderer.rules.bullet_list_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		ordered_list_open:
 			md.renderer.rules.ordered_list_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		list_item_open:
 			md.renderer.rules.list_item_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		blockquote_open:
 			md.renderer.rules.blockquote_open ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		code_block:
 			md.renderer.rules.code_block ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			},
 		fence:
 			md.renderer.rules.fence ||
-			function (tokens, idx, options, env, self) {
+			function (tokens: any[], idx: number, options: any, env: any, self: any) {
 				return self.renderToken(tokens, idx, options);
 			}
 	};
 
-	md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.heading_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		const token = tokens[idx];
 		const level = parseInt(token.tag.substring(1), 10);
 		const tag = `h${level}` as keyof ClassMap;
@@ -79,42 +86,42 @@
 		return defaultRenderers.heading_open(tokens, idx, options, env, self);
 	};
 
-	md.renderer.rules.paragraph_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.paragraph_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.p) {
 			tokens[idx].attrJoin('class', classMap.p);
 		}
 		return defaultRenderers.paragraph_open(tokens, idx, options, env, self);
 	};
 
-	md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.link_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.a) {
 			tokens[idx].attrJoin('class', classMap.a);
 		}
 		return defaultRenderers.link_open(tokens, idx, options, env, self);
 	};
 	
-	md.renderer.rules.bullet_list_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.bullet_list_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.ul) {
 			tokens[idx].attrJoin('class', classMap.ul);
 		}
 		return defaultRenderers.bullet_list_open(tokens, idx, options, env, self);
 	};
 	
-	md.renderer.rules.ordered_list_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.ordered_list_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.ol) {
 			tokens[idx].attrJoin('class', classMap.ol);
 		}
 		return defaultRenderers.ordered_list_open(tokens, idx, options, env, self);
 	};
 	
-	md.renderer.rules.list_item_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.list_item_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.li) {
 			tokens[idx].attrJoin('class', classMap.li);
 		}
 		return defaultRenderers.list_item_open(tokens, idx, options, env, self);
 	};
 	
-	md.renderer.rules.blockquote_open = (tokens, idx, options, env, self) => {
+	md.renderer.rules.blockquote_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
 		if (classMap.blockquote) {
 			tokens[idx].attrJoin('class', classMap.blockquote);
 		}

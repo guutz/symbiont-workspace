@@ -21,14 +21,15 @@ function resolveDatabaseId(db: DatabaseBlueprint): HydratedDatabaseConfig {
  * Dynamically loads the symbiont.config.ts file from the project root,
  * resolves environment variables referenced by name in the blueprint and returns
  * the fully hydrated config.
+ * 
+ * This is a server-only function that should not be imported on the client.
  */
 export async function loadConfig(): Promise<HydratedSymbiontConfig> {
 	const configPath = path.resolve(process.cwd(), 'symbiont.config.ts');
-	const module = await import(configPath);
+	const module = await import(/* @vite-ignore */ configPath);
 	const config: SymbiontConfig = module.default;
 
 	return {
 		databases: config.databases.map(resolveDatabaseId)
 	};
 }
-

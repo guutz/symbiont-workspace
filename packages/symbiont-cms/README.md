@@ -1,12 +1,74 @@
-# Svelte library
+# Symbiont CMS
 
-Everything you need to build a Svelte library, powered by [`sv`](https://npmjs.com/package/sv).
+A CMS package for SvelteKit applications that syncs content from Notion.
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
+## Installation
 
-## Creating a project
+```bash
+npm install symbiont-cms
+# or
+pnpm add symbiont-cms
+```
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Usage
+
+### Client-Side Components
+
+For your Svelte components and client-side code:
+
+```typescript
+// Import client-side components and utilities
+import { BlogPostPage, Renderer, defineSymbiontConfig } from 'symbiont-cms';
+import type { Post, SymbiontConfig } from 'symbiont-cms';
+```
+
+#### Example: Blog Post Page
+
+```svelte
+<!-- src/routes/blog/[slug]/+page.svelte -->
+<script lang="ts">
+  import { BlogPostPage } from 'symbiont-cms';
+  import type { PageData } from './$types';
+
+  export let data: PageData;
+</script>
+
+<BlogPostPage post={data.post} />
+```
+
+### Server-Side Functions
+
+For server-side code (API routes, load functions):
+
+```typescript
+// Import server-only functions
+import { blogLoad, handlePollBlogRequest, syncFromNotion, loadConfig } from 'symbiont-cms/server';
+```
+
+#### Example: Blog Load Function
+
+```typescript
+// src/routes/blog/[slug]/+page.server.ts
+export { blogLoad as load } from 'symbiont-cms/server';
+```
+
+#### Example: API Route
+
+```typescript
+// src/routes/api/sync/poll-blog/+server.ts
+import { handlePollBlogRequest } from 'symbiont-cms/server';
+
+export const GET = handlePollBlogRequest;
+```
+
+## Package Structure
+
+The package provides two main entry points:
+
+- **`symbiont-cms`** - Client-side components and utilities  
+- **`symbiont-cms/server`** - Server-only functions (API handlers, sync logic)
+
+This separation ensures that server-only code doesn't get bundled in your client-side code.
 
 ```sh
 # create a new project in the current directory

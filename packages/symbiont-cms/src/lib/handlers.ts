@@ -4,7 +4,7 @@ import { json, type RequestEvent } from '@sveltejs/kit';
 import { GraphQLClient, gql } from 'graphql-request';
 import { NotionToMarkdown } from 'notion-to-md';
 import slugify from 'slugify';
-import { loadConfig } from './config-loader.js';
+import { loadConfig } from './config-loader.server.js';
 import { requireEnvVar, requirePublicEnvVar } from './env.js';
 import type { HydratedDatabaseConfig, SyncSummary } from './types.js';
 
@@ -152,7 +152,15 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 		const title = (pageResponse.properties.Name as any).title?.[0]?.plain_text ?? 'Untitled';
 
 		const mdblocks = await n2m.pageToMarkdown(pageResponse.id);
-		const mdString = n2m.toMarkdownString(mdblocks);
+		const mdResult = n2m.toMarkdownString(mdblocks);
+		
+		// Handle different return types from notion-to-md
+		let mdString = '';
+		if (typeof mdResult === 'string') {
+			mdString = mdResult;
+		} else if (mdResult && typeof mdResult.parent === 'string') {
+			mdString = mdResult.parent;
+		}
 
 		const postData = {
 			notion_page_id: pageResponse.id,
@@ -165,7 +173,7 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 			slug: slugify.default
 				? slugify.default(title, { lower: true, strict: true })
 				: (slugify as any)(title, { lower: true, strict: true }),
-			content: mdString.parent
+			content: mdString
 		};
 
 		await gqlClient.request(UPSERT_POST_MUTATION, { post: postData });

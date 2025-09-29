@@ -15,8 +15,7 @@ const config = {
         }),
         alias: {
             $content: 'content',
-            $components: 'src/lib/components',
-            'symbiont-cms': '../symbiont-cms/src/lib'
+            $components: 'src/lib/components'
         },
         prerender: {
             entries: ['*']

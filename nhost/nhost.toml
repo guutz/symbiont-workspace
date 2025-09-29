@@ -175,6 +175,8 @@ interval = '1m'
 version = '14.18-20250728-1'
 
 [postgres.resources]
+enablePublicAccess = false
+
 [postgres.resources.storage]
 capacity = 1
 

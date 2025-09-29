@@ -20,11 +20,8 @@ export type {
 // Export the config helper function
 export { defineSymbiontConfig } from './types.js';
 
-// Export the config loader function
-export { loadConfig } from './config-loader.js';
-
-// Export the poll blog handler
-export { handlePollBlogRequest, syncFromNotion } from './handlers.js';
+// Note: Server-only functions (loadConfig, syncFromNotion, handlePollBlogRequest) 
+// are exported from './server.js' to prevent client-side bundling issues
 
 export {
 	GET_POST_BY_SLUG,
@@ -37,14 +34,6 @@ export type {
 	SymbiontGraphQLClientOptions
 } from './blog-client.js';
 
-export {
-	createBlogLoad,
-	load as blogLoad
-} from './blog/server.js';
-
-export type {
-	BlogServerLoad,
-	BlogLoadOptions
-} from './blog/server.js';
+// Note: blogLoad and createBlogLoad are server-only and exported from './server.js'
 
 export { default as BlogPostPage } from './blog/BlogPostPage.svelte';

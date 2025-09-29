@@ -25,6 +25,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"svelte": "./dist/index.js"
+		},
+		"./server": {
+			"types": "./dist/server.d.ts",
+			"import": "./dist/server.js"
 		}
 	},
 	"peerDependencies": {
@@ -35,6 +39,7 @@
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/package": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@types/markdown-it": "14.1.2",
 		"publint": "^0.3.2",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
@@ -50,7 +55,7 @@
 		"graphql-request": "7.2.0",
 		"gray-matter": "4.0.3",
 		"markdown-it": "14.1.0",
-		"slugify": "1.6.6",
-		"notion-to-md": "3.1.9"
+		"notion-to-md": "3.1.9",
+		"slugify": "1.6.6"
 	}
 }
