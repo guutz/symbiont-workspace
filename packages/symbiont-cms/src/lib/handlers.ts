@@ -2,18 +2,20 @@ import { Client } from '@notionhq/client';
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { GraphQLClient, gql } from 'graphql-request';
+import { NotionToMarkdown } from 'notion-to-md';
 import slugify from 'slugify';
 import { loadConfig } from './config-loader.js';
-import { requireEnvVar } from './env.js';
+import { requireEnvVar, requirePublicEnvVar } from './env.js';
 import type { HydratedDatabaseConfig, SyncSummary } from './types.js';
 
 // --- SETUP: Load Environment Variables & Initialize Clients ---
 const NOTION_API_KEY = requireEnvVar('NOTION_API_KEY', 'Set NOTION_API_KEY in your environment.');
-const NHOST_GRAPHQL_URL = requireEnvVar('NHOST_GRAPHQL_URL', 'Set NHOST_GRAPHQL_URL to your Nhost endpoint.');
+const NHOST_GRAPHQL_URL = requirePublicEnvVar('PUBLIC_NHOST_GRAPHQL_URL', 'Set PUBLIC_NHOST_GRAPHQL_URL to your Nhost endpoint.');
 const NHOST_ADMIN_SECRET = requireEnvVar('NHOST_ADMIN_SECRET', 'Set NHOST_ADMIN_SECRET for admin access to Nhost.');
 const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
 
 const notion = new Client({ auth: NOTION_API_KEY });
+const n2m = new NotionToMarkdown({ notionClient: notion });
 const gqlClient = new GraphQLClient(NHOST_GRAPHQL_URL, {
 	headers: { 'x-hasura-admin-secret': NHOST_ADMIN_SECRET }
 });
@@ -148,15 +150,22 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 
 		const pageResponse = page as PageObjectResponse;
 		const title = (pageResponse.properties.Name as any).title?.[0]?.plain_text ?? 'Untitled';
-		
+
+		const mdblocks = await n2m.pageToMarkdown(pageResponse.id);
+		const mdString = n2m.toMarkdownString(mdblocks);
+
 		const postData = {
 			notion_page_id: pageResponse.id,
 			title: title,
 			tags: ((pageResponse.properties.Tags as any)?.multi_select ?? []).map((tag: { name: string }) => tag.name),
 			updated_at: pageResponse.last_edited_time,
-			publish_at: config.isPublicRule(pageResponse) ? ((pageResponse.properties["Publish Date"] as any)?.date?.start ?? new Date().toISOString()) : null,
-			slug: slugify.default ? slugify.default(title, { lower: true, strict: true }) : (slugify as any)(title, { lower: true, strict: true }),
-			content: 'Content sync is a work in progress...' // TODO: Fetch and convert page content
+			publish_at: config.isPublicRule(pageResponse)
+				? (pageResponse.properties['Publish Date'] as any)?.date?.start ?? new Date().toISOString()
+				: null,
+			slug: slugify.default
+				? slugify.default(title, { lower: true, strict: true })
+				: (slugify as any)(title, { lower: true, strict: true }),
+			content: mdString.parent
 		};
 
 		await gqlClient.request(UPSERT_POST_MUTATION, { post: postData });

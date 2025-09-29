@@ -1,1 +1,1 @@
-export { blogLoad as load } from '$lib';
+export { blogLoad as load } from 'symbiont-cms';

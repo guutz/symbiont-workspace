@@ -360,6 +360,9 @@ importers:
       markdown-it:
         specifier: 14.1.0
         version: 14.1.0
+      notion-to-md:
+        specifier: 3.1.9
+        version: 3.1.9
       slugify:
         specifier: 1.6.6
         version: 1.6.6
