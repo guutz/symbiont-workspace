@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://svelte-qwer.vercel.app/sitemap.xml
