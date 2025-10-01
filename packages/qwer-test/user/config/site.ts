@@ -19,6 +19,7 @@ export const siteConfig: Site.Config = {
   lang: 'en',
   timeZone: 'Asia/Taipei',
   since: 2022,
+  indexLayout: 'posts-only', // Options: 'default', 'posts-only', 'profile-only', 'custom'
   cover: SiteCover,
   author: {
     name: 'John Doe',

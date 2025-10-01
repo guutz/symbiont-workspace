@@ -1,4 +1,6 @@
 export namespace Site {
+  export type IndexLayout = 'default' | 'posts-only' | 'profile-only' | 'custom';
+
   export interface Config {
     /** site url  without tailing slash. for example: `https://example.com` */
     url: string;
@@ -15,6 +17,12 @@ export namespace Site {
 
     /** site published since year. */
     since?: number;
+
+    /** layout type for the index page. Options: 'default' (profile + posts), 'posts-only', 'profile-only', 'custom' */
+    indexLayout?: IndexLayout;
+
+    /** path to a custom layout component file (relative to src/lib/components/) */
+    customLayoutComponent?: string;
 
     author: Author;
 

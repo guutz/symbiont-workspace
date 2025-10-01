@@ -8,10 +8,23 @@
   let className: string | undefined = undefined;
   export { className as class };
 
-  let loaded = false;
+  let mounted = false;
+  let isLoading = true;
+
   onMount(() => {
-    loaded = true;
+    mounted = true;
+    // Wait a bit for posts to load, then stop showing loading
+    const timer = setTimeout(() => {
+      isLoading = false;
+    }, 500);
+    
+    return () => clearTimeout(timer);
   });
+
+  // Also stop loading when posts are actually loaded
+  $: if (mounted && $postsShow.length > 0) {
+    isLoading = false;
+  }
 </script>
 
 <main
@@ -20,7 +33,15 @@
   itemscope
   itemprop="mainEntityOfPage"
   itemtype="https://schema.org/Blog">
-  {#if loaded}
+  {#if isLoading}
+    <div
+      class="h-[20rem] flex flex-col items-center justify-center gap4"
+      in:fade|global={{ duration: 300, delay: 300 }}
+      out:fade|global={{ duration: 300 }}>
+      <h2 class="text-3xl">{strings.LoadingPosts()}</h2>
+      <div class="i-line-md-loading-twotone-loop !h-16 !w-16"></div>
+    </div>
+  {:else}
     {#key $postsShow}
       {#if $postsShow.length === 0}
         <div
@@ -45,14 +66,6 @@
         {/each}
       {/if}
     {/key}
-  {:else}
-    <div
-      class="h-[20rem] flex flex-col items-center justify-center gap4"
-      in:fade|global={{ duration: 300, delay: 300 }}
-      out:fade|global={{ duration: 300 }}>
-  <h2 class="text-3xl">{strings.LoadingPosts()}</h2>
-      <div class="i-line-md-loading-twotone-loop !h-16 !w-16"></div>
-    </div>
   {/if}
 </main>
 
