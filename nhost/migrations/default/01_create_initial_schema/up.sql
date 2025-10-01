@@ -1,12 +1,9 @@
 -- Symbiont CMS: Nhost Database Migration (v2 - Multi-Tenant Ready)
 
--- Step 1: Enable the pgcrypto extension for UUID generation
-CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
-
 -- Step 2: Create the posts table with multi-tenant support
 CREATE TABLE public.posts (
   -- Core Fields
-  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   
