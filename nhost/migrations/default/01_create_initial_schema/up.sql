@@ -1,21 +1,40 @@
+-- Symbiont CMS: Nhost Database Migration (v2 - Multi-Tenant Ready)
+
 -- Step 1: Enable the pgcrypto extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
 
--- Step 2: Create the posts table
+-- Step 2: Create the posts table with multi-tenant support
 CREATE TABLE public.posts (
+  -- Core Fields
   id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
-  notion_page_id TEXT UNIQUE,
-  slug TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  
+  -- Multi-Tenant Identifier
+  source_id TEXT NOT NULL, -- e.g., 'personal-blog', 'newspaper'
+
+  -- Notion-Specific Fields
+  notion_page_id TEXT NOT NULL, -- The Notion Page UUID
+  notion_short_id TEXT NOT NULL, -- The "Unique ID" property from Notion
+  
+  -- Content Fields
   title TEXT NOT NULL,
+  slug TEXT NOT NULL,
   content TEXT,
-  custom_id TEXT,
   publish_at TIMESTAMPTZ,
-  tags TEXT[]
+  tags TEXT[],
+
+  -- A post must have a slug that is unique to its source
+  UNIQUE (source_id, slug),
+  
+  -- A post must have a Notion Page ID that is unique to its source
+  UNIQUE (source_id, notion_page_id),
+
+  -- A post must have a Notion Short ID that is unique to its source
+  UNIQUE (source_id, notion_short_id)
 );
 
--- Step 3: Create the helper function and trigger
+-- Step 3: Create the helper function and trigger for `updated_at`
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -29,17 +48,10 @@ BEFORE UPDATE ON public.posts
 FOR EACH ROW
 EXECUTE PROCEDURE public.handle_updated_at();
 
--- Step 4: Add indexes and enable RLS
-CREATE INDEX ON public.posts (slug);
+-- Step 4: Add indexes for performance
+CREATE INDEX ON public.posts (source_id);
 CREATE INDEX ON public.posts (publish_at);
-ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 
--- Step 5: CREATE THE SECURITY POLICY (The "Open" Sign)
--- This is the rule that allows the public to read published posts.
-CREATE POLICY "Allow public read access to published posts"
-ON public.posts FOR SELECT -- This rule only applies to SELECT (read) queries
-TO public -- Explicitly specify this applies to the public role
-USING (
-  -- The condition for allowing access:
-  publish_at IS NOT NULL AND publish_at <= CURRENT_TIMESTAMP
-);
+-- NOTE: API security (e.g., allowing public access to only published posts)
+-- is not handled here. It MUST be configured in Hasura's permissions,
+-- which are stored in the .yaml files within the /nhost/metadata/ directory.

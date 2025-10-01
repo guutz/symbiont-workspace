@@ -5,15 +5,17 @@ select_permissions:
   - role: public
     permission:
       columns:
-        - id
-        - slug
-        - created_at
-        - updated_at
-        - title
         - content
-        - custom_id
+        - created_at
+        - id
+        - notion_page_id
+        - notion_short_id
         - publish_at
+        - slug
+        - source_id
         - tags
+        - title
+        - updated_at
       filter:
         _and:
           - publish_at:
