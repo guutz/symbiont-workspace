@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { GraphQLClient } from 'graphql-request';
-import { createSymbiontGraphQLClient, getPostBySlug } from '../blog-client.js';
-import { requirePublicEnvVar } from '../env.js';
+import { createSymbiontGraphQLClient, getPostBySlug } from '../client/queries.js';
+import { requirePublicEnvVar } from '../utils/env.js';
 import type { Post } from '../types.js';
 
 type BlogLoadEvent = {
@@ -27,6 +27,7 @@ export type BlogServerLoad<Event extends BlogLoadEvent = BlogLoadEvent> = (
 export function createBlogLoad<Event extends BlogLoadEvent = BlogLoadEvent>(
 	options: BlogLoadOptions<Event> = {}
 ): BlogServerLoad<Event> {
+	
 	const graphqlEndpoint =
 		options.graphqlEndpoint ??
 		requirePublicEnvVar('PUBLIC_NHOST_GRAPHQL_URL', 'Set PUBLIC_NHOST_GRAPHQL_URL in your .env file');

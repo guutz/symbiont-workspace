@@ -71,6 +71,20 @@ interface DatabaseRuleBase {
 
     /** A function that determines the source of truth for a page's content. */
     sourceOfTruthRule: (page: PageObjectResponse) => SourceOfTruth;
+
+    /** 
+     * A function that determines the slug for a post. 
+     * Should return the slug from the page's Slug property if present,
+     * otherwise return null to trigger auto-generation.
+     * Default behavior: reads from page.properties.Slug.rich_text
+     */
+    slugRule?: (page: PageObjectResponse) => string | null;
+
+    /**
+     * The name of the Notion property where the generated slug should be written back.
+     * Defaults to 'Slug' if not specified.
+     */
+    slugPropertyName?: string;
 }
 
 type DatabaseWithInlineId = DatabaseRuleBase & {

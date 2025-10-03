@@ -1,6 +1,6 @@
 <script lang="ts">
 	import MarkdownIt from 'markdown-it';
-	import type { ClassMap } from './types.js';
+	import type { ClassMap } from '../types.js';
 
 	/**
 	 * The raw Markdown string to be rendered.

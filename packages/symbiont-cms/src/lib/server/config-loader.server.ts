@@ -1,6 +1,6 @@
 import path from 'path';
-import type { DatabaseBlueprint, HydratedDatabaseConfig, HydratedSymbiontConfig, SymbiontConfig } from './types.js';
-import { readEnvVar } from './env.js';
+import type { DatabaseBlueprint, HydratedDatabaseConfig, HydratedSymbiontConfig, SymbiontConfig } from '../types.js';
+import { readEnvVar } from '../utils/env.js';
 
 function resolveDatabaseId(db: DatabaseBlueprint): HydratedDatabaseConfig {
 	const { databaseIdEnvVar, databaseId, ...rules } = db;

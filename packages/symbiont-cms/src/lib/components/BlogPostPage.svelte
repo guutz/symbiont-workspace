@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Renderer from '../Renderer.svelte';
+	import Renderer from './Renderer.svelte';
 	import type { Post, ClassMap } from '../types.js';
 
 	export let post: Post | null = null;
