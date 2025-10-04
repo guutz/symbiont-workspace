@@ -45,15 +45,25 @@ export type ClassMap = {
  * Represents the structure of a single post or article.
  * This type should mirror the data fetched from your Nhost/Supabase backend,
  * ensuring that component props are strongly typed.
+ * 
+ * Extended to be compatible with QWER post type for seamless integration.
  */
 export type Post = {
     id: string; // UUID
-    title: string;
+    title: string | null;
     slug: string;
     content: string | null; // The markdown content
     publish_at: string | null; // ISO 8601 date string
-    tags?: string[] | null;
-    // Add any other properties from your schema as needed
+    updated_at?: string | null; // Last updated timestamp
+    tags?: string[] | any[] | null;
+    
+    // Optional QWER-compatible fields
+    summary?: string;
+    description?: string;
+    language?: string;
+    cover?: string;
+    
+    // Allow any other properties from your schema
     [key: string]: any;
 };
 

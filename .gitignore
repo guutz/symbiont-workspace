@@ -4,3 +4,6 @@ node_modules
 .secrets
 
 .DS_Store
+
+# AI-generated documentation (not tracked in git)
+.docs/

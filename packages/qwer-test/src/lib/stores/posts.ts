@@ -1,25 +1,45 @@
 import { readable, writable, get } from 'svelte/store';
 import type { Post } from '$lib/types/post';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import postsjson from '$generated/posts.json';
 import { tagsCur } from '$stores/tags';
 import { result } from '$lib/search/stores';
 
-const _allposts = postsjson as [string, Post.Post][];
+// Store for all posts - will be initialized from server data
+export const postsAll = writable<Map<string, Post.Post>>(new Map());
 
-export const postsAll = readable<Map<string, Post.Post>>(new Map(_allposts));
+// Initialize posts from server-loaded data
+export function initializePostsFromServer(posts: Post.Post[]) {
+  const postMap = new Map(posts.map((post) => [post.slug, post]));
+  postsAll.set(postMap);
+}
+
+// Keep backward compatibility: try to load from generated file if available
+let _allposts: [string, Post.Post][] = [];
+try {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - This import might not exist in dynamic mode
+  const postsjson = await import('$generated/posts.json');
+  _allposts = postsjson.default as [string, Post.Post][];
+  if (_allposts && _allposts.length > 0) {
+    postsAll.set(new Map(_allposts));
+  }
+} catch (e) {
+  // No generated posts.json - will be initialized from server
+  console.log('[posts store] No static posts.json found, waiting for server data');
+}
 
 export const postsShow = (() => {
-  const _default = _allposts
-    .filter((e) => {
-      return !(e[1]['options'] && e[1]['options'].includes('unlisted'));
-    })
-    .flatMap((e) => e[1]);
-  const { subscribe, set } = writable<Post.Post[]>(_default);
+  const { subscribe, set } = writable<Post.Post[]>([]);
+
+  const _getDefaultPosts = () => {
+    const allPostsMap = get(postsAll);
+    return Array.from(allPostsMap.values())
+      .filter((post) => {
+        return !(post.options && post.options.includes('unlisted'));
+      });
+  };
 
   const _init = () => {
-    set(_default);
+    set(_getDefaultPosts());
   };
 
   const _filterBySlugs = (data: Post.Post[]) => {
@@ -73,7 +93,7 @@ export const postsShow = (() => {
   };
 
   const _filter = () => {
-    let _data = _default;
+    let _data = _getDefaultPosts();
     _data = _filterByTags(_data);
     _data = _filterBySlugs(_data);
     set(_data);

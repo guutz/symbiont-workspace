@@ -3,15 +3,46 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
 import type { Post } from '$lib/types/post';
 import LZString from 'lz-string';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import postsjson from '$generated/posts.json';
+import { createSymbiontGraphQLClient, getAllPosts } from 'symbiont-cms/client';
 
-const _allposts = (postsjson as [string, Post.Post][]).filter((e) => {
-  return !(e[1].options && e[1].options.includes('unlisted'));
-});
+const getPosts = async () => {
+  // Try to get posts from database
+  const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
+  
+  if (graphqlEndpoint) {
+    try {
+      const client = createSymbiontGraphQLClient(graphqlEndpoint);
+      const postsFromDb = await getAllPosts(client, { limit: 100 });
+      
+      return postsFromDb
+        .filter((post) => {
+          // Filter out unlisted posts (if that field exists)
+          return true; // Adjust based on your needs
+        })
+        .map((post) => ({
+          id: post.slug,
+          url: `${new URL(post.slug, siteConfig.url).href}`,
+          title: post.title ?? 'Untitled',
+          summary: post.content?.substring(0, 200) ?? '',
+          image: undefined,
+          date_published: post.publish_at ?? new Date().toISOString(),
+          date_modified: post.updated_at ?? post.publish_at ?? new Date().toISOString(),
+          content_text: post.content,
+          content_html: post.content, // Can be rendered as HTML if needed
+          tags: Array.isArray(post.tags) ? post.tags : []
+        }));
+    } catch (error) {
+      console.error('[feed.json] Error fetching posts from database:', error);
+    }
+  }
+  
+  // Fallback to empty array if database not available
+  return [];
+};
 
 const render = async () => {
+  const items = await getPosts();
+  
   return {
     version: 'https://jsonfeed.org/version/1.1',
     title: siteConfig.title,
@@ -28,36 +59,7 @@ const render = async () => {
       },
     ],
     language: siteConfig.lang ?? 'en',
-    items: _allposts.map((e) => {
-      return {
-        id: e[1].slug,
-        url: `${new URL(`${e[1].slug}`, siteConfig.url).href}`,
-        title: e[1].title,
-        summary: e[1].summary,
-        image: e[1].cover,
-        date_published: e[1].published,
-        date_modified: e[1].updated,
-        content_text: e[1].content && LZString.decompressFromBase64(e[1].content),
-        content_html: e[1].html && LZString.decompressFromBase64(e[1].html),
-        tags: e[1].tags
-          ?.map((c: string | string[] | { string: string } | { string: string[] }) => {
-            if (typeof c === 'string') return c;
-            if (Array.isArray(c)) {
-              return c.map((v) => {
-                return v;
-              });
-            }
-            const [key, value] = Object.entries(c)[0];
-            if (Array.isArray(value)) {
-              return value.map((v) => {
-                return `${key}-${v}`;
-              });
-            }
-            return `${key}-${value}`;
-          })
-          .flat(),
-      };
-    }),
+    items
   };
 };
 

@@ -2,25 +2,39 @@ export const prerender = true;
 import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
 import type { Post } from '$lib/types/post';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import postsjson from '$generated/posts.json';
+import { createSymbiontGraphQLClient, getAllPosts, type Post as SymbiontPost } from 'symbiont-cms/client';
 
-const _allposts = postsjson as [string, Post.Post][];
+const getPosts = async (): Promise<SymbiontPost[]> => {
+  const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
+  
+  if (graphqlEndpoint) {
+    try {
+      const client = createSymbiontGraphQLClient(graphqlEndpoint);
+      return await getAllPosts(client, { limit: 100 });
+    } catch (error) {
+      console.error('[sitemap.xml] Error fetching posts:', error);
+    }
+  }
+  
+  return [];
+};
 
-const render = async (): Promise<string> => `<?xml version='1.0' encoding='utf-8'?>
+const render = async (): Promise<string> => {
+  const posts = await getPosts();
+  
+  return `<?xml version='1.0' encoding='utf-8'?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
       <loc>${siteConfig.url}</loc>
       <changefreq>weekly</changefreq>
       <priority>0.7</priority>
     </url>
-    ${_allposts
-      .map((e) => {
+    ${posts
+      .map((post) => {
         return `
         <url>
-        <loc>${new URL(e[1].slug, siteConfig.url).href}</loc>
-        <lastmod>${new Date(e[1].updated).toISOString()}</lastmod>
+        <loc>${new URL(post.slug, siteConfig.url).href}</loc>
+        <lastmod>${new Date(post.updated_at ?? post.publish_at ?? new Date()).toISOString()}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.5</priority>
         </url>
@@ -28,6 +42,7 @@ const render = async (): Promise<string> => `<?xml version='1.0' encoding='utf-8
       })
       .join('')}
 </urlset>`;
+};
 
 export const GET: RequestHandler = async () => {
   return new Response(await render(), {
