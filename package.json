@@ -2,8 +2,8 @@
   "name": "symbiont-workspace",
   "private": true,
   "scripts": {
-    "dev:guutz": "pnpm --filter guutz-blog dev",
-    "dev:qwer": "pnpm --filter qwer-test dev",
+    "dev:guutz": "pnpm build:package && pnpm --filter guutz-blog dev",
+    "dev:qwer": "pnpm build:package && pnpm --filter qwer-test dev",
     "build:package": "pnpm --filter symbiont-cms build"
   },
   "devDependencies": {

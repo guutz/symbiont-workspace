@@ -12,6 +12,8 @@
 		"declarationMap": true,
 		"strict": true,
 		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
+		"moduleResolution": "NodeNext",
+		"composite": true,
+		"noEmit": false
 	}
 }

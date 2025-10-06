@@ -1,7 +1,5 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
-import type { Post } from '$lib/types/post';
-import LZString from 'lz-string';
 import { getPostsFromPrimarySource, type Post as SymbiontPost } from 'symbiont-cms';
 
 const getPosts = async (): Promise<SymbiontPost[]> => {

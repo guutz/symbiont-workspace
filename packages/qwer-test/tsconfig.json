@@ -24,5 +24,8 @@
     "./tests/**/*.ts",
     "./tests/**/*.svelte"
   ],
-  "exclude": ["node_modules", "build/**/*", "src/lib/template/**/*", "src/generated/**/*"]
+  "exclude": ["node_modules", "build/**/*", "src/lib/template/**/*", "src/generated/**/*"],
+  "references": [
+    { "path": "../symbiont-cms" }
+  ]
 }
