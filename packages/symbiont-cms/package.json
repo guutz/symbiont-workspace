@@ -27,11 +27,20 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"svelte": "./dist/index.js"
+			"svelte": "./dist/index.js",
+			"default": "./dist/index.js"
 		},
 		"./server": {
 			"types": "./dist/server.d.ts",
-			"import": "./dist/server.js"
+			"default": "./dist/server.js"
+		},
+		"./vite": {
+			"types": "./dist/vite-plugin.d.ts",
+			"default": "./dist/vite-plugin.js"
+		},
+		"./config": {
+			"types": "./dist/config.d.ts",
+			"default": "./dist/config.js"
 		}
 	},
 	"peerDependencies": {

@@ -48,8 +48,8 @@ This integration is **Phase 1** of the transition from QWER's build-time static 
 - Initializes stores with database data before filtering
 
 #### Created Individual Post Route (`src/routes/[slug]/`)
-- **NEW** `+page.server.ts` - Re-exports `load` from `symbiont-cms/server`
-- **NEW** `+page.svelte` - Uses `BlogPostPage` component from symbiont
+- **NEW** `+page.server.ts` - Re-exports `postLoad as load` from `symbiont-cms/server`
+- **NEW** `+page.svelte` - Uses `PostPage` component from symbiont
 - Applies QWER styling via `classMap` prop
 - Integrates QWER's date formatting config
 
@@ -101,7 +101,7 @@ All three feed routes updated to fetch from database instead of static JSON:
 ┌─────────────────────────────────────────────────────┐
 │  UI Components                                      │
 │  • index_posts.svelte (homepage list)              │
-│  • BlogPostPage (individual post)                  │
+│  • PostPage (individual post)                      │
 └─────────────────────────────────────────────────────┘
 ```
 

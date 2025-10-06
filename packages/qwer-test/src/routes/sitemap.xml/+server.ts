@@ -1,27 +1,18 @@
-export const prerender = true;
 import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
-import type { Post } from '$lib/types/post';
-import { getPostsFromPrimarySource, type Post as SymbiontPost } from 'symbiont-cms';
+import { getPosts, type Post as SymbiontPost } from 'symbiont-cms';
 
-const getPosts = async (): Promise<SymbiontPost[]> => {
-  const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
-  
-  if (graphqlEndpoint) {
-    try {
-      return await getPostsFromPrimarySource(graphqlEndpoint, { 
-        limit: 100
-      });
-    } catch (error) {
-      console.error('[sitemap.xml] Error fetching posts:', error);
-    }
+const fetchPosts = async (fetch: typeof globalThis.fetch): Promise<SymbiontPost[]> => {
+  try {
+    return await getPosts({ fetch, limit: 100 });
+  } catch (error) {
+    console.error('[sitemap.xml] Error fetching posts:', error);
+    return [];
   }
-  
-  return [];
 };
 
-const render = async (): Promise<string> => {
-  const posts = await getPosts();
+const render = async (fetch: typeof globalThis.fetch): Promise<string> => {
+  const posts = await fetchPosts(fetch);
   
   return `<?xml version='1.0' encoding='utf-8'?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -45,8 +36,8 @@ const render = async (): Promise<string> => {
 </urlset>`;
 };
 
-export const GET: RequestHandler = async () => {
-  return new Response(await render(), {
+export const GET: RequestHandler = async ({ fetch }) => {
+  return new Response(await render(fetch), {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
     },

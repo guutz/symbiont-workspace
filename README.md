@@ -2,6 +2,8 @@
 
 Monorepo for Symbiont CMS and integrated blog applications.
 
+> **📚 Complete Documentation**: See the [`.docs/`](.docs/) folder for comprehensive guides, architecture docs, and implementation strategies. Start with [`.docs/README.md`](.docs/README.md) for the reading order.
+
 ## 📦 Packages
 
 ### `symbiont-cms`

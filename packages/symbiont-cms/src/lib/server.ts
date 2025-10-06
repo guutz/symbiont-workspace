@@ -3,11 +3,13 @@
 
 export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webhook.js';
 export { syncFromNotion } from './server/sync.js';
-export { loadConfig } from './server/config-loader.server.js';
-export { createBlogLoad, load as blogLoad } from './server/blog.js';
+export { createPostLoad, load as postLoad } from './server/post-loader.js';
 export { requireEnvVar } from './utils/env.js';
 
+// Config loading (server-only, returns full SymbiontConfig with rules/functions)
+export { loadConfig } from './server/load-config.js';
+
 export type {
-	BlogServerLoad,
-	BlogLoadOptions
-} from './server/blog.js';
+	PostServerLoad,
+	PostLoadOptions
+} from './server/post-loader.js';

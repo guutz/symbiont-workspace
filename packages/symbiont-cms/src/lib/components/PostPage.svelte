@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Renderer from './Renderer.svelte';
-	import type { Post, ClassMap } from '../types.js';
+	import type { Post, ClassMap } from '$lib/types.js';
 
 	export let post: Post | null = null;
 	export let formatDate: (value: string) => string = (value) =>

@@ -1,25 +1,18 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
-import { getPostsFromPrimarySource, type Post as SymbiontPost } from 'symbiont-cms';
+import { getPosts, type Post as SymbiontPost } from 'symbiont-cms';
 
-const getPosts = async (): Promise<SymbiontPost[]> => {
-  const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
-  
-  if (graphqlEndpoint) {
-    try {
-      return await getPostsFromPrimarySource(graphqlEndpoint, { 
-        limit: 100
-      });
-    } catch (error) {
-      console.error('[atom.xml] Error fetching posts:', error);
-    }
+const fetchPosts = async (fetch: typeof globalThis.fetch): Promise<SymbiontPost[]> => {
+  try {
+    return await getPosts({ fetch, limit: 100 });
+  } catch (error) {
+    console.error('[atom.xml] Error fetching posts:', error);
+    return [];
   }
-  
-  return [];
 };
 
-const render = async (): Promise<string> => {
-  const posts = await getPosts();
+const render = async (fetch: typeof globalThis.fetch): Promise<string> => {
+  const posts = await fetchPosts(fetch);
   
   return `<?xml version='1.0' encoding='utf-8'?>
 <feed xmlns="http://www.w3.org/2005/Atom" ${siteConfig.lang ? `xml:lang="${siteConfig.lang}"` : ''}>
@@ -65,8 +58,8 @@ ${posts
 `;
 };
 
-export const GET: RequestHandler = async () => {
-  return new Response(await render(), {
+export const GET: RequestHandler = async ({ fetch }) => {
+  return new Response(await render(fetch), {
     headers: {
       'Content-Type': 'application/atom+xml; charset=utf-8',
     },

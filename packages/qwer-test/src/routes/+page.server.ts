@@ -1,23 +1,10 @@
-import { getPostsFromPrimarySource, requirePublicEnvVar, type Post as SymbiontPost } from 'symbiont-cms';
+import { getPosts, type Post as SymbiontPost } from 'symbiont-cms';
 import type { Post } from '$lib/types/post';
 
 export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
-	// Get GraphQL endpoint from environment
-	const graphqlEndpoint = requirePublicEnvVar('PUBLIC_NHOST_GRAPHQL_URL');
-	
-	if (!graphqlEndpoint) {
-		console.warn('[qwer-test] PUBLIC_NHOST_GRAPHQL_URL not set, returning empty posts');
-		return {
-			posts: []
-		};
-	}
-
 	try {
-		// Fetch posts using high-level helper that loads config automatically
-		const postsFromDb = await getPostsFromPrimarySource(graphqlEndpoint, {
-			fetch,
-			limit: 100
-		});
+		// Fetch posts using the new simple API - config loaded automatically!
+		const postsFromDb = await getPosts({ fetch, limit: 100 });
 
 		// Transform Symbiont posts to QWER Post format
 		// Most fields pass through directly thanks to type compatibility!

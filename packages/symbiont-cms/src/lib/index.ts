@@ -2,7 +2,10 @@
 
 export { default as Renderer } from './components/Renderer.svelte';
 export { default as Editor } from './components/Editor.svelte';
-export { default as BlogPostPage } from './components/BlogPostPage.svelte';
+export { default as PostPage } from './components/PostPage.svelte';
+
+// Config helper for type-safe .js configs
+export { defineConfig } from './config.js';
 
 export type {
 	ClassMap,
@@ -12,26 +15,29 @@ export type {
 	DatabaseBlueprint,
 	HydratedDatabaseConfig,
 	HydratedSymbiontConfig,
-	PageObjectResponse
+	PageObjectResponse,
+	PublicSymbiontConfig
 } from './types.js';
 
 export { defineSymbiontConfig } from './types.js';
 
-// GraphQL client utilities
+// GraphQL client utilities (new simple API)
 export {
+	getPosts,
+	getPost,
 	GET_POST_BY_SLUG,
 	GET_ALL_POSTS,
 	createSymbiontGraphQLClient,
 	getPostBySlug,
-	getAllPosts,
-	getPostsFromPrimarySource,
-	getPostsFromAllSources
+	getAllPosts
 } from './client/queries.js';
 
-export { requirePublicEnvVar } from './utils/env.js';
-
 export type {
+	GetPostsOptions,
 	GetPostBySlugResult,
 	GetAllPostsResult,
 	SymbiontGraphQLClientOptions
 } from './client/queries.js';
+
+// Config loading (client-safe, returns PublicSymbiontConfig)
+export { loadConfig } from './client/load-config.js';

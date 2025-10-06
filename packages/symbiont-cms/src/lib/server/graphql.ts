@@ -1,13 +1,39 @@
 import { GraphQLClient, gql } from 'graphql-request';
-import { requireEnvVar, requirePublicEnvVar } from '../utils/env.js';
+import { requireEnvVar } from '../utils/env.js';
+import { loadConfig } from './load-config.js';
 
-// Initialize GraphQL client
-const NHOST_GRAPHQL_URL = requirePublicEnvVar('PUBLIC_NHOST_GRAPHQL_URL', 'Set PUBLIC_NHOST_GRAPHQL_URL to your Nhost endpoint.');
+// Initialize secrets
 const NHOST_ADMIN_SECRET = requireEnvVar('NHOST_ADMIN_SECRET', 'Set NHOST_ADMIN_SECRET for admin access to Nhost.');
 
-export const gqlClient = new GraphQLClient(NHOST_GRAPHQL_URL, {
-	headers: { 'x-hasura-admin-secret': NHOST_ADMIN_SECRET }
-});
+// Lazy-initialized GraphQL client
+let _gqlClient: GraphQLClient | null = null;
+
+/**
+ * Get the GraphQL client (initializes on first call with config)
+ */
+async function getGqlClient(): Promise<GraphQLClient> {
+	if (!_gqlClient) {
+		const config = await loadConfig();
+		_gqlClient = new GraphQLClient(config.graphqlEndpoint, {
+			headers: { 'x-hasura-admin-secret': NHOST_ADMIN_SECRET }
+		});
+	}
+	return _gqlClient;
+}
+
+/**
+ * GraphQL client wrapper that auto-initializes from config on first use.
+ * Lazily loads symbiont.config.ts to get the graphqlEndpoint.
+ * 
+ * @example
+ * const result = await gqlClient.request<MyType>(QUERY, variables);
+ */
+export const gqlClient = {
+	async request<T = any>(document: any, variables?: any): Promise<T> {
+		const client = await getGqlClient();
+		return client.request<T>(document, variables);
+	}
+};
 
 // --- GraphQL Operations ---
 

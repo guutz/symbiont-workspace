@@ -68,21 +68,21 @@ coverStyle: Post.CoverStyle.NONE
 **Issue:** Invalid closing tag structure with slots
 ```svelte
 <!-- ❌ Before -->
-<BlogPostPage>
+<PostPage>
   <svelte:fragment slot="before">
     <article>
   </svelte:fragment>
   <svelte:fragment slot="after">
     </article>  <!-- Invalid! -->
   </svelte:fragment>
-</BlogPostPage>
+</PostPage>
 ```
 
 **Solution:** Simplified structure
 ```svelte
 <!-- ✅ After -->
 <div class="max-w-4xl mx-auto px-4 py-8">
-  <BlogPostPage 
+  <PostPage 
     post={data.post} 
     {formatDate}
     classMap={{ ... }}

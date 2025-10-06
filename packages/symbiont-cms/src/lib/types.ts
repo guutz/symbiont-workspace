@@ -69,21 +69,28 @@ export type Post = {
 
 type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
 
-interface DatabaseRuleBase {
-    /** A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-article-staging'. */
+/**
+ * Database configuration blueprint.
+ * Contains both public data (short_db_ID, notionDatabaseId) and private server-only rules.
+ */
+export interface DatabaseBlueprint {
+    /** PUBLIC: A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-blog'. */
     short_db_ID: string;
 
-    /** Whether the Symbiont web editor should be exposed for this database. */
+    /** PUBLIC: The Notion database ID. This is NOT secret - it's just an identifier. */
+    notionDatabaseId: string;
+
+    /** PRIVATE: Whether the Symbiont web editor should be exposed for this database. */
     webEditorEnabled?: boolean;
 
-    /** A function that determines if a Notion page should be considered public. */
+    /** PRIVATE: A function that determines if a Notion page should be considered public. */
     isPublicRule: (page: PageObjectResponse) => boolean;
 
-    /** A function that determines the source of truth for a page's content. */
+    /** PRIVATE: A function that determines the source of truth for a page's content. */
     sourceOfTruthRule: (page: PageObjectResponse) => SourceOfTruth;
 
     /** 
-     * A function that determines the slug for a post. 
+     * PRIVATE: A function that determines the slug for a post. 
      * Should return the slug from the page's Slug property if present,
      * otherwise return null to trigger auto-generation.
      * Default behavior: reads from page.properties.Slug.rich_text
@@ -91,40 +98,46 @@ interface DatabaseRuleBase {
     slugRule?: (page: PageObjectResponse) => string | null;
 
     /**
-     * The name of the Notion property where the generated slug should be written back.
+     * PRIVATE: The name of the Notion property where the generated slug should be written back.
      * Defaults to 'Slug' if not specified.
      */
     slugPropertyName?: string;
 }
 
-type DatabaseWithInlineId = DatabaseRuleBase & {
-    notionDatabaseId: string;
-    notionDatabaseIdEnvVar?: never;
-};
-
-type DatabaseWithEnvPointer = DatabaseRuleBase & {
-    notionDatabaseIdEnvVar: string;
-    notionDatabaseId?: never;
-};
-
 /**
- * Configuration as authored by the developer. Database IDs may be provided inline or
- * referenced by environment variable name, but not both.
+ * Full Symbiont configuration.
+ * Contains both public data (graphqlEndpoint) and private server-only configuration (databases with rules).
  */
-export type DatabaseBlueprint = DatabaseWithInlineId | DatabaseWithEnvPointer;
-
 export interface SymbiontConfig {
+    /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
+    graphqlEndpoint: string;
+    
+    /** PRIVATE: Database configurations with server-only sync rules. */
     databases: DatabaseBlueprint[];
 }
 
 /**
- * Fully hydrated configuration used at runtime where all database IDs must be defined.
+ * Client-safe public configuration extracted from SymbiontConfig.
+ * This is what gets exposed via the virtual module 'virtual:symbiont/config'.
+ * Contains NO functions, NO secrets - only public identifiers.
  */
-export type HydratedDatabaseConfig = DatabaseRuleBase & {
-    notionDatabaseId: string;
-};
+export interface PublicSymbiontConfig {
+	/** GraphQL endpoint URL */
+	graphqlEndpoint: string;
+	
+	/** Primary database short_db_ID (first configured database) */
+	primaryShortDbId: string;
+	
+	/** All configured database short_db_IDs */
+	shortDbIds: string[];
+}/**
+ * Fully hydrated configuration used at runtime where all database IDs are resolved.
+ * This is what loadConfig() returns on the server.
+ */
+export type HydratedDatabaseConfig = DatabaseBlueprint;
 
 export interface HydratedSymbiontConfig {
+    graphqlEndpoint: string;
     databases: HydratedDatabaseConfig[];
 }
 

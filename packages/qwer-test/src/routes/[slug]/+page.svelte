@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BlogPostPage } from 'symbiont-cms';
+  import { PostPage } from 'symbiont-cms';
   import type { PageData } from './$types';
   import { dateConfig } from '$config/site';
   
@@ -26,7 +26,7 @@
 </svelte:head>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
-	<BlogPostPage 
+	<PostPage 
 		post={data.post} 
 		{formatDate}
 		classMap={{

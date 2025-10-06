@@ -1,4 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import { symbiontVitePlugin } from 'symbiont-cms/vite';
 import Unocss from 'unocss/vite';
 import { presetTypography, presetIcons, presetUno } from 'unocss';
 import extractorSvelte from '@unocss/extractor-svelte';
@@ -34,6 +35,7 @@ export default defineConfig({
     __VERSION_QWER__: qwerPkg,
   },
   plugins: [
+    symbiontVitePlugin(), // Add Symbiont config plugin FIRST
     Unocss({
       extractors: [extractorSvelte()],
       presets: [

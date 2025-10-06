@@ -129,30 +129,43 @@ pnpm add symbiont-cms
 
 ### Step 4: Configure Environment
 
+**Secrets only** - Store sensitive data in `.env`:
+
 ```bash
 # .env
-PUBLIC_NHOST_GRAPHQL_URL=https://your-project.nhost.run/v1/graphql
 NOTION_API_KEY=secret_xxxxx
-NOTION_BLOG_DATABASE_ID=xxxxx
 NHOST_ADMIN_SECRET=xxxxx
 ```
 
+**Non-secrets** go in `symbiont.config.js` (see Step 5).
+
 ### Step 5: Create Configuration
 
-Create `symbiont.config.ts` in your project root:
+Create `symbiont.config.js` in your project root:
 
-```typescript
-import { defineSymbiontConfig, type PageObjectResponse } from 'symbiont-cms';
+> ⚠️ **Must be `.js` (not `.ts`)** - The config file must be a `.js` or `.mjs` file so it can be loaded at build time and runtime without transpilation.
 
-const config = defineSymbiontConfig({
+```javascript
+// @ts-check
+import { defineConfig } from 'symbiont-cms/config';
+
+export default defineConfig({
+  // GraphQL endpoint (public, non-secret)
+  graphqlEndpoint: 'https://your-project.nhost.run/v1/graphql',
+  
+  // Notion database ID (public, non-secret)
+  notionDatabaseId: 'your-notion-database-id-here',
+  
+  // Primary database identifier
+  primaryShortDbId: 'blog',
+  
   databases: [
     {
-      short_db_ID: 'my-blog',
-      notionDatabaseIdEnvVar: 'NOTION_BLOG_DATABASE_ID',
+      short_db_ID: 'blog',
       
       // When is a post published?
-      isPublicRule: (page: PageObjectResponse) => {
-        const status = page.properties.Status as { select: { name: string } | null };
+      isPublicRule: (page) => {
+        const status = page.properties.Status;
         return status.select?.name === 'Published';
       },
       
@@ -163,44 +176,63 @@ const config = defineSymbiontConfig({
       slugPropertyName: "Website Slug",
       
       // How to extract the slug?
-      slugRule: (page: PageObjectResponse) => {
-        const slugProperty = (page.properties["Website Slug"] as any)?.rich_text;
+      slugRule: (page) => {
+        const slugProperty = page.properties["Website Slug"]?.rich_text;
         return slugProperty?.[0]?.plain_text?.trim() || null;
       },
     },
   ],
 });
-
-export default config;
 ```
 
-### Step 6: Create Sync Endpoint
+**TypeScript autocomplete works!** The `defineConfig()` helper provides full IntelliSense in `.js` files via JSDoc type hints.
+
+### Step 6: Add Vite Plugin
+
+In your `vite.config.js` (or `.ts`), add the Symbiont plugin:
+
+```javascript
+import { sveltekit } from '@sveltejs/kit/vite';
+import { symbiontVitePlugin } from 'symbiont-cms';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [
+    symbiontVitePlugin(), // ← Add this!
+    sveltekit()
+  ]
+});
+```
+
+**What does this do?** The plugin creates a virtual module `virtual:symbiont/config` that makes your config available at build time (for SSG) and runtime (for SSR).
+
+### Step 7: Create Sync Endpoint
 
 ```typescript
 // src/routes/api/sync/poll-blog/+server.ts
 export { handlePollBlogRequest as GET } from 'symbiont-cms/server';
 ```
 
-### Step 7: Create Blog Routes
+### Step 8: Create Post Routes
 
 ```typescript
-// src/routes/blog/[slug]/+page.server.ts
-export { blogLoad as load } from 'symbiont-cms/server';
+// src/routes/[slug]/+page.server.ts
+export { postLoad as load } from 'symbiont-cms/server';
 ```
 
 ```svelte
-<!-- src/routes/blog/[slug]/+page.svelte -->
+<!-- src/routes/[slug]/+page.svelte -->
 <script lang="ts">
-  import { BlogPostPage } from 'symbiont-cms';
+  import { PostPage } from 'symbiont-cms';
   import type { PageData } from './$types';
   
   export let data: PageData;
 </script>
 
-<BlogPostPage post={data.post} />
+<PostPage post={data.post} />
 ```
 
-### Step 8: First Sync
+### Step 9: First Sync
 
 ```bash
 # Trigger sync
@@ -216,66 +248,119 @@ open http://localhost:5173/blog/your-first-post
 
 ### Configuration Reference
 
-```typescript
-import { defineSymbiontConfig, type PageObjectResponse } from 'symbiont-cms';
+> ⚠️ **Must be `.js` file** - Use `symbiont.config.js` (not `.ts`) for compatibility.
 
-const config = defineSymbiontConfig({
+```javascript
+// @ts-check
+import { defineConfig } from 'symbiont-cms/config';
+
+export default defineConfig({
+  // ═══════════════════════════════════════════════════════════
+  // REQUIRED: Core Configuration
+  // ═══════════════════════════════════════════════════════════
+  
+  /** GraphQL endpoint URL (public, non-secret) */
+  graphqlEndpoint: 'https://your-project.nhost.run/v1/graphql',
+  
+  /** Notion database ID (public, non-secret) */
+  notionDatabaseId: 'your-notion-database-id',
+  
+  /** Primary database identifier (used as default) */
+  primaryShortDbId: 'blog',
+  
+  // ═══════════════════════════════════════════════════════════
+  // REQUIRED: Database Configuration
+  // ═══════════════════════════════════════════════════════════
+  
   databases: [
     {
-      // Required: Unique identifier for this database
-      short_db_ID: string;
+      /** Unique identifier for this database */
+      short_db_ID: 'blog',
       
-      // Required: Name of env var containing Notion database ID
-      notionDatabaseIdEnvVar: string;
+      /** Determines if a Notion page should be published */
+      isPublicRule: (page) => {
+        const status = page.properties.Status;
+        return status.select?.name === 'Published';
+      },
       
-      // Required: Function determining if a page should be published
-      isPublicRule: (page: PageObjectResponse) => boolean;
+      /** Where content comes from: 'NOTION' or 'DATABASE' */
+      sourceOfTruthRule: (page) => 'NOTION',
       
-      // Required: Where content comes from ('NOTION' or 'DATABASE')
-      sourceOfTruthRule: (page: PageObjectResponse) => 'NOTION' | 'DATABASE';
+      /** Name of Notion property containing the URL slug */
+      slugPropertyName: 'Website Slug',
       
-      // Required: Name of Notion property containing the slug
-      slugPropertyName: string;
+      // ─────────────────────────────────────────────────────────
+      // Optional: Custom Extraction Rules
+      // ─────────────────────────────────────────────────────────
       
-      // Optional: Custom slug extraction logic
-      slugRule?: (page: PageObjectResponse) => string | null;
+      /** Custom slug extraction logic */
+      slugRule: (page) => {
+        const prop = page.properties['Website Slug']?.rich_text;
+        return prop?.[0]?.plain_text?.trim() || null;
+      },
       
-      // Optional: Custom title extraction logic
-      titleRule?: (page: PageObjectResponse) => string | null;
+      /** Custom title extraction logic */
+      titleRule: (page) => {
+        const title = page.properties.Name?.title;
+        return title?.[0]?.plain_text || null;
+      },
     }
-  ]
+  ],
+  
+  // ═══════════════════════════════════════════════════════════
+  // OPTIONAL: Additional Databases
+  // ═══════════════════════════════════════════════════════════
+  
+  // You can add more databases here with different rules
+  // shortDbIds: ['blog', 'docs', 'recipes']
 });
+```
+
+**Why `.js` not `.ts`?**
+- Works at build time AND runtime without transpilation
+- Simpler tooling, no extra dependencies
+- Standard practice (like `vite.config.js`, `tailwind.config.js`)
+- Full TypeScript autocomplete via `defineConfig()` helper
+
+### Config Properties
 
 export default config;
 ```
 
 ### Environment Variables
 
+Store only **secrets** in `.env` - public configuration goes in `symbiont.config.js`:
+
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PUBLIC_NHOST_GRAPHQL_URL` | ✅ Yes | Your Nhost GraphQL endpoint |
 | `NOTION_API_KEY` | ✅ Yes | Notion integration secret |
-| `NOTION_BLOG_DATABASE_ID` | ✅ Yes | Notion database ID to sync |
 | `NHOST_ADMIN_SECRET` | ✅ Yes | Nhost admin secret for mutations |
+
+> **Note**: GraphQL endpoint and database IDs are public (non-secret) and belong in your config file, not environment variables.
 
 ### Configuration Loader
 
-The `loadConfig()` function securely hydrates your configuration at runtime:
+The `loadConfig()` function dynamically imports your config file at runtime:
 
 ```typescript
 import { loadConfig } from 'symbiont-cms/server';
 
-const hydratedConfig = await loadConfig();
-// Config now has actual database IDs from environment variables
+// In server-side code (API routes, load functions, etc.)
+const config = await loadConfig();
+// config.graphqlEndpoint, config.notionDatabaseId, etc.
 ```
 
 **What it does:**
-1. Reads your `symbiont.config.ts` file
-2. Securely accesses environment variables on the server
-3. "Hydrates" the configuration by injecting actual secret values
-4. Returns fully assembled config for the sync service
+1. Looks for `symbiont.config.js` (or `.mjs`) in your project root
+2. Dynamically imports it using Node.js native `import()`
+3. Returns the complete configuration object
+4. Throws helpful error if config file not found
 
-**Security:** The hydrated config (with secrets) never leaves the server.
+**Virtual module vs loadConfig():**
+- `virtual:symbiont/config` - Build-time config extraction (for SSG/prerendering)
+- `loadConfig()` - Runtime config loading (for SSR/API routes)
+
+Both are needed for a complete SvelteKit app!
 
 ### Multiple Databases
 
@@ -302,25 +387,27 @@ const config = defineSymbiontConfig({
 
 ### Package Structure
 
-The package provides **two main entry points** to ensure server-only code doesn't get bundled in your client:
+The package provides **three main entry points** to ensure proper code splitting:
 
 ```
 symbiont-cms
-├── Client exports (import from 'symbiont-cms')
+├── 📦 symbiont-cms (Client exports)
 │   ├── <Renderer /> - Markdown to HTML
-│   ├── <BlogPostPage /> - Complete blog post component
+│   ├── <PostPage /> - Complete post rendering component
 │   ├── <Editor /> - Tiptap editor (planned)
-│   ├── GraphQL utilities (getPostBySlug, getAllPosts)
-│   ├── Type definitions (Post, SymbiontConfig)
-│   └── defineSymbiontConfig() helper
+│   ├── GraphQL utilities (getPosts, getPostBySlug, getAllPosts)
+│   └── Type definitions (SymbiontPost, SymbiontConfig)
 │
-└── Server exports (import from 'symbiont-cms/server')
-    ├── handlePollBlogRequest() - Manual sync handler
-    ├── handleNotionWebhookRequest() - Webhook handler
-    ├── syncFromNotion() - Core sync logic
-    ├── loadConfig() - Config hydration
-    ├── blogLoad() - Pre-built load function
-    └── createBlogLoad() - Custom load factory
+├── 📦 symbiont-cms/server (Server-only exports)
+│   ├── handlePollBlogRequest() - Manual sync handler
+│   ├── handleNotionWebhookRequest() - Webhook handler
+│   ├── syncFromNotion() - Core sync logic
+│   ├── loadConfig() - Config loader
+│   ├── postLoad() - Pre-built load function
+│   └── createPostLoad() - Custom load factory
+│
+└── 📦 symbiont-cms/config (Config helper)
+    └── defineConfig() - Type-safe config helper for .js files
 ```
 
 ### Client-Side Components
@@ -347,17 +434,17 @@ Safely renders Markdown content with full styling control:
 />
 ```
 
-#### `<BlogPostPage />` - Complete Blog Post Component
+#### `<PostPage />` - Complete Post Component
 
-Renders a complete blog post with built-in formatting:
+Renders a complete post page with built-in formatting:
 
 ```svelte
 <script>
-  import { BlogPostPage } from 'symbiont-cms';
+  import { PostPage } from 'symbiont-cms';
   export let data;
 </script>
 
-<BlogPostPage 
+<PostPage 
   post={data.post}
   formatDate={(date) => new Date(date).toLocaleDateString()}
   classMap={{
@@ -386,28 +473,49 @@ Tiptap wrapper for collaborative, Markdown-native editing:
 
 ### GraphQL Client Utilities
 
-Query your content directly:
+Query your content directly from any SvelteKit load function:
 
 ```typescript
-import { getAllPosts, getPostBySlug } from 'symbiont-cms';
+import { getPosts, getPostBySlug } from 'symbiont-cms';
 
 // In +page.server.ts
-export const load = async ({ params, fetch }) => {
-  // Get all posts
-  const posts = await getAllPosts(
-    process.env.PUBLIC_NHOST_GRAPHQL_URL!,
-    { fetch, limit: 10 }
-  );
+export const load = async ({ fetch }) => {
+  // Get posts from primary database
+  const posts = await getPosts({ 
+    fetch,
+    limit: 10 
+  });
   
-  // Or get specific post
-  const post = await getPostBySlug(
-    process.env.PUBLIC_NHOST_GRAPHQL_URL!,
-    params.slug,
-    { fetch }
-  );
-  
-  return { posts, post };
+  return { posts };
 };
+
+// Get posts from specific database
+export const load = async ({ fetch }) => {
+  const docs = await getPosts({ 
+    fetch,
+    limit: 20,
+    shortDbId: 'documentation' 
+  });
+  
+  return { docs };
+};
+
+// Get specific post by slug
+export const load = async ({ params, fetch }) => {
+  const post = await getPostBySlug(params.slug, { fetch });
+  
+  if (!post) {
+    throw error(404, 'Post not found');
+  }
+  
+  return { post };
+};
+```
+
+**Why pass `fetch`?** SvelteKit's special `fetch` function enables:
+- Cookie/session forwarding for auth
+- Request deduplication
+- Better SSR performance
 ```
 
 ### Server-Side Functions
@@ -433,27 +541,40 @@ export { handleNotionWebhookRequest as POST } from 'symbiont-cms/server';
 
 Notion sends webhook when pages change for instant updates.
 
-#### Blog Load Functions
+#### Post Page Loaders
 
-**Simple Usage:**
+**Simple Usage** - Use the default loader:
+
 ```typescript
-// src/routes/blog/[slug]/+page.server.ts
-export { blogLoad as load } from 'symbiont-cms/server';
-// Automatically fetches post by slug from GraphQL
+// src/routes/[slug]/+page.server.ts
+export { postLoad as load } from 'symbiont-cms/server';
+// Automatically fetches post by slug from primary database
 ```
 
-**Custom Usage:**
-```typescript
-import { createBlogLoad } from 'symbiont-cms/server';
+**Custom Usage** - Create a customized loader:
 
-export const load = createBlogLoad({
-  graphqlEndpoint: process.env.PUBLIC_NHOST_GRAPHQL_URL!,
+```typescript
+// src/routes/[slug]/+page.server.ts
+import { createPostLoad } from 'symbiont-cms/server';
+
+export const load = createPostLoad({
+  // Optional: Override database
+  shortDbId: 'documentation',
+  
+  // Optional: Transform post data
   formatPost: (post) => ({
     ...post,
-    readingTime: calculateReadingTime(post.content)
+    readingTime: calculateReadingTime(post.content),
+    relatedPosts: findRelatedPosts(post.tags)
   })
 });
 ```
+
+**What does it do?**
+- Extracts `slug` from route params (`params.slug`)
+- Queries GraphQL for the post
+- Returns `{ post }` for your page component
+- Throws 404 if post not found
 
 #### Direct Sync
 
@@ -473,14 +594,23 @@ export const POST = async () => {
 
 ```typescript
 import type {
-  Post,                    // Blog post type
-  SymbiontConfig,          // Config type
-  PageObjectResponse,      // Notion page type
-  ClassMap,               // Styling type
+  SymbiontPost,           // Post data type
+  SymbiontConfig,         // Config type
+  PageObjectResponse,     // Notion page type (from @notionhq/client)
+  ClassMap,               // Styling type for components
   SyncSummary,            // Sync result type
   DatabaseBlueprint,      // Database config type
-  HydratedDatabaseConfig, // Runtime config type
+  HydratedDatabaseConfig, // Runtime config type (with secrets)
+  PostServerLoad,         // SvelteKit load type
+  PostLoadEvent,          // Load function event type
 } from 'symbiont-cms';
+```
+
+**Import from `symbiont-cms/config`:**
+
+```typescript
+import { defineConfig } from 'symbiont-cms/config';
+// Provides type safety for JavaScript configs
 ```
 
 ---
@@ -572,7 +702,7 @@ From Notion page to database:
 
 - **UI Components**
   - ✅ `<Renderer />` with classMap styling
-  - ✅ `<BlogPostPage />` complete component
+  - ✅ `<PostPage />` complete component
   - ✅ SSR support
   - ✅ GraphQL client utilities
 

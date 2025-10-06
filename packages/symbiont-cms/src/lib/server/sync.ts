@@ -1,10 +1,10 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig, SyncSummary } from '../types.js';
-import { loadConfig } from './config-loader.server.js';
 import { buildPostLookups } from '../utils/notion-helpers.js';
 import { gqlClient, GET_ALL_POSTS_FOR_DATABASE_QUERY, DELETE_POSTS_BY_SOURCE_MUTATION, type AllPostsResponse, type DeletePostsResponse } from './graphql.js';
 import { notion } from './notion.js';
 import { processPageBatch } from './page-processor.js';
+import { loadConfig } from './load-config.js';
 
 /**
  * Sync content from Notion databases to Nhost

@@ -1,6 +1,8 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { loadConfig } from './config-loader.server.js';
+import { Client } from '@notionhq/client';
+import { readEnvVar } from '../utils/env.js';
+import { loadConfig } from './load-config.js';
 import { requireEnvVar } from '../utils/env.js';
 import { gqlClient, GET_EXISTING_POST_QUERY, type ExistingPostResponse } from './graphql.js';
 import { notion } from './notion.js';
@@ -26,7 +28,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const notionDatabaseId = payload.page.parent.data_source_id;
 
 		const config = await loadConfig();
-		const dbConfig = config.databases.find((db) => db.notionDatabaseId === notionDatabaseId);
+		const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === notionDatabaseId);
 
 		if (!dbConfig) {
 			console.warn(`[symbiont] Received webhook for an unknown database ID: ${notionDatabaseId}.`);

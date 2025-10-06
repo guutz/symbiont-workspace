@@ -2,8 +2,8 @@ import type { PageObjectResponse } from '@notionhq/client';
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import { requireEnvVar } from '../utils/env.js';
-import { loadConfig } from './config-loader.server.js';
 import { defaultSlugRule } from '../utils/notion-helpers.js';
+import { loadConfig } from './load-config.js';
 
 // Initialize Notion clients
 const NOTION_API_KEY = requireEnvVar('NOTION_API_KEY', 'Set NOTION_API_KEY in your environment.');
@@ -22,7 +22,7 @@ export async function syncSlugToNotion(
 ): Promise<void> {
 
 	const config = await loadConfig();
-	const dbConfig = config.databases.find(db => db.notionDatabaseId === databaseConfigId);
+	const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === databaseConfigId);
 	
 	if (!dbConfig) {
 		console.warn(`[symbiont] Could not find database config '${databaseConfigId}' for slug sync`);
