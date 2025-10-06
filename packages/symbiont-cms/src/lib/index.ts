@@ -17,13 +17,21 @@ export type {
 
 export { defineSymbiontConfig } from './types.js';
 
+// GraphQL client utilities
 export {
 	GET_POST_BY_SLUG,
+	GET_ALL_POSTS,
 	createSymbiontGraphQLClient,
-	getPostBySlug
+	getPostBySlug,
+	getAllPosts,
+	getPostsFromPrimarySource,
+	getPostsFromAllSources
 } from './client/queries.js';
+
+export { requirePublicEnvVar } from './utils/env.js';
 
 export type {
 	GetPostBySlugResult,
+	GetAllPostsResult,
 	SymbiontGraphQLClientOptions
 } from './client/queries.js';

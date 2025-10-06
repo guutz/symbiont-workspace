@@ -5,6 +5,7 @@ export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webh
 export { syncFromNotion } from './server/sync.js';
 export { loadConfig } from './server/config-loader.server.js';
 export { createBlogLoad, load as blogLoad } from './server/blog.js';
+export { requireEnvVar } from './utils/env.js';
 
 export type {
 	BlogServerLoad,

@@ -10,7 +10,7 @@ export const getTitle = (page: PageObjectResponse): string =>
 /**
  * Extract short ID from Notion page properties (with optional prefix)
  */
-export const getShortId = (page: PageObjectResponse): string | null => {
+export const getShortPostID = (page: PageObjectResponse): string | null => {
 	const { prefix, number } = (page.properties['ID'] as any)?.unique_id || {};
 	return prefix ? `${prefix}-${number}` : number ? String(number) : null;
 };

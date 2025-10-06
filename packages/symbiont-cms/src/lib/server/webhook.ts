@@ -26,18 +26,18 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const notionDatabaseId = payload.page.parent.data_source_id;
 
 		const config = await loadConfig();
-		const dbConfig = config.databases.find((db) => db.databaseId === notionDatabaseId);
+		const dbConfig = config.databases.find((db) => db.notionDatabaseId === notionDatabaseId);
 
 		if (!dbConfig) {
 			console.warn(`[symbiont] Received webhook for an unknown database ID: ${notionDatabaseId}.`);
 			return json({ message: `Database ID ${notionDatabaseId} not configured` }, { status: 404 });
 		}
 
-		console.log(`[symbiont] Webhook received for page '${pageId}' in database '${dbConfig.id}'.`);
+		console.log(`[symbiont] Webhook received for page '${pageId}' in database '${dbConfig.short_db_ID}'.`);
 
 		// Check if post exists (efficient single query)
 		const existingPostResult = await gqlClient.request<ExistingPostResponse>(GET_EXISTING_POST_QUERY, {
-			source_id: dbConfig.id,
+			source_id: dbConfig.short_db_ID,
 			notion_page_id: pageId
 		});
 

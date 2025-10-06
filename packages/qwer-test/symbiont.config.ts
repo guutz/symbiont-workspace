@@ -8,8 +8,8 @@ import { defineSymbiontConfig, type PageObjectResponse } from 'symbiont-cms';
 const config = defineSymbiontConfig({
 	databases: [
 		{
-			id: 'tech-article-staging',
-			databaseIdEnvVar: 'NOTION_BLOG_DATABASE_ID',
+			short_db_ID: 'tech-article-staging',
+			notionDatabaseIdEnvVar: 'NOTION_BLOG_DATABASE_ID',
 			isPublicRule: (page: PageObjectResponse) => {
 				const status = page.properties.Status as { select: { name: string } | null };
 				return status.select?.name === 'Published';

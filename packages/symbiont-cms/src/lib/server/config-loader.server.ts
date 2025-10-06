@@ -3,7 +3,7 @@ import type { DatabaseBlueprint, HydratedDatabaseConfig, HydratedSymbiontConfig,
 import { readEnvVar } from '../utils/env.js';
 
 function resolveDatabaseId(db: DatabaseBlueprint): HydratedDatabaseConfig {
-	const { databaseIdEnvVar, databaseId, ...rules } = db;
+	const { notionDatabaseIdEnvVar: databaseIdEnvVar, notionDatabaseId: databaseId, ...rules } = db;
 
 	const resolvedId = databaseId ?? (databaseIdEnvVar && readEnvVar(databaseIdEnvVar));
 
@@ -11,10 +11,10 @@ function resolveDatabaseId(db: DatabaseBlueprint): HydratedDatabaseConfig {
 		const hint = databaseIdEnvVar
 			? `Set the ${databaseIdEnvVar} environment variable (e.g. in Vercel) or provide a databaseId directly.`
 			: 'Provide a databaseId.';
-		throw new Error(`Database ID for config '${rules.id}' is missing. ${hint}`);
+		throw new Error(`Database ID for config sourceId='${rules.short_db_ID}' is missing. ${hint}`);
 	}
 
-	return { ...rules, databaseId: resolvedId };
+	return { ...rules, notionDatabaseId: resolvedId };
 }
 
 /**

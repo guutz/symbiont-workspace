@@ -1,6 +1,6 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig } from '../types.js';
-import { getTitle, getShortId, getTags, getPublishDate, defaultSlugRule } from '../utils/notion-helpers.js';
+import { getTitle, getShortPostID, getTags, getPublishDate, defaultSlugRule } from '../utils/notion-helpers.js';
 import { createSlug, generateUniqueSlugSync } from '../utils/slug-helpers.js';
 import { gqlClient, UPSERT_POST_MUTATION, CHECK_SLUG_QUERY, type SlugCheckResponse } from './graphql.js';
 import { pageToMarkdown, syncSlugToNotion } from './notion.js';
@@ -15,7 +15,7 @@ export async function processPageBatch(
 	usedSlugs: Set<string>
 ): Promise<void> {
 	const title = getTitle(page);
-	const shortIdString = getShortId(page);
+	const short_post_ID = getShortPostID(page);
 	const mdString = await pageToMarkdown(page.id);
 
 	// Determine slug
@@ -44,14 +44,14 @@ export async function processPageBatch(
 		}
 	} else {
 		// New post - generate slug
-		slug = await resolveNewSlugBatch(page, config, title, shortIdString, usedSlugs);
+		slug = await resolveNewSlugBatch(page, config, title, short_post_ID, usedSlugs);
 	}
 
 	// Always sync slug back to Notion to keep them in sync
-	await syncSlugToNotion(page, config.id, slug);
+	await syncSlugToNotion(page, config.notionDatabaseId, slug);
 
 	// Upsert post
-	await upsertPost(page, config, title, shortIdString, slug, mdString);
+	await upsertPost(page, config, title, short_post_ID, slug, mdString);
 	console.log(`[symbiont] ${existingPost ? 'Updated' : 'Created'} post '${slug}' for page '${page.id}'`);
 }
 
@@ -64,7 +64,7 @@ export async function processPageWebhook(
 	existingPost: { id: string; slug: string } | null
 ): Promise<void> {
 	const title = getTitle(page);
-	const shortIdString = getShortId(page);
+	const short_post_ID = getShortPostID(page);
 	const mdString = await pageToMarkdown(page.id);
 
 	// Determine slug
@@ -77,7 +77,7 @@ export async function processPageWebhook(
 		if (notionSlug && notionSlug !== existingPost.slug) {
 			// User wants to override - validate it's unique
 			const conflictCheck = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-				source_id: config.id,
+				source_id: config.short_db_ID,
 				slug: notionSlug
 			});
 			
@@ -96,14 +96,14 @@ export async function processPageWebhook(
 		}
 	} else {
 		// New post - generate slug
-		slug = await resolveNewSlugWebhook(page, config, title, shortIdString);
+		slug = await resolveNewSlugWebhook(page, config, title);
 	}
 
 	// Always sync slug back to Notion to keep them in sync
-	await syncSlugToNotion(page, config.id, slug);
+	await syncSlugToNotion(page, config.notionDatabaseId, slug);
 
 	// Upsert post
-	await upsertPost(page, config, title, shortIdString, slug, mdString);
+	await upsertPost(page, config, title, short_post_ID, slug, mdString);
 	console.log(`[symbiont] ${existingPost ? 'Updated' : 'Created'} post '${slug}' for page '${page.id}'`);
 }
 
@@ -159,8 +159,7 @@ async function resolveNewSlugBatch(
 async function resolveNewSlugWebhook(
 	page: PageObjectResponse,
 	config: HydratedDatabaseConfig,
-	title: string,
-	shortId: string | null
+	title: string
 ): Promise<string> {
 	const slugRule = config.slugRule || defaultSlugRule;
 	const customSlug = slugRule(page);
@@ -170,27 +169,13 @@ async function resolveNewSlugWebhook(
 
 	// Try base slug first
 	const baseCheck = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-		source_id: config.id,
+		source_id: config.short_db_ID,
 		slug: baseSlug
 	});
 
 	if (baseCheck.posts.length === 0) {
 		console.log(`[symbiont] Generated slug '${baseSlug}'`);
 		return baseSlug;
-	}
-
-	// Conflict - try with short ID if available
-	if (shortId) {
-		const slugWithId = `${baseSlug}-${shortId.toLowerCase()}`;
-		const idCheck = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-			source_id: config.id,
-			slug: slugWithId
-		});
-
-		if (idCheck.posts.length === 0) {
-			console.log(`[symbiont] Slug '${baseSlug}' taken, using '${slugWithId}'`);
-			return slugWithId;
-		}
 	}
 
 	// Still conflict - resolve with numbered suffix
@@ -210,7 +195,7 @@ async function resolveSlugConflict(
 	for (let i = 2; i <= 100; i++) {
 		const numberedSlug = `${baseSlug}-${i}`;
 		const result = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-			source_id: config.id,
+			source_id: config.short_db_ID,
 			slug: numberedSlug
 		});
 
@@ -230,14 +215,14 @@ async function upsertPost(
 	page: PageObjectResponse,
 	config: HydratedDatabaseConfig,
 	title: string,
-	shortIdString: string | null,
+	short_post_ID: string | null,
 	slug: string,
 	mdString: string
 ): Promise<void> {
 	const postData = {
-		source_id: config.id,
+		source_id: config.short_db_ID,
 		notion_page_id: page.id,
-		notion_short_id: shortIdString,
+		notion_short_id: short_post_ID,
 		title,
 		slug,
 		tags: getTags(page),

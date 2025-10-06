@@ -22,7 +22,7 @@ export async function syncSlugToNotion(
 ): Promise<void> {
 
 	const config = await loadConfig();
-	const dbConfig = config.databases.find(db => db.id === databaseConfigId);
+	const dbConfig = config.databases.find(db => db.notionDatabaseId === databaseConfigId);
 	
 	if (!dbConfig) {
 		console.warn(`[symbiont] Could not find database config '${databaseConfigId}' for slug sync`);

@@ -3,7 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
 import type { Post } from '$lib/types/post';
 import LZString from 'lz-string';
-import { createSymbiontGraphQLClient, getAllPosts } from 'symbiont-cms/client';
+import { getPostsFromPrimarySource } from 'symbiont-cms';
 
 const getPosts = async () => {
   // Try to get posts from database
@@ -11,8 +11,9 @@ const getPosts = async () => {
   
   if (graphqlEndpoint) {
     try {
-      const client = createSymbiontGraphQLClient(graphqlEndpoint);
-      const postsFromDb = await getAllPosts(client, { limit: 100 });
+      const postsFromDb = await getPostsFromPrimarySource(graphqlEndpoint, { 
+        limit: 100
+      });
       
       return postsFromDb
         .filter((post) => {

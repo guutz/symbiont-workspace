@@ -1,9 +1,9 @@
-import { createSymbiontGraphQLClient, getAllPosts, type Post as SymbiontPost } from 'symbiont-cms/client';
-import { Post } from '$lib/types/post';
+import { getPostsFromPrimarySource, requirePublicEnvVar, type Post as SymbiontPost } from 'symbiont-cms';
+import type { Post } from '$lib/types/post';
 
 export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
 	// Get GraphQL endpoint from environment
-	const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
+	const graphqlEndpoint = requirePublicEnvVar('PUBLIC_NHOST_GRAPHQL_URL');
 	
 	if (!graphqlEndpoint) {
 		console.warn('[qwer-test] PUBLIC_NHOST_GRAPHQL_URL not set, returning empty posts');
@@ -13,12 +13,10 @@ export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
 	}
 
 	try {
-		// Create GraphQL client with fetch for SSR
-		const client = createSymbiontGraphQLClient(graphqlEndpoint, { fetch });
-		
-		// Fetch all posts from database
-		const postsFromDb = await getAllPosts(client, {
-			limit: 100 // Adjust as needed
+		// Fetch posts using high-level helper that loads config automatically
+		const postsFromDb = await getPostsFromPrimarySource(graphqlEndpoint, {
+			fetch,
+			limit: 100
 		});
 
 		// Transform Symbiont posts to QWER Post format
@@ -41,7 +39,7 @@ export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
 			
 			// QWER-specific UI fields (defaults)
 			html: '', // Processed client-side if needed
-			coverStyle: Post.CoverStyle.NONE,
+			coverStyle: 'NONE' as Post.CoverStyle,
 			coverInPost: true,
 			coverCaption: undefined,
 			options: [],

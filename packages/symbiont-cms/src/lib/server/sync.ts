@@ -32,10 +32,10 @@ export async function syncFromNotion(
 			summaries.push(await syncDatabase(dbConfig, sinceIso, options.wipe || false));
 		} catch (err: any) {
 			const message = err?.message ?? 'Unknown error';
-			console.error(`[symbiont] Failed to sync database '${dbConfig.id}':`, err);
+			console.error(`[symbiont] Failed to sync database '${dbConfig.short_db_ID}':`, err);
 			summaries.push({
-				id: dbConfig.id,
-				databaseId: dbConfig.databaseId,
+				short_db_ID: dbConfig.short_db_ID,
+				notionDatabaseId: dbConfig.notionDatabaseId,
 				processed: 0,
 				skipped: 0,
 				status: 'error',
@@ -55,14 +55,14 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 
 	// Wipe existing posts if requested
 	if (wipe) {
-		console.log(`[symbiont] Wiping all existing posts for database '${config.id}'...`);
+		console.log(`[symbiont] Wiping all existing posts for database '${config.short_db_ID}'...`);
 		const deleteResult = await gqlClient.request<DeletePostsResponse>(DELETE_POSTS_BY_SOURCE_MUTATION, {
-			source_id: config.id
+			source_id: config.short_db_ID
 		});
-		console.log(`[symbiont] Deleted ${deleteResult.delete_posts.affected_rows} post(s) for database '${config.id}'.`);
+		console.log(`[symbiont] Deleted ${deleteResult.delete_posts.affected_rows} post(s) for database '${config.short_db_ID}'.`);
 	}
 
-	const queryOptions: any = { data_source_id: config.databaseId };
+	const queryOptions: any = { data_source_id: config.notionDatabaseId };
 	if (sinceIso) {
 		queryOptions.filter = {
 			timestamp: 'last_edited_time',
@@ -89,20 +89,20 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 		cursor = response.has_more ? response.next_cursor : null;
 		
 		if (cursor) {
-			console.log(`[symbiont] Fetching page ${pageCount + 1} of results for '${config.id}'...`);
+			console.log(`[symbiont] Fetching page ${pageCount + 1} of results for '${config.short_db_ID}'...`);
 		}
 	} while (cursor);
 
 	if (allPages.length === 0) {
-		console.log(`[symbiont] No changes for database '${config.id}'.`);
-		return { id: config.id, databaseId: config.databaseId, processed: 0, skipped: 0, status: 'no-changes' };
+		console.log(`[symbiont] No changes for database '${config.short_db_ID}'.`);
+		return { short_db_ID: config.short_db_ID, notionDatabaseId: config.notionDatabaseId, processed: 0, skipped: 0, status: 'no-changes' };
 	}
 
-	console.log(`[symbiont] Processing ${allPages.length} page(s) for '${config.id}' (fetched in ${pageCount} request${pageCount > 1 ? 's' : ''}).`);
+	console.log(`[symbiont] Processing ${allPages.length} page(s) for '${config.short_db_ID}' (fetched in ${pageCount} request${pageCount > 1 ? 's' : ''}).`);
 
 	// Batch query: Get all existing posts and build lookup maps
 	const allPostsResult = await gqlClient.request<AllPostsResponse>(GET_ALL_POSTS_FOR_DATABASE_QUERY, {
-		source_id: config.id
+		source_id: config.short_db_ID
 	});
 	const { byPageId: existingPostsByPageId, slugs: usedSlugs } = buildPostLookups(allPostsResult.posts);
 
@@ -114,7 +114,7 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 		processed++;
 	}
 
-	return { id: config.id, databaseId: config.databaseId, processed, skipped, status: 'ok' };
+	return { short_db_ID: config.short_db_ID, notionDatabaseId: config.notionDatabaseId, processed, skipped, status: 'ok' };
 }
 
 /**
@@ -126,5 +126,5 @@ function getTargetDatabases(
 ): HydratedDatabaseConfig[] {
 
 	if (!filterId) return databases;
-	return databases.filter((db) => db.id === filterId || db.databaseId === filterId);
+	return databases.filter((db) => db.short_db_ID === filterId || db.notionDatabaseId === filterId);
 }

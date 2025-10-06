@@ -1,17 +1,17 @@
-export const prerender = true;
 import type { RequestHandler } from '@sveltejs/kit';
 import { siteConfig } from '$config/site';
 import type { Post } from '$lib/types/post';
 import LZString from 'lz-string';
-import { createSymbiontGraphQLClient, getAllPosts, type Post as SymbiontPost } from 'symbiont-cms/client';
+import { getPostsFromPrimarySource, type Post as SymbiontPost } from 'symbiont-cms';
 
 const getPosts = async (): Promise<SymbiontPost[]> => {
   const graphqlEndpoint = process.env.PUBLIC_NHOST_GRAPHQL_URL;
   
   if (graphqlEndpoint) {
     try {
-      const client = createSymbiontGraphQLClient(graphqlEndpoint);
-      return await getAllPosts(client, { limit: 100 });
+      return await getPostsFromPrimarySource(graphqlEndpoint, { 
+        limit: 100
+      });
     } catch (error) {
       console.error('[atom.xml] Error fetching posts:', error);
     }

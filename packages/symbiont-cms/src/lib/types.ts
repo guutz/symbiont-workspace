@@ -49,7 +49,7 @@ export type ClassMap = {
  * Extended to be compatible with QWER post type for seamless integration.
  */
 export type Post = {
-    id: string; // UUID
+    sql_id: string; // UUID
     title: string | null;
     slug: string;
     content: string | null; // The markdown content
@@ -70,8 +70,8 @@ export type Post = {
 type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
 
 interface DatabaseRuleBase {
-    /** A unique identifier for this configuration, e.g., 'personal-blog'. */
-    id: string;
+    /** A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-article-staging'. */
+    short_db_ID: string;
 
     /** Whether the Symbiont web editor should be exposed for this database. */
     webEditorEnabled?: boolean;
@@ -98,13 +98,13 @@ interface DatabaseRuleBase {
 }
 
 type DatabaseWithInlineId = DatabaseRuleBase & {
-    databaseId: string;
-    databaseIdEnvVar?: never;
+    notionDatabaseId: string;
+    notionDatabaseIdEnvVar?: never;
 };
 
 type DatabaseWithEnvPointer = DatabaseRuleBase & {
-    databaseIdEnvVar: string;
-    databaseId?: never;
+    notionDatabaseIdEnvVar: string;
+    notionDatabaseId?: never;
 };
 
 /**
@@ -121,7 +121,7 @@ export interface SymbiontConfig {
  * Fully hydrated configuration used at runtime where all database IDs must be defined.
  */
 export type HydratedDatabaseConfig = DatabaseRuleBase & {
-    databaseId: string;
+    notionDatabaseId: string;
 };
 
 export interface HydratedSymbiontConfig {
@@ -136,10 +136,10 @@ export function defineSymbiontConfig<T extends SymbiontConfig>(config: T): T {
  * Represents the result of a sync operation for a single database
  */
 export type SyncSummary = {
-    /** The configured ID for this database */
-    id: string;
+    /** The configured source_id for this database in GraphQL */
+    short_db_ID: string;
     /** The actual Notion database ID */
-    databaseId: string;
+    notionDatabaseId: string;
     /** Number of pages processed */
     processed: number;
     /** Number of pages skipped */
