@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tagsCur, tagsShowMobile, tagsShowDesktop } from '$stores/tags';
+  import { tagsCur, tagsShowMobile, tagsShowDesktop, initializeTagsFromPosts } from '$stores/tags';
   import { postsShow, initializePostsFromServer } from '$stores/posts';
   import { siteConfig } from '$config/site';
   import { getLayoutComponent } from '$lib/components/LayoutMapper';
@@ -17,6 +17,8 @@
     // Initialize posts from server data
     if (data.posts && data.posts.length > 0) {
       initializePostsFromServer(data.posts);
+      // Initialize tags from posts
+      initializeTagsFromPosts(data.posts);
     }
     
     tagsCur.init();

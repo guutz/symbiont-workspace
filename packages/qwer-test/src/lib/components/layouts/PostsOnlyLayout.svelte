@@ -33,16 +33,16 @@
   itemtype="https://schema.org/Blog"
   itemprop="blog"
   class="flex-nowrap justify-center flex-col items-center hidden xl:(flex flex-row items-stretch)">
+  <div class="min-w-12rem max-w-screen-md flex-1 relative"></div>
+  
   <div
     in:fly|global={{ y: 100, duration: 300, delay: 300 }}
     out:fly|global={{ y: -100, duration: 300 }}
     class="h-feed min-h-50vh flex-none w-full md:(rounded-2xl w-[50rem] mx2)">
     <IndexPosts />
   </div>
-  <div
-    in:fly|global={{ x: 100, y: -100, duration: 300, delay: 300 }}
-    out:fly|global={{ x: 100, y: 100, duration: 300 }}
-    class="min-w-12rem max-w-screen-md flex-1 relative mr6">
+  
+  <div class="min-w-12rem max-w-screen-md flex-1 relative mr6">
     {#if $tagsShowDesktop}
       <Tags class="hidden max-w-[20rem] my4 rounded-2xl p4 xl:(flex flex-col min-w-[12rem] sticky top-[4rem])" />
     {/if}
