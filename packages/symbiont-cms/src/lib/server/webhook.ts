@@ -4,7 +4,7 @@ import { Client } from '@notionhq/client';
 import { readEnvVar } from '../utils/env.js';
 import { loadConfig } from './load-config.js';
 import { requireEnvVar } from '../utils/env.js';
-import { gqlClient, GET_EXISTING_POST_QUERY, type ExistingPostResponse } from './graphql.js';
+import { gqlAdminClient, GET_EXISTING_POST_QUERY, type ExistingPostResponse } from './graphql.js';
 import { notion } from './notion.js';
 import { processPageWebhook } from './page-processor.js';
 import { syncFromNotion } from './sync.js';
@@ -38,7 +38,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		console.log(`[symbiont] Webhook received for page '${pageId}' in database '${dbConfig.short_db_ID}'.`);
 
 		// Check if post exists (efficient single query)
-		const existingPostResult = await gqlClient.request<ExistingPostResponse>(GET_EXISTING_POST_QUERY, {
+		const existingPostResult = await gqlAdminClient.request<ExistingPostResponse>(GET_EXISTING_POST_QUERY, {
 			source_id: dbConfig.short_db_ID,
 			notion_page_id: pageId
 		});

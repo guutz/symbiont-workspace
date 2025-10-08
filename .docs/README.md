@@ -12,9 +12,11 @@ This folder contains AI-generated documentation created during development sessi
 - **QUICKSTART.md** - Quick start guide for running the integrated system
 - **INTEGRATION_GUIDE.md** - Comprehensive guide for QWER + Symbiont integration
 - **TYPE_COMPATIBILITY.md** - Type system improvements and compatibility details
+- **markdown-compatibility.md** - 📝 **Notion & Tiptap markdown syntax compatibility** reference
+- **notion-color-workaround.md** - 🎨 **Workaround for Notion text colors & highlights** (notion-to-md v3.1.9 limitation)
 
 ### Strategy Documents
-- **image-optimization-strategy.md** - Image handling: Notion AWS S3 → Nhost Storage migration
+- **image-optimization-strategy.md** - Image handling: Notion AWS S3 → Nhost Storage migration + Image zoom/lightbox feature
 - **dynamic-file-management.md** - File upload & storage strategy for dynamic CMS
 - **dynamic-redirects-strategy.md** - Database-driven redirects without rebuilds
 
@@ -34,4 +36,4 @@ These documents can be regenerated at any time by asking the AI assistant to rec
 
 ---
 
-**Last Generated:** October 5, 2025
+**Last Generated:** October 7, 2025

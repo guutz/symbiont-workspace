@@ -373,6 +373,124 @@ console.log(`[symbiont] Uploaded image: ${externalUrl} → ${nhostUrl}`);
 
 ---
 
+## Image Zoom / Lightbox Feature
+
+Symbiont CMS includes built-in support for image zoom functionality using the lightweight `medium-zoom` library.
+
+### How It Works
+
+1. **Server-side**: The markdown processor uses `@mdit/plugin-figure` to wrap standalone images in semantic `<figure>` tags with captions
+2. **Client-side**: Optional `medium-zoom` integration provides lightbox/zoom functionality
+3. **Feature Detection**: `MarkdownFeatures.images` tells the client when images are present
+
+### Setup
+
+#### 1. Install medium-zoom
+
+```bash
+pnpm add medium-zoom
+```
+
+#### 2. Basic Usage (Svelte)
+
+```svelte
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { initializeImageZoom } from 'symbiont-cms';
+  import mediumZoom from 'medium-zoom';
+  
+  export let html: string;
+  export let features;
+  
+  let containerElement: HTMLElement;
+  
+  onMount(() => {
+    if (features.images) {
+      const zoom = initializeImageZoom(mediumZoom, {
+        container: containerElement,
+        background: 'rgba(25, 18, 25, 0.9)',
+      });
+      
+      return () => zoom.destroy();
+    }
+  });
+</script>
+
+<article bind:this={containerElement}>
+  {@html html}
+</article>
+```
+
+#### 3. Using Svelte Action (Even Simpler)
+
+```svelte
+<script lang="ts">
+  import { imageZoom } from 'symbiont-cms';
+  import mediumZoom from 'medium-zoom';
+  
+  export let html: string;
+  export let features;
+</script>
+
+{#if features.images}
+  <article use:imageZoom={{ mediumZoom }}>
+    {@html html}
+  </article>
+{:else}
+  <article>
+    {@html html}
+  </article>
+{/if}
+```
+
+### Customization
+
+Target only images within figures:
+
+```typescript
+initializeImageZoom(mediumZoom, {
+  selector: 'figure img',
+  container: containerElement,
+});
+```
+
+Custom styling:
+
+```typescript
+initializeImageZoom(mediumZoom, {
+  background: 'rgba(0, 0, 0, 0.95)',
+  scrollOffset: 40,
+});
+```
+
+### Size Impact
+
+- **Server-side**: `@mdit/plugin-figure` (~9.5KB, included in symbiont-cms)
+- **Client-side**: `medium-zoom` (~13KB minified+gzipped, installed separately)
+- **Total**: Only ~13KB client-side when images are present
+
+### Why This Approach?
+
+✅ **Lightweight**: Only ~13KB of client-side JS  
+✅ **Zero CSS**: `medium-zoom` creates overlays programmatically  
+✅ **Semantic HTML**: Uses proper `<figure>` and `<figcaption>` tags  
+✅ **Conditional Loading**: Only load when images are present  
+✅ **Flexible**: Works with any image in markdown  
+
+### Markdown Syntax
+
+Any standalone image will automatically get the figure treatment:
+
+```markdown
+![Alt text](image.png)
+
+![Alt text with title](image.png "This becomes the caption")
+
+[![Linked image](image.png)](https://example.com)
+```
+
+---
+
 ## Related Documentation
 
 - **[Symbiont CMS Complete Guide](symbiont-cms.md)** 📦 - Full system documentation
@@ -383,6 +501,6 @@ console.log(`[symbiont] Uploaded image: ${externalUrl} → ${nhostUrl}`);
 
 ---
 
-**Status:** 📋 Strategy Documented (Not Yet Implemented)  
+**Status:** 📋 Strategy Documented (Image Zoom: ✅ Implemented)  
 **Priority:** ⚠️ High (Notion URLs expire after ~1 hour)  
-**Last Updated:** October 5, 2025
+**Last Updated:** October 7, 2025

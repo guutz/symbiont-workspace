@@ -1,7 +1,9 @@
+import type { LoadEvent } from '@sveltejs/kit';
 import { error } from '@sveltejs/kit';
 import type { GraphQLClient } from 'graphql-request';
 import { createSymbiontGraphQLClient, getPostBySlug } from '../client/queries.js';
-import { loadConfig } from './load-config.js';
+import { loadConfig } from '../client/load-config.js'; // don't need admin gql access
+import { parseMarkdown } from './markdown-processor.js';
 import type { Post } from '../types.js';
 
 type PostLoadEvent = {
@@ -79,3 +81,20 @@ export function createPostLoad<Event extends PostLoadEvent = PostLoadEvent>(
  * export { load } from 'symbiont-cms/server';
  */
 export const load = createPostLoad();
+
+// Export ISR config if enabled
+export const config = (async () => {
+  const symbiontConfig = await loadConfig();
+  
+  if (symbiontConfig.caching?.isr?.enabled) {
+    // Note: Bypass tokens should be accessed from environment at runtime
+    // via server-side functions, not from config
+    return {
+      isr: {
+        expiration: symbiontConfig.caching.isr.revalidate,
+      },
+    };
+  }
+  
+  return {};
+})();

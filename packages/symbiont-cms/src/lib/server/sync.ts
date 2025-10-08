@@ -1,7 +1,7 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig, SyncSummary } from '../types.js';
 import { buildPostLookups } from '../utils/notion-helpers.js';
-import { gqlClient, GET_ALL_POSTS_FOR_DATABASE_QUERY, DELETE_POSTS_BY_SOURCE_MUTATION, type AllPostsResponse, type DeletePostsResponse } from './graphql.js';
+import { gqlAdminClient, GET_ALL_POSTS_FOR_DATABASE_QUERY, DELETE_POSTS_BY_SOURCE_MUTATION, type AllPostsResponse, type DeletePostsResponse } from './graphql.js';
 import { notion } from './notion.js';
 import { processPageBatch } from './page-processor.js';
 import { loadConfig } from './load-config.js';
@@ -56,7 +56,7 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 	// Wipe existing posts if requested
 	if (wipe) {
 		console.log(`[symbiont] Wiping all existing posts for database '${config.short_db_ID}'...`);
-		const deleteResult = await gqlClient.request<DeletePostsResponse>(DELETE_POSTS_BY_SOURCE_MUTATION, {
+		const deleteResult = await gqlAdminClient.request<DeletePostsResponse>(DELETE_POSTS_BY_SOURCE_MUTATION, {
 			source_id: config.short_db_ID
 		});
 		console.log(`[symbiont] Deleted ${deleteResult.delete_posts.affected_rows} post(s) for database '${config.short_db_ID}'.`);
@@ -101,7 +101,7 @@ async function syncDatabase(config: HydratedDatabaseConfig, sinceIso: string | n
 	console.log(`[symbiont] Processing ${allPages.length} page(s) for '${config.short_db_ID}' (fetched in ${pageCount} request${pageCount > 1 ? 's' : ''}).`);
 
 	// Batch query: Get all existing posts and build lookup maps
-	const allPostsResult = await gqlClient.request<AllPostsResponse>(GET_ALL_POSTS_FOR_DATABASE_QUERY, {
+	const allPostsResult = await gqlAdminClient.request<AllPostsResponse>(GET_ALL_POSTS_FOR_DATABASE_QUERY, {
 		source_id: config.short_db_ID
 	});
 	const { byPageId: existingPostsByPageId, slugs: usedSlugs } = buildPostLookups(allPostsResult.posts);

@@ -2,7 +2,7 @@ import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig } from '../types.js';
 import { getTitle, getShortPostID, getTags, getPublishDate, defaultSlugRule } from '../utils/notion-helpers.js';
 import { createSlug, generateUniqueSlugSync } from '../utils/slug-helpers.js';
-import { gqlClient, UPSERT_POST_MUTATION, CHECK_SLUG_QUERY, type SlugCheckResponse } from './graphql.js';
+import { gqlAdminClient, UPSERT_POST_MUTATION, CHECK_SLUG_QUERY, type SlugCheckResponse } from './graphql.js';
 import { pageToMarkdown, syncSlugToNotion } from './notion.js';
 
 /**
@@ -76,7 +76,7 @@ export async function processPageWebhook(
 		// Check if user changed the slug in Notion
 		if (notionSlug && notionSlug !== existingPost.slug) {
 			// User wants to override - validate it's unique
-			const conflictCheck = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
+			const conflictCheck = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
 				source_id: config.short_db_ID,
 				slug: notionSlug
 			});
@@ -168,7 +168,7 @@ async function resolveNewSlugWebhook(
 	const baseSlug = customSlug || createSlug(title);
 
 	// Try base slug first
-	const baseCheck = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
+	const baseCheck = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
 		source_id: config.short_db_ID,
 		slug: baseSlug
 	});
@@ -194,7 +194,7 @@ async function resolveSlugConflict(
 	// Conflict - try numbered variations
 	for (let i = 2; i <= 100; i++) {
 		const numberedSlug = `${baseSlug}-${i}`;
-		const result = await gqlClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
+		const result = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
 			source_id: config.short_db_ID,
 			slug: numberedSlug
 		});
@@ -231,5 +231,5 @@ async function upsertPost(
 		content: mdString
 	};
 
-	await gqlClient.request(UPSERT_POST_MUTATION, { post: postData });
+	await gqlAdminClient.request(UPSERT_POST_MUTATION, { post: postData });
 }

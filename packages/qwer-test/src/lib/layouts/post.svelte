@@ -88,7 +88,7 @@
   in:fade|global={{ duration: 300, delay: 300 }}
   out:fade|global={{ duration: 300 }}
   class="flex flex-nowrap justify-center">
-  <div class="max-w-screen-md flex-1" />
+  <div class="max-w-screen-md flex-1"></div>
 
   <article
     id="post"
@@ -117,7 +117,7 @@
         in:fade|global={{ duration: 300, delay: 300 }}
         out:fade|global={{ duration: 300 }}>
   <h2 class="text-3xl">{strings.LoadingPost()}</h2>
-        <div class="i-line-md-loading-twotone-loop !h-16 !w-16" />
+        <div class="i-line-md-loading-twotone-loop !h-16 !w-16"></div>
       </div>
     {/if}
   </article>
@@ -137,21 +137,21 @@
     in:fade|global={{ duration: 300, delay: 300 }}
     out:fade|global={{ duration: 300 }}
     class="flex flex-nowrap justify-center">
-    <div class="max-w-screen-md flex-1" />
+    <div class="max-w-screen-md flex-1"></div>
 
     <div id="post-bottom" class="flex-none flex flex-col max-w-[55rem] w-full xl:(rounded-b-2xl)">
       {#if thisPost}
         <TagsSection tags={thisPost.tags} />
       {/if}
 
-      <div class="divider" />
+      <div class="divider"></div>
 
       {#if nextPost || prevPost}
         <nav class="flex flex-col h-[20rem] md:(flex-row h-[12rem]) my8">
           {#if nextPost}
             <div id="next-post" class="relative flex-1 group overflow-hidden bg-white/[0.5] dark:bg-black/[0.5]">
               <div
-                class="absolute z-10 i-mdi-chevron-left !w-[1.5rem] !h-[1.5rem] top-[1.25rem] left-[0.75rem] animate-bounce-left" />
+                class="absolute z-10 i-mdi-chevron-left !w-[1.5rem] !h-[1.5rem] top-[1.25rem] left-[0.75rem] animate-bounce-left"></div>
               <a
                 rel="next"
                 href="/{nextPost.slug}"
@@ -174,7 +174,7 @@
                 {prevPost.title}
               </a>
               <div
-                class="absolute z-10 i-mdi-chevron-right !w-[1.5rem] !h-[1.5rem] top-[6rem] right-[0.75rem] animate-bounce-right" />
+                class="absolute z-10 i-mdi-chevron-right !w-[1.5rem] !h-[1.5rem] top-[6rem] right-[0.75rem] animate-bounce-right"></div>
               {#if prevPost.cover}
                 <ImgBanner
                   src={prevPost.cover}
@@ -192,7 +192,7 @@
       {/key}
     </div>
 
-    <div class="max-w-screen-md flex-1" />
+    <div class="max-w-screen-md flex-1"></div>
   </div>
 {/if}
 

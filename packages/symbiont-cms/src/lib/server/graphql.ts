@@ -6,31 +6,31 @@ import { loadConfig } from './load-config.js';
 const NHOST_ADMIN_SECRET = requireEnvVar('NHOST_ADMIN_SECRET', 'Set NHOST_ADMIN_SECRET for admin access to Nhost.');
 
 // Lazy-initialized GraphQL client
-let _gqlClient: GraphQLClient | null = null;
+let _adminGqlClient: GraphQLClient | null = null;
 
 /**
- * Get the GraphQL client (initializes on first call with config)
+ * Get the Admin GraphQL client (initializes on first call with config)
  */
-async function getGqlClient(): Promise<GraphQLClient> {
-	if (!_gqlClient) {
+async function getAdminGqlClient(): Promise<GraphQLClient> {
+	if (!_adminGqlClient) {
 		const config = await loadConfig();
-		_gqlClient = new GraphQLClient(config.graphqlEndpoint, {
+		_adminGqlClient = new GraphQLClient(config.graphqlEndpoint, {
 			headers: { 'x-hasura-admin-secret': NHOST_ADMIN_SECRET }
 		});
 	}
-	return _gqlClient;
+	return _adminGqlClient;
 }
 
 /**
  * GraphQL client wrapper that auto-initializes from config on first use.
- * Lazily loads symbiont.config.ts to get the graphqlEndpoint.
+ * Lazily loads symbiont.config.js to get the graphqlEndpoint.
  * 
  * @example
- * const result = await gqlClient.request<MyType>(QUERY, variables);
+ * const result = await gqlAdminClient.request<MyType>(QUERY, variables);
  */
-export const gqlClient = {
+export const gqlAdminClient = {
 	async request<T = any>(document: any, variables?: any): Promise<T> {
-		const client = await getGqlClient();
+		const client = await getAdminGqlClient();
 		return client.request<T>(document, variables);
 	}
 };
