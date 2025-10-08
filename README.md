@@ -29,6 +29,22 @@ Personal blog implementation using Symbiont CMS.
 
 ## 🚀 Quick Start
 
+**What's Working:**
+- ✅ Dynamic post loading from Notion → Nhost → SvelteKit
+- ✅ Real-time updates without rebuilds
+- ✅ GraphQL client/server utilities
+- ✅ Markdown rendering with feature detection
+- ✅ Feed generation (Atom, JSON, Sitemap)
+
+**What's Designed (Not Yet Implemented):**
+- 📋 File upload system (design in `.docs/dynamic-file-management.md`)
+- 📋 Dynamic redirects (design in `.docs/dynamic-redirects-strategy.md`)
+- 📋 Observability/logging infrastructure
+
+---
+
+### Setup Instructions
+
 1. **Configure environment:**
    ```bash
    cd packages/qwer-test
@@ -56,6 +72,11 @@ Detailed documentation is available in the `.docs/` folder (gitignored):
 These docs are AI-generated and can be regenerated as needed.
 
 ## 🔧 Recent Changes
+
+**Oct 8, 2025:**
+- 📝 Documentation accuracy update: clarified implementation status
+- ✅ Phase 1 (Posts) is production-ready and fully implemented
+- 📋 Phases 2-3 (Media/Redirects) have complete designs but await implementation
 
 **Oct 4, 2025:**
 - ✅ Integrated QWER with Symbiont database backend

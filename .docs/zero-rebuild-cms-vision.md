@@ -1,6 +1,33 @@
-# Zero-Rebuild CMS Vision
+# Zero-Rebuild CMS ## Where we stand (Oct 2025)
 
-The Symbiont roadmap aims for a world where editors publish content, media, and routing changes without ever triggering a rebuild. Use this document as the executive summary of that journey.
+**✅ What's WorPhases 2–3 unblock "zero rebuild" claims for most sites; later phases round out the CMS experience.
+
+**Note**: Phases 2-3 have complete design documents but **no code implementation yet**. See respective strategy docs for full designs.ing (Production Ready)**
+- **Dynamic posts** are live: Notion → Symbiont sync → Nhost → SvelteKit SSR
+- **Feature detection** runs at ingestion so render paths stay lean
+- **Build pipeline** only compiles the SvelteKit app; no content artifacts are generated
+- **GraphQL client/server** utilities fully functional
+- **Multi-tenant support** via `source_id` in database schema
+- **Feed generation** (Atom, JSON, Sitemap) backed by live data
+
+**⚠️ What's Missing (Needs Implementation)**
+- **No file upload system** - File upload utilities not yet implemented
+- **No Nhost Storage config** - Storage buckets not configured in `nhost.toml`
+- **No observability** - Manual log inspection only, no structured logging/alerts
+- **No testing infrastructure** - Zero test coverage in `symbiont-cms` package
+- **No redirect system** - Database schema and middleware not implemented
+
+---
+
+## Roadmap phases
+
+| Phase | Scope | Status | Immediate next step |
+|-------|-------|--------|---------------------|
+| 1 | Posts | ✅ **Shipped** | Add tests + observability |
+| 2 | Media & files | 📋 **Designed only** | Configure Nhost Storage buckets + implement upload utilities |
+| 3 | Redirects | 📋 **Designed only** | Create database migration + middleware implementation |
+| 4 | Site config | 💭 **Concept** | Define schema + editorial workflow |
+| 5 | Authoring surface | 💭 **Concept** | Validate collaborative editor stack (Tiptap + Hocuspocus) |nt roadmap aims for a world where editors publish content, media, and routing changes without ever triggering a rebuild. Use this document as the executive summary of that journey.
 
 ---
 
@@ -85,9 +112,20 @@ Notion change ─► Symbiont sync (poll/webhook) ─► Nhost (Postgres + Stora
 
 ## Key next bets
 
-1. **Media migration loop** – mirror Notion URLs into Nhost, persist both origins, and ensure future uploads default to Nhost links.
-2. **Redirect middleware** – resolve redirects from Postgres inside `hooks.server.ts`, cache lookups, and expose an admin UX.
-3. **Sync telemetry** – ship structured logs/alerts for failed pages, asset uploads, and schema mismatches.
+**Immediate Priorities (To Enable Phase 1 Production Use):**
+1. **Testing infrastructure** – Set up Vitest, add core unit tests for sync/markdown/GraphQL
+2. **Structured logging** – Implement observability for sync success/failure tracking
+3. **Error handling** – Add proper error boundaries and retry logic in sync handlers
+
+**Phase 2 Implementation (Media & Files):**
+4. **Nhost Storage setup** – Configure buckets in `nhost.toml` (see `dynamic-file-management.md` for design)
+5. **File upload utilities** – Implement `file-upload.ts` server utilities
+6. **Image URL rewriting** – Mirror Notion images to Nhost, rewrite URLs in markdown
+
+**Phase 3 Implementation (Redirects):**
+7. **Database migration** – Create redirects table schema (see `dynamic-redirects-strategy.md` for design)
+8. **Middleware** – Implement redirect resolution in `hooks.server.ts`
+9. **Admin UI** – Build simple interface for redirect management
 
 ---
 

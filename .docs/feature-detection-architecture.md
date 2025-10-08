@@ -1,6 +1,19 @@
 # Feature Detection Architecture
 
-> **Design Decision**: Feature detection happens during content **ingestion** (Notion→DB or Tiptap→DB), not during markdown **rendering**.
+> **📖 Part of Phase 1.5 Enhancement** - Design is complete, partial implementation exists
+
+> **⚠️ IMPLEMENTATION STATUS: PARTIALLY IMPLEMENTED**  
+> - ✅ TypeScript interface exists (`ContentFeatures` in `markdown-processor.ts`)
+> - ✅ Markdown processor accepts optional `features` parameter for optimization
+> - ❌ Database schema doesn't have `features` JSONB column yet
+> - ❌ No feature detection code during sync process
+> - ❌ No backfill for existing content
+> 
+> This document describes the **recommended architecture** for feature detection. See `.docs/IMPLEMENTATION_STATUS.md` for tracking.
+
+## Design Decision
+
+Feature detection should happen during content **ingestion** (Notion→DB or Tiptap→DB), not during markdown **rendering**.
 
 ## Why This Approach?
 

@@ -2,6 +2,14 @@
 
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
+> **⚠️ IMPLEMENTATION STATUS: DESIGNED ONLY**  
+> This document contains a complete design for dynamic redirects, but **no code has been implemented yet**.  
+> - ❌ No database migration for redirects table exists  
+> - ❌ No middleware implementation in `hooks.server.ts`  
+> - ❌ No admin UI for redirect management  
+> 
+> This is a **roadmap document** for Phase 3 implementation.
+
 ## Overview
 
 Moving from build-time redirect configuration to runtime dynamic redirect management controlled by a database (potentially via Notion).

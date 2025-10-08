@@ -1,14 +1,23 @@
 # Markdown Compatibility Guide
 
-> **Critical**: This document defines the markdown syntax contract between content sources (Notion, Tiptap) and the Symbiont CMS markdown processor
+> **📖 Markdown Rendering Reference** - Syntax supported by the current implementation
 
-> **Architecture Note**: Feature detection (syntax highlighting, math, images) should happen during content ingestion (Notion→DB or Tiptap→DB sync) and be stored in the database as feature flags. The markdown processor itself does NOT track features. See `.docs/feature-detection-architecture.md` for implementation details.
+> **Implementation Status:**
+> - ✅ **Basic CommonMark**: Fully implemented via `markdown-it`
+> - ✅ **Syntax Highlighting**: Implemented via Shiki
+> - ✅ **Math**: Implemented via `@mdit/plugin-mathjax`
+> - ✅ **Embeds**: Implemented via `@mdit/plugin-embed`
+> - ✅ **Image Size**: Implemented via `@mdit/plugin-img-size`
+> - ⚠️ **Task Lists**: NOT currently configured (easy to add)
+> - ⚠️ **Callouts**: NOT implemented (Notion exports as plain blockquotes)
+
+> **Architecture Note**: Feature detection (syntax highlighting, math, images) should happen during content ingestion (Notion→DB or Tiptap→DB sync) and be stored in the database as feature flags. The markdown processor itself does NOT track features. See `.docs/feature-detection-architecture.md` for design details (not yet fully implemented).
 
 ## Overview
 
 Symbiont CMS content comes from two sources:
-1. **Notion** - via `notion-to-md` library (v3.1.9)
-2. **Tiptap** - via custom markdown export (future implementation)
+1. **Notion** - via `notion-to-md` library (v3.1.9) ✅ Currently active
+2. **Tiptap** - via custom markdown export 💭 Future implementation
 
 Both must output markdown that **markdown-it** (with our plugins) can correctly parse and render.
 

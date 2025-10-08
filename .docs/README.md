@@ -6,6 +6,7 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 - **`symbiont-cms.md`** – System overview, architecture, configuration, and package API surface
 - **`zero-rebuild-cms-vision.md`** – The product vision and phased roadmap toward a zero-rebuild CMS
+- **`IMPLEMENTATION_STATUS.md`** – **NEW:** Honest tracker of what's shipped vs. designed vs. conceptual
 
 ## Implementation Guides
 
@@ -15,9 +16,9 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## Content Pipeline
 
-- **`markdown-compatibility.md`** – Supported syntax, plugins, and testing guidance for Notion/Tiptap content
-- **`feature-detection-architecture.md`** – How and where feature flags are derived during ingestion
-- **`notion-color-workaround.md`** – Temporary instructions for text colour handling until notion-to-md v4 ships
+- **`markdown-compatibility.md`** – Supported markdown syntax (Notion/Tiptap → markdown-it rendering)
+- **`feature-detection-architecture.md`** – Design for feature detection at ingestion (Phase 1.5 - partially implemented)
+- **`notion-color-workaround.md`** – Temporary workaround for text colors (until notion-to-md v4)
 
 ## Platform Strategy
 
@@ -27,7 +28,16 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
-- Consolidated overlapping guidance and removed deprecated documents (for example, the old server-side markdown v2 write-up)
+- **Oct 8, 2025:** Major documentation cleanup and accuracy update
+  - Deleted `server-side-markdown-rendering-v2.md` (1435 lines, deprecated)
+  - Deleted `id-usage-guide.md` (info covered in symbiont-cms.md)
+  - Updated feature-detection-architecture.md with partial implementation status
+  - Updated markdown-compatibility.md with current implementation status  
+  - Created `IMPLEMENTATION_STATUS.md` for transparent tracking
+  - Updated all strategy docs with implementation status banners
+  - Clarified Phase 2-3 are designed but not yet implemented
+  - Identified gaps: testing, observability, Nhost Storage config
+- Consolidated overlapping guidance and removed deprecated documents
 - Folded ID usage notes and type-alignment context into the integration and core docs
 - Updated statuses so "implemented" means shipped in the repo as of October 2025
 

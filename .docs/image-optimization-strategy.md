@@ -2,6 +2,14 @@
 
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
+> **⚠️ IMPLEMENTATION STATUS: DESIGNED ONLY**  
+> This document contains a complete design for image optimization, but **no code has been implemented yet**.  
+> - ❌ No Nhost Storage bucket configuration exists  
+> - ❌ No image download/upload utilities implemented  
+> - ❌ No URL rewriting in markdown processor  
+> 
+> This is a **roadmap document** for Phase 2 implementation.
+
 ## Context
 
 We're building a dynamic blog CMS where:
