@@ -112,8 +112,17 @@ export interface SymbiontConfig {
     /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
     graphqlEndpoint: string;
     
+    /** PUBLIC: Optional explicit default database identifier. Falls back to first database when omitted. */
+    primaryShortDbId?: string;
+
     /** PRIVATE: Database configurations with server-only sync rules. */
     databases: DatabaseBlueprint[];
+
+    /** PRIVATE: Markdown rendering options that control server-side parsing. */
+    markdown?: MarkdownConfig;
+
+    /** PRIVATE: Response caching strategy (e.g. ISR). */
+    caching?: CachingConfig;
 }
 
 /**
@@ -130,7 +139,52 @@ export interface PublicSymbiontConfig {
 	
 	/** All configured database short_db_IDs */
 	shortDbIds: string[];
-}/**
+}
+
+/** Markdown configuration block from symbiont.config.js */
+export interface MarkdownConfig {
+    syntaxHighlighting?: {
+        enabled: boolean;
+        theme?: string;
+        showLineNumbers?: boolean;
+        languages?: string[];
+    };
+    math?: {
+        enabled: boolean;
+        inlineDelimiters?: [string, string];
+        displayDelimiters?: [string, string];
+    };
+    toc?: {
+        enabled: boolean;
+        minHeadingLevel?: number;
+        maxHeadingLevel?: number;
+    };
+    extensions?: {
+        footnotes?: boolean;
+        spoilers?: boolean;
+        highlights?: boolean;
+        textColors?: boolean;
+        gfm?: boolean;
+    };
+    images?: {
+        lazy?: boolean;
+        nhostStorage?: boolean;
+    };
+}
+
+export type CachingStrategy = 'isr' | 'none';
+
+export interface ISRConfig {
+    enabled: boolean;
+    revalidate: number;
+}
+
+export interface CachingConfig {
+    strategy: CachingStrategy;
+    isr?: ISRConfig;
+}
+
+/**
  * Fully hydrated configuration used at runtime where all database IDs are resolved.
  * This is what loadConfig() returns on the server.
  */
@@ -138,11 +192,10 @@ export type HydratedDatabaseConfig = DatabaseBlueprint;
 
 export interface HydratedSymbiontConfig {
     graphqlEndpoint: string;
+    primaryShortDbId: string;
     databases: HydratedDatabaseConfig[];
-}
-
-export function defineSymbiontConfig<T extends SymbiontConfig>(config: T): T {
-    return config;
+    markdown?: MarkdownConfig;
+    caching?: CachingConfig;
 }
 
 /**

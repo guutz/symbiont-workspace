@@ -10,12 +10,18 @@
  * See `.docs/markdown-compatibility.md` for the full markdown syntax contract
  * and compatibility requirements between content sources and this processor.
  * 
+ * **ARCHITECTURE NOTE**: This processor does NOT detect features (syntax highlighting,
+ * math, images, etc.). Feature detection should happen during content ingestion
+ * (Notion→DB or Tiptap→DB sync) and be stored in the database. This keeps the
+ * renderer simple and performant. See `.docs/feature-detection-architecture.md`
+ * for details on the recommended approach.
+ * 
  * @module markdown-processor
  */
 
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
-import type { SymbiontConfig } from '../types.js';
+import type { MarkdownConfig, SymbiontConfig } from '../types.js';
 
 // @mdit plugins
 import { abbr } from '@mdit/plugin-abbr';
@@ -24,6 +30,7 @@ import { embed } from '@mdit/plugin-embed';
 import { figure } from '@mdit/plugin-figure';
 import { footnote } from '@mdit/plugin-footnote';
 import { imgLazyload } from '@mdit/plugin-img-lazyload';
+import { imgSize } from '@mdit/plugin-img-size';
 import { mark } from '@mdit/plugin-mark';
 import { spoiler } from '@mdit/plugin-spoiler';
 import { katex, loadMhchem } from '@mdit/plugin-katex';
@@ -39,7 +46,7 @@ const slugify = (text: string, options?: any) => {
 };
 
 // Track loaded Prism languages to avoid reloading
-const loadedLanguages = new Set<string>(['markup', 'css', 'clike', 'javascript']); // Built-in languages
+const loadedLanguages = new Set<string>();
 
 /**
  * Load a Prism language if not already loaded
@@ -64,38 +71,48 @@ interface TOCItem {
   child?: TOCItem[];
 }
 
-export interface MarkdownFeatures {
-  syntaxHighlighting?: string[];  // ['typescript', 'python'] - which languages were used
-  syntaxHighlightingTheme?: string;
-  math?: boolean;    // Was math rendering used? (client needs to load KaTeX CSS)
-  images?: boolean;  // Were images present? (client can initialize medium-zoom)
+export interface ContentFeatures {
+  syntaxHighlighting?: string[];  // ['javascript', 'python', 'rust']
+  math?: boolean;
+  images?: boolean;
+  // ... other features as needed
 }
 
 export interface MarkdownResult {
   html: string;
   toc: TOCItem[];
-  features: MarkdownFeatures;  // Detected during parsing
 }
 
 export interface MarkdownOptions {
   config: SymbiontConfig['markdown'];
+  features?: ContentFeatures;  // Optional: features detected during sync
 }
 
 /**
  * Configurable markdown processor using markdown-it
- * Features enabled/disabled via symbiont.config.js
+ * 
+ * @param content - Markdown content to render
+ * @param options - Configuration and optional features
+ * @param options.config - Markdown configuration from symbiont.config
+ * @param options.features - Pre-detected features from database (for optimization)
+ * 
+ * If `features.syntaxHighlighting` is provided, only those Prism languages will be preloaded.
+ * Otherwise, languages are loaded on-demand during rendering (lazy loading).
  */
 export async function parseMarkdown(
   content: string, 
   options: MarkdownOptions
 ): Promise<MarkdownResult> {
-  const config = options.config;
+  const config: MarkdownConfig = options.config ?? {};
+  const features = options.features;
   const toc: TOCItem[] = [];
-  const features: MarkdownFeatures = {};
   
-  // Track detected features
-  const detectedLanguages = new Set<string>();
-  let hasMath = false;
+  // Preload Prism languages if we know which ones are needed
+  if (features?.syntaxHighlighting && config.syntaxHighlighting?.enabled) {
+    for (const lang of features.syntaxHighlighting) {
+      loadPrismLanguage(lang);
+    }
+  }
   
   // Initialize markdown-it with base options
   const md = new MarkdownIt({
@@ -113,6 +130,7 @@ export async function parseMarkdown(
   md.use(spoiler);  // Spoilers: ||text||
   md.use(figure);   // Wrap images in <figure> with <figcaption>
   md.use(embed);    // Embed videos/content
+  md.use(imgSize);  // Image size syntax: ![alt](url =WxH)
   
   // Add lazy loading for images if enabled
   if (config.images?.lazy) {
@@ -161,11 +179,6 @@ export async function parseMarkdown(
     const token = tokens[idx];
     const code = token.content;
     const language = token.info.trim();
-    
-    // Track language usage
-    if (language) {
-      detectedLanguages.add(language);
-    }
     
     // Syntax highlighting if enabled
     if (config.syntaxHighlighting?.enabled && language && Prism) {
@@ -263,31 +276,7 @@ export async function parseMarkdown(
   // Parse with markdown-it (plugins handle footnotes now)
   const html = md.render(content);
 
-  // Detect if math was actually used in the content
-  if (html.includes('class="katex"') || html.includes('class="katex-display"')) {
-    hasMath = true;
-  }
-
-  // Detect if images were used (look for <img> or <figure> tags from plugin-figure)
-  const hasImages = html.includes('<img') || html.includes('<figure');
-
-  // Build features metadata (just report what was detected/used)
-  if (detectedLanguages.size > 0 && config.syntaxHighlighting?.enabled) {
-    features.syntaxHighlighting = Array.from(detectedLanguages);
-    features.syntaxHighlightingTheme = config.syntaxHighlighting.theme;
-  }
-  
-  // Math is always available, report if used
-  if (hasMath) {
-    features.math = true;
-  }
-
-  // Images were present - client can initialize medium-zoom
-  if (hasImages) {
-    features.images = true;
-  }
-
-  return { html, toc, features };
+  return { html, toc };
 }
 
 // Helper functions

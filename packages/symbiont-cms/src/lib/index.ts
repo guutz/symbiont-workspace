@@ -19,8 +19,6 @@ export type {
 	PublicSymbiontConfig
 } from './types.js';
 
-export { defineSymbiontConfig } from './types.js';
-
 // GraphQL client utilities (new simple API)
 export {
 	getPosts,

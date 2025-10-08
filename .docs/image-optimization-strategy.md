@@ -74,6 +74,50 @@ const retina = `${baseUrl}?w=1600&dpr=2`;
 
 ---
 
+## Image Size Hints with @mdit/plugin-img-size
+
+Symbiont CMS uses `@mdit/plugin-img-size` to support explicit width/height dimensions in markdown:
+
+```markdown
+<!-- Specify width and height for better CLS (Cumulative Layout Shift) -->
+![Alt text](https://nhost-url.com/image.jpg =800x600)
+
+<!-- Width only (auto height) -->
+![Alt text](https://nhost-url.com/image.jpg =800x)
+
+<!-- Height only (auto width) -->
+![Alt text](https://nhost-url.com/image.jpg =x600)
+
+<!-- Combined with Nhost optimization -->
+![Alt text](https://nhost-url.com/image.jpg?w=1200&fm=webp =800x600)
+```
+
+**Generated HTML:**
+```html
+<img src="https://nhost-url.com/image.jpg?w=1200&fm=webp" 
+     width="800" 
+     height="600" 
+     alt="Alt text">
+```
+
+### Benefits
+
+✅ **Better Performance**: Browser reserves space before image loads (no layout shift)  
+✅ **Clean Markdown**: Size hints are readable and portable  
+✅ **No Metadata Table**: Dimensions stored inline with content  
+✅ **Works with External URLs**: No database dependency  
+
+### During Notion Sync
+
+When downloading images from Notion, you can optionally:
+1. Detect original image dimensions
+2. Append size hint to markdown: `![alt](nhost-url =WxH)`
+3. Store in database
+
+This improves Core Web Vitals (CLS) without requiring a separate metadata table.
+
+---
+
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
@@ -86,11 +130,13 @@ const retina = `${baseUrl}?w=1600&dpr=2`;
  * 
  * @param markdown - Original markdown content with external image URLs
  * @param notionPageId - Notion page ID for organizing uploads
- * @returns Markdown with Nhost Storage URLs
+ * @param detectDimensions - Whether to detect and append image dimensions
+ * @returns Markdown with Nhost Storage URLs (and optional size hints)
  */
 export async function processMarkdownImages(
   markdown: string,
-  notionPageId: string
+  notionPageId: string,
+  detectDimensions = true
 ): Promise<string> {
   // 1. Extract all image URLs from markdown
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -98,6 +144,15 @@ export async function processMarkdownImages(
   
   // 2. Download and upload each image
   for (const [fullMatch, alt, url] of images) {
+    const { nhostUrl, width, height } = await downloadAndUploadImage(url, notionPageId, alt);
+    
+    // Optionally append size hint for better CLS
+    const sizeHint = (detectDimensions && width && height) ? ` =${width}x${height}` : '';
+    markdown = markdown.replace(fullMatch, `![${alt}](${nhostUrl}${sizeHint})`);
+  }
+  
+  return markdown;
+}
     const nhostUrl = await downloadAndUploadImage(url, notionPageId, alt);
     markdown = markdown.replace(fullMatch, `![${alt}](${nhostUrl})`);
   }
@@ -247,6 +302,48 @@ The existing QWER `ImgBanner` component already handles external URLs:
 
 ---
 
+## Why Inline URLs Instead of Separate Image Metadata?
+
+### ❌ Separate Metadata Table Approach (Not Recommended)
+
+Some systems store image metadata separately:
+
+```typescript
+// posts table
+{ content: "![cover](ref:image-1)" }
+
+// post_images table
+{ id: "image-1", url: "...", width: 1920, height: 1080 }
+```
+
+**Problems:**
+- ❌ **Not portable**: References break if exported
+- ❌ **Complex rendering**: Need joins or resolution step
+- ❌ **Fragile**: Broken references if images deleted
+- ❌ **Not standard**: Markdown parsers won't work
+
+### ✅ Inline URLs with Size Hints (Recommended)
+
+```markdown
+![Alt text](https://nhost-url.com/image.jpg?w=1200&fm=webp =800x600)
+```
+
+**Benefits:**
+- ✅ **Portable**: Markdown works anywhere (GitHub, editors, exports)
+- ✅ **Simple**: No joins, no resolution, just render
+- ✅ **Standards-compliant**: Works with any markdown parser
+- ✅ **Self-contained**: All info in markdown source
+- ✅ **Still queryable**: Can extract from markdown when needed
+
+### When You Need Image Metadata
+
+Nhost already tracks uploads in `storage.files`:
+- File size, upload date, MIME type
+- Can join with posts using regex on markdown content
+- Or extract image URLs during feature detection at sync time
+
+---
+
 ## Alternative Approaches (Considered but Not Recommended)
 
 ### Option 1: Keep External URLs
@@ -261,6 +358,13 @@ The existing QWER `ImgBanner` component already handles external URLs:
 - ❌ **Problem**: Slow first load (download + upload)
 - ❌ **Problem**: Complex caching logic
 - ⚠️ Good for gradual migration but not ideal long-term
+
+### Option 3: Separate Image Registry
+- Store image references in markdown: `![alt](ref:image-1)`
+- Resolve references from `post_images` table during rendering
+- ❌ **Problem**: Not portable, breaks markdown ecosystem
+- ❌ **Problem**: Adds complexity to rendering and exporting
+- ⚠️ Only useful if you need heavy image management (DAM system)
 
 ---
 
@@ -381,7 +485,7 @@ Symbiont CMS includes built-in support for image zoom functionality using the li
 
 1. **Server-side**: The markdown processor uses `@mdit/plugin-figure` to wrap standalone images in semantic `<figure>` tags with captions
 2. **Client-side**: Optional `medium-zoom` integration provides lightbox/zoom functionality
-3. **Feature Detection**: `MarkdownFeatures.images` tells the client when images are present
+3. **Feature Detection**: `post.features.images` from the database tells the client when images are present
 
 ### Setup
 
@@ -501,6 +605,6 @@ Any standalone image will automatically get the figure treatment:
 
 ---
 
-**Status:** 📋 Strategy Documented (Image Zoom: ✅ Implemented)  
+**Status:** 📋 Strategy Documented (Image Zoom: ✅ Implemented, Image Size Hints: ✅ Implemented)  
 **Priority:** ⚠️ High (Notion URLs expire after ~1 hour)  
-**Last Updated:** October 7, 2025
+**Last Updated:** October 8, 2025

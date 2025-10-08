@@ -5,6 +5,7 @@ export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webh
 export { syncFromNotion } from './server/sync.js';
 export { createPostLoad, load as postLoad } from './server/post-loader.js';
 export { requireEnvVar } from './utils/env.js';
+export { parseMarkdown } from './server/markdown-processor.js';
 
 // Config loading (server-only, returns full SymbiontConfig with rules/functions)
 export { loadConfig } from './server/load-config.js';
@@ -13,3 +14,9 @@ export type {
 	PostServerLoad,
 	PostLoadOptions
 } from './server/post-loader.js';
+
+export type {
+	ContentFeatures,
+	MarkdownOptions,
+	MarkdownResult
+} from './server/markdown-processor.js';

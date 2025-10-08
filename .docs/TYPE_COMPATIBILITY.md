@@ -1,326 +1,84 @@
-# Type Compatibility: QWER + Symbiont Integration
+# Type Compatibility Snapshot
 
-> **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
-
-## Overview
-Enhanced type compatibility between QWER's `Post.Post` type and Symbiont's `Post` type to enable seamless data transformation and reduce mapping complexity.
-
-This type system enables the hybrid approach described in the Zero-Rebuild CMS vision, allowing static and dynamic content to coexist during the transition.
+Use this file as the quick reference when mapping Symbiont posts into QWER components (or any other consumer).
 
 ---
 
-## Changes Made
+## 1. Core mapping
 
-### 1. **Symbiont Post Type Extended** (`packages/symbiont-cms/src/lib/types.ts`)
+| Symbiont (`Post`) | QWER (`Post.Post`) | Notes |
+|--------------------|--------------------|-------|
+| `id` | `slug`/internal references | QWER doesn’t need the UUID, but keep it around for related post lookups. |
+| `slug` | `slug` | Primary identifier across both systems. |
+| `title` (nullable) | `title` | Provide a fallback string when null. |
+| `content` (markdown) | `content` | QWER renders markdown via `PostPage`; HTML is produced server-side. |
+| `publish_at` | `published` | Ensure ISO format; fall back to `new Date().toISOString()` if undefined. |
+| `updated_at` | `updated` | Default to `publish_at` when empty. |
+| `tags` (`string[] | null`) | `tags` (`any[]`) | Coerce to `[]` to satisfy the QWER type. |
+| `summary` / `description` (optional) | `summary` / `description` | Populate if your schema extends these fields. |
+| `cover` (optional) | `cover` | QWER expects a URL; use Nhost once image migration lands. |
+| `language` (optional) | `language` | Defaults to `'en'` if omitted. |
 
-**Before:**
-```typescript
-export type Post = {
-    id: string;
-    title: string;
-    slug: string;
-    content: string | null;
-    publish_at: string | null;
-    tags?: string[] | null;
-    [key: string]: any;
-};
-```
-
-**After:**
-```typescript
-export type Post = {
-    id: string;
-    title: string | null;        // ✨ Now nullable for consistency
-    slug: string;
-    content: string | null;
-    publish_at: string | null;
-    updated_at?: string | null;  // ✨ Added for QWER compatibility
-    tags?: string[] | any[] | null;  // ✨ More flexible tag types
-    
-    // Optional QWER-compatible fields
-    summary?: string;            // ✨ Added
-    description?: string;        // ✨ Added
-    language?: string;           // ✨ Added
-    cover?: string;              // ✨ Added
-    
-    [key: string]: any;
-};
-```
-
-### 2. **Fixed QWER Post Transformation** (`packages/qwer-test/src/routes/+page.server.ts`)
-
-**Issue:** `coverStyle: 0` was causing type error
-```typescript
-// ❌ Before
-coverStyle: 0  // Type 'number' is not assignable to type 'CoverStyle'
-```
-
-**Solution:** Use enum value
-```typescript
-// ✅ After
-import { Post } from '$lib/types/post';  // Import as value, not type
-
-coverStyle: Post.CoverStyle.NONE
-```
-
-### 3. **Fixed [slug] Page Component** (`packages/qwer-test/src/routes/[slug]/+page.svelte`)
-
-**Issue:** Invalid closing tag structure with slots
-```svelte
-<!-- ❌ Before -->
-<PostPage>
-  <svelte:fragment slot="before">
-    <article>
-  </svelte:fragment>
-  <svelte:fragment slot="after">
-    </article>  <!-- Invalid! -->
-  </svelte:fragment>
-</PostPage>
-```
-
-**Solution:** Simplified structure
-```svelte
-<!-- ✅ After -->
-<div class="max-w-4xl mx-auto px-4 py-8">
-  <PostPage 
-    post={data.post} 
-    {formatDate}
-    classMap={{ ... }}
-  />
-</div>
-```
+`Post.CoverStyle.NONE` is the safe default unless you adopt QWER’s cover positioning options.
 
 ---
 
-## Type Mapping Strategy
+## 2. Recommended transform helper
 
-### Minimal Transformation Approach
+```ts
+import type { Post as SymbiontPost } from 'symbiont-cms';
+import { Post as QWERPost } from '$lib/types/post';
 
-With the enhanced Symbiont `Post` type, the transformation from database → QWER is more straightforward:
-
-```typescript
-// Symbiont Post (from database)
-{
-  id: "uuid-123",
-  title: "My Post",
-  slug: "my-post",
-  content: "# Hello",
-  publish_at: "2024-01-01T00:00:00Z",
-  updated_at: "2024-01-02T00:00:00Z",
-  tags: ["tech", "blog"]
-}
-
-// ↓ Transform to QWER Post.Post
-
-// QWER Post
-{
-  slug: "my-post",
-  title: "My Post",
-  content: "# Hello",
-  published: "2024-01-01T00:00:00Z",
-  updated: "2024-01-02T00:00:00Z",
-  tags: ["tech", "blog"],
-  // ... QWER-specific UI fields
-  coverStyle: Post.CoverStyle.NONE,
-  language: 'en',
-  // etc.
+export function toQWER(post: SymbiontPost): QWERPost.Post {
+	return {
+		slug: post.slug,
+		title: post.title ?? '(untitled)',
+		content: post.content ?? '',
+		description: post.description ?? '',
+		summary: post.summary ?? '',
+		language: post.language ?? 'en',
+		published: post.publish_at ?? new Date().toISOString(),
+		updated: post.updated_at ?? post.publish_at ?? new Date().toISOString(),
+		created: post.publish_at ?? new Date().toISOString(),
+		cover: post.cover ?? undefined,
+		coverStyle: QWERPost.CoverStyle.NONE,
+		coverCaption: undefined,
+		coverInPost: false,
+		tags: Array.isArray(post.tags) ? post.tags : [],
+		html: undefined, // supplied by symbiont postLoad
+		toc: undefined,
+		options: [],
+	};
 }
 ```
 
-### Optional Fields for Future Enhancement
-
-The extended Symbiont type now supports optional fields that can be populated directly from the database:
-
-- `summary` - Post excerpt/summary
-- `description` - SEO description
-- `language` - Content language code
-- `cover` - Cover image URL
-
-**Example GraphQL Query Enhancement:**
-```graphql
-query GetAllPosts {
-  posts {
-    id
-    title
-    slug
-    content
-    publish_at
-    updated_at
-    tags
-    summary      # ✨ Can add to schema
-    description  # ✨ Can add to schema
-    language     # ✨ Can add to schema
-    cover        # ✨ Can add to schema
-  }
-}
-```
+- Extend this helper when you add new columns (e.g. `reading_time`, `authors`).
+- Keep the function close to the consumer so TypeScript redlines any future breaking changes.
 
 ---
 
-## Benefits
+## 3. Optional schema extensions
 
-### ✅ **Type Safety**
-- No more `any` types in transformations
-- Compile-time checks for field access
-- Better IDE autocomplete
+To enrich the mapping without extra transformation logic, add columns to `public.posts`:
 
-### ✅ **Reduced Mapping**
-- Fewer fields need transformation
-- More direct pass-through of data
-- Less code to maintain
-
-### ✅ **Future-Proof**
-- Easy to add new fields to both systems
-- Graceful handling of optional fields
-- Extensible with `[key: string]: any`
-
-### ✅ **Developer Experience**
-- Clear type definitions
-- Self-documenting code
-- Easier to onboard new developers
-
----
-
-## Migration Path (Optional)
-
-If you want to fully align the types in the future:
-
-### 1. **Add Fields to Database Schema**
 ```sql
-ALTER TABLE posts ADD COLUMN summary TEXT;
-ALTER TABLE posts ADD COLUMN description TEXT;
-ALTER TABLE posts ADD COLUMN language VARCHAR(10) DEFAULT 'en';
-ALTER TABLE posts ADD COLUMN cover TEXT;
+ALTER TABLE public.posts ADD COLUMN summary text;
+ALTER TABLE public.posts ADD COLUMN description text;
+ALTER TABLE public.posts ADD COLUMN language text DEFAULT 'en';
+ALTER TABLE public.posts ADD COLUMN cover text;
 ```
 
-### 2. **Update Notion Sync to Extract These Fields**
-```typescript
-// In page-processor.ts
-const summary = extractSummary(page);
-const description = extractDescription(page);
-const language = extractLanguage(page);
-const cover = extractCoverImage(page);
-```
-
-### 3. **Update GraphQL Queries**
-```typescript
-export const GET_ALL_POSTS = gql`
-  query GetAllPosts {
-    posts {
-      id
-      title
-      slug
-      content
-      publish_at
-      updated_at
-      tags
-      summary
-      description
-      language
-      cover
-    }
-  }
-`;
-```
-
-### 4. **Simplify Transformation**
-```typescript
-// Much simpler transformation!
-const qwerPosts: Post.Post[] = postsFromDb.map((post) => ({
-  ...post,  // Most fields pass through!
-  published: post.publish_at ?? new Date().toISOString(),
-  updated: post.updated_at ?? post.publish_at ?? new Date().toISOString(),
-  coverStyle: Post.CoverStyle.NONE,
-  // Only QWER-specific UI fields need mapping
-}));
-```
+Update your GraphQL fragments/queries and Notion sync to populate the new fields. Once present, the helper above passes them straight through.
 
 ---
 
-## Type Reference
+## 4. Tooling tips
 
-### QWER Post Type
-```typescript
-namespace Post {
-  export type Post = {
-    slug: string;
-    title: string;
-    language: string;
-    description: string;
-    summary?: string;
-    content?: string;
-    html?: string;
-    published: string;
-    updated: string;
-    created: string;
-    cover?: string;
-    coverInPost?: boolean;
-    coverCaption?: string;
-    coverStyle: CoverStyle;
-    options?: Array<string>;
-    series_tag?: string;
-    series_title?: string;
-    prev?: string;
-    next?: string;
-    toc?: TOC.Heading[];
-    tags?: Array<any>;
-  };
-  
-  export enum CoverStyle {
-    TOP = 'TOP',
-    RIGHT = 'RIGHT',
-    BOT = 'BOT',
-    LEFT = 'LEFT',
-    IN = 'IN',
-    NONE = 'NONE',
-  }
-}
-```
-
-### Symbiont Post Type (Extended)
-```typescript
-export type Post = {
-    id: string;
-    title: string | null;
-    slug: string;
-    content: string | null;
-    publish_at: string | null;
-    updated_at?: string | null;
-    tags?: string[] | any[] | null;
-    summary?: string;
-    description?: string;
-    language?: string;
-    cover?: string;
-    [key: string]: any;
-};
-```
+- Import `Post` from QWER as both type *and* value when using enums: `import { Post } from '$lib/types/post';`.
+- Regenerate Symbiont’s types after edits by running `pnpm -F symbiont-cms build`; QWER consumes the emitted `.d.ts` files.
 
 ---
 
-## Checklist
+For the full integration story (stores, feeds, SSR), see `INTEGRATION_GUIDE.md`.
 
-- [x] Extended Symbiont `Post` type with QWER-compatible fields
-- [x] Fixed `coverStyle` enum usage
-- [x] Fixed [slug] page component structure
-- [x] Removed unused CSS
-- [x] Rebuilt symbiont-cms package
-- [x] All TypeScript errors resolved
-- [ ] (Optional) Add new fields to database schema
-- [ ] (Optional) Update Notion sync to extract metadata
-- [ ] (Optional) Simplify transformation logic
-
----
-
-## Related Documentation
-
-- **📦 [Symbiont CMS Complete Guide](symbiont-cms.md)** - Full system documentation
-- **🎯 [Zero-Rebuild CMS Vision](zero-rebuild-cms-vision.md)** - Architecture overview
-- **[Integration Guide](INTEGRATION_GUIDE.md)** - How QWER + Symbiont work together
-- **[Image Optimization Strategy](image-optimization-strategy.md)** - Handling media files
-
----
-
-**Status:** ✅ Type Compatibility Implemented
-**Build Status:** ✅ All Packages Building Successfully
-**TypeScript Errors:** ✅ None
-**Last Updated:** October 5, 2025
+**Last refreshed:** October 8, 2025

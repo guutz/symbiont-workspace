@@ -1,315 +1,165 @@
 # QWER-Test + Symbiont Integration Guide
 
-> **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
-
-## Overview
-Successfully integrated `qwer-test` with `symbiont-cms` to enable dynamic blog post loading from an Nhost/Hasura GraphQL database instead of static JSON files.
-
-This integration is **Phase 1** of the transition from QWER's build-time static generation to a fully dynamic CMS where content updates appear instantly without rebuilds.
-
-## Changes Made
-
-### 1. **Symbiont CMS Package** (`packages/symbiont-cms`)
-
-#### Added Client Export (`src/lib/client.ts`)
-- Created new client module to export GraphQL utilities
-- Enables other packages to query the database
-
-#### Extended Queries (`src/lib/client/queries.ts`)
-- Added `GET_ALL_POSTS` GraphQL query to fetch multiple posts
-- Added `getAllPosts()` function with pagination support
-- Added `tags` field to `GET_POST_BY_SLUG` query
-- Fixed import paths to use `.js` extension
-
-#### Updated Package Exports (`package.json`)
-- Added `./client` export path pointing to `dist/client.js`
-- Enables `import from 'symbiont-cms/client'`
+> Phase 1 of the zero-rebuild roadmap: the QWER demo app consumes live content from Symbiont CMS instead of generated JSON.
 
 ---
 
-### 2. **QWER Test Package** (`packages/qwer-test`)
+## 1. What lives where?
 
-#### Created Server Load Function (`src/routes/+page.server.ts`)
-- **NEW FILE** - Fetches posts from Nhost GraphQL endpoint
-- Transforms Symbiont posts to QWER `Post.Post` format
-- Handles missing environment variables gracefully
-- Returns empty array if database unavailable
+- **Symbiont CMS (`packages/symbiont-cms`)** – exposes sync handlers, markdown rendering, GraphQL helpers, and UI components.
+- **QWER Test App (`packages/qwer-test`)** – consumes the package and renders the blog using QWER’s layouts/stores.
+- **Nhost** – stores posts in `public.posts`; GraphQL queries filter by `source_id` (`short_db_ID`).
 
-#### Updated Posts Store (`src/lib/stores/posts.ts`)
-- **Changed** from importing static JSON to writable store
-- Added `initializePostsFromServer()` function
-- Modified `postsShow` to dynamically get posts from `postsAll`
-- Maintains backward compatibility with static JSON if available
-- Now uses `get(postsAll)` instead of `_allposts` array
-
-#### Updated Homepage Component (`src/routes/+page.svelte`)
-- Imports server data via `PageData` type
-- Calls `initializePostsFromServer(data.posts)` in `onMount`
-- Initializes stores with database data before filtering
-
-#### Created Individual Post Route (`src/routes/[slug]/`)
-- **NEW** `+page.server.ts` - Re-exports `postLoad as load` from `symbiont-cms/server`
-- **NEW** `+page.svelte` - Uses `PostPage` component from symbiont
-- Applies QWER styling via `classMap` prop
-- Integrates QWER's date formatting config
-
-#### Updated Feed Routes
-All three feed routes updated to fetch from database instead of static JSON:
-
-**`src/routes/feed.json/+server.ts`**
-- Added `getPosts()` async function
-- Uses `getAllPosts()` from symbiont
-- Transforms to JSON Feed format
-
-**`src/routes/sitemap.xml/+server.ts`**
-- Added `getPosts()` async function  
-- Uses `getAllPosts()` from symbiont
-- Generates sitemap with database posts
-
-**`src/routes/atom.xml/+server.ts`**
-- Added `getPosts()` async function
-- Uses `getAllPosts()` from symbiont
-- Generates Atom feed with database posts
-- Simplified tag handling
+```
+Notion page ─→ Symbiont sync ─→ Nhost Postgres ─→ `getPosts` / `postLoad` ─→ QWER UI
+```
 
 ---
 
-## How It Works
+## 2. Wiring steps
 
-### Architecture Flow
+1. **Build Symbiont** – `pnpm -F symbiont-cms build`. QWER pulls compiled JS from `dist/`.
+2. **Expose config to the app** – ensure `symbiont.config.js` defines `primaryShortDbId` that matches the posts you want on the blog.
+3. **Provide environment variables** – `packages/qwer-test/.env` needs `PUBLIC_NHOST_GRAPHQL_URL`. Secrets (admin secret, Notion key) stay in the workspace root `.env`.
+4. **Start the dev server** – `pnpm -F qwer-test dev`.
+5. **Sync data** – hit `/api/sync/poll-blog` or rely on the Notion webhook to populate Nhost.
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Notion Database                                    │
-│  ↓ (via symbiont sync webhook)                     │
-│  Nhost/Hasura GraphQL Database                     │
-└─────────────────────────────────────────────────────┘
-                         ↓
-┌─────────────────────────────────────────────────────┐
-│  SvelteKit Server Load Functions                    │
-│  • +page.server.ts (homepage - all posts)          │
-│  • [slug]/+page.server.ts (individual posts)       │
-│  • feed routes (RSS/Atom/JSON)                     │
-└─────────────────────────────────────────────────────┘
-                         ↓
-┌─────────────────────────────────────────────────────┐
-│  Svelte Stores (Client-side)                       │
-│  • postsAll - Map of all posts                     │
-│  • postsShow - Filtered/displayed posts            │
-└─────────────────────────────────────────────────────┘
-                         ↓
-┌─────────────────────────────────────────────────────┐
-│  UI Components                                      │
-│  • index_posts.svelte (homepage list)              │
-│  • PostPage (individual post)                      │
-└─────────────────────────────────────────────────────┘
+---
+
+## 3. Data flow inside QWER
+
+### Homepage
+
+`src/routes/+page.server.ts`
+
+```ts
+import { getPosts } from 'symbiont-cms/client';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async ({ fetch }) => {
+	const posts = await getPosts({ fetch, limit: 50 });
+	return { posts }; // serialised to the client
+};
 ```
 
-### Data Transformation
+`src/routes/+page.svelte`
 
-Symbiont Post → QWER Post:
-```typescript
-{
-  // Symbiont fields
-  slug: string;
-  title: string | null;
-  content: string | null;
-  publish_at: string | null;
-  updated_at: string | null;
-  tags: any;
-  
-  // ↓ Transformed to ↓
-  
-  // QWER fields
-  slug: string;
-  title: string;
-  content: string;
-  published: string;
-  updated: string;
-  summary: string;
-  tags: Array<any>;
-  // ... other QWER-specific fields
+```svelte
+import { onMount } from 'svelte';
+import { initializePostsFromServer } from '$lib/stores/posts';
+
+export let data;
+
+onMount(() => initializePostsFromServer(data.posts));
+```
+
+`src/lib/stores/posts.ts`
+
+- falls back to `$generated/posts.json` if present
+- otherwise uses the SSR payload supplied via `initializePostsFromServer`
+
+### Individual post pages
+
+`src/routes/[slug]/+page.server.ts`
+
+```ts
+export { postLoad as load } from 'symbiont-cms/server';
+```
+
+`postLoad` queries Hasura with the slug, runs `parseMarkdown`, and returns `{ post, html, toc, features }`. `PostPage` handles the layout while QWER-specific styling is passed through `classMap`.
+
+### Feeds (Atom / JSON / Sitemap)
+
+Each feed route shares a helper:
+
+```ts
+import { createSymbiontGraphQLClient, getAllPosts } from 'symbiont-cms/client';
+import { loadConfig } from 'virtual:symbiont/config';
+
+async function fetchPosts(fetch?: typeof globalThis.fetch) {
+	const config = await loadConfig();
+	const client = createSymbiontGraphQLClient(config.graphqlEndpoint, { fetch });
+	return getAllPosts(client, { short_db_ID: config.primaryShortDbId });
 }
 ```
 
+The routes then map Symbiont posts into the format required by each feed.
+
 ---
 
-## Setup Requirements
+## 4. Type alignment snapshot
 
-### Environment Variables
+| Symbiont (`Post`) | QWER (`Post.Post`) | Notes |
+|--------------------|--------------------|-------|
+| `slug` | `slug` | Used as the canonical key on both sides. |
+| `title` (nullable) | `title` (string) | Provide a fallback when mapping. |
+| `content` | `content` | Markdown string rendered by QWER components. |
+| `publish_at` | `published` | Use `publish_at ?? new Date().toISOString()`. |
+| `updated_at` | `updated` | Fall back to `publish_at` if null. |
+| `tags` | `tags` | QWER expects an array; ensure you coerce to `[]`. |
+| `summary`/`description` (optional) | `summary`/`description` | Populate if you extend the schema. |
 
-Add to your `.env` file:
-```bash
-PUBLIC_NHOST_GRAPHQL_URL=https://your-app.nhost.run/v1/graphql
+See `TYPE_COMPATIBILITY.md` for the full table and enum mapping (`Post.CoverStyle`, etc.).
+
+---
+
+## 5. Using multiple databases
+
+If `symbiont.config.js` defines several `databases[]`, you can override the default when fetching:
+
+```ts
+const posts = await getPosts({ fetch, shortDbId: 'documentation' });
 ```
 
-### Build Symbiont Package
-
-Before running qwer-test, build symbiont-cms:
-```bash
-cd packages/symbiont-cms
-npm run build
-```
-
-Or from workspace root:
-```bash
-pnpm -F symbiont-cms build
-```
+In feeds, pass `short_db_ID` explicitly to `getAllPosts`. The QWER stores already handle per-source maps by keying on slug, so the only change is deciding which dataset to hydrate.
 
 ---
 
-## Usage
+## 6. Handling empty/errored states
 
-### Development Mode
-
-```bash
-# Terminal 1: Start qwer-test dev server
-cd packages/qwer-test
-npm run dev
-
-# The site will fetch posts from your Nhost database
-# Posts will appear on homepage at http://localhost:5173
-# Individual posts at http://localhost:5173/[slug]
-```
-
-### Adding/Updating Posts
-
-Posts are managed through your Notion database:
-1. Edit pages in Notion
-2. Symbiont sync webhook automatically updates Nhost
-3. Refresh your qwer-test site to see changes
-4. No rebuild needed! ✨
+- `getPosts` returns an empty array if the GraphQL request fails (it logs and swallows the error). The homepage should render a "no posts" state gracefully.
+- `postLoad` throws a SvelteKit `error(404)` when a slug isn’t found – QWER’s routes surface the default 404 page.
+- If `PUBLIC_NHOST_GRAPHQL_URL` is absent, the server load functions bail early and return an empty result; you’ll see a warning in the terminal.
 
 ---
 
-## Benefits
+## 7. Optional enhancements
 
-### ✅ **Dynamic Content**
-- No rebuild required for new posts
-- Content updates propagate immediately
-- Real-time content management
-
-### ✅ **Database-Backed**
-- Query/filter posts efficiently
-- Scalable for large blogs
-- Full SQL/GraphQL power
-
-### ✅ **Best of Both Worlds**
-- QWER's beautiful UI and filtering
-- Symbiont's Notion → Database pipeline
-- SvelteKit's SSR/SSG flexibility
-
-### ✅ **Foundation for Full Dynamic CMS**
-- Posts: ✅ **Done** (this guide)
-- Images: 🚧 See `image-optimization-strategy.md`
-- Files: 🚧 See `dynamic-file-management.md`
-- Redirects: 🚧 See `dynamic-redirects-strategy.md`
-- Site Config: 🔮 Future enhancement
+- **Pagination** – extend `getPosts({ limit, offset })` and feed into QWER’s filtering/ordering utilities.
+- **Caching** – wrap GraphQL calls with an LRU cache or SvelteKit `depends` to avoid re-fetching on every request.
+- **Search** – repoint the search worker to query Nhost instead of static JSON once you enable full-text indexing.
+- **Preview mode** – expose a draft-only endpoint by filtering on `is_public` or status column in Hasura.
 
 ---
 
-## Backward Compatibility
+## 8. Checklist for new environments
 
-The posts store still attempts to load from `$generated/posts.json` if available:
-- Useful for local development without database
-- Graceful fallback if database unavailable
-- Can be removed once fully migrated
-
----
-
-## Next Steps
-
-### Optional Enhancements
-
-1. **Add Pagination**
-   - Modify `getAllPosts()` to use `offset`
-   - Implement page navigation in UI
-
-2. **Add Caching**
-   - Cache posts in-memory on server
-   - Add TTL-based revalidation
-
-3. **Source ID Filtering**
-   - Use `source_id` param to filter by database
-   - Support multiple Notion databases
-
-4. **Enhanced Metadata**
-   - Extract more fields from Notion
-   - Add cover images, authors, categories
-
-5. **Search Integration**
-   - Update search worker to query database
-   - Add full-text search via GraphQL
+- [ ] Configure `.env` in both the repo root and `packages/qwer-test/`
+- [ ] Build `symbiont-cms`
+- [ ] Run a manual sync (`/api/sync/poll-blog`) and confirm rows appear in `public.posts`
+- [ ] Load homepage and verify posts render
+- [ ] Visit `/feed.json` and `/sitemap.xml` to confirm they’re data-backed
 
 ---
 
-## Troubleshooting
+## 9. Troubleshooting quick hits
 
-### "Cannot find module 'symbiont-cms/client'"
-**Solution:** Build the symbiont-cms package first:
-```bash
-pnpm -F symbiont-cms build
-```
-
-### Posts not appearing
-**Check:**
-1. `PUBLIC_NHOST_GRAPHQL_URL` is set correctly
-2. Database has posts with `publish_at` dates
-3. Check browser console for errors
-4. Verify GraphQL endpoint is accessible
-
-### Type errors in QWER files
-**Solution:** The stores and components are designed to work with or without database:
-- Check `data.posts` exists in `+page.svelte`
-- Ensure `initializePostsFromServer` is called before filtering
+| Issue | Fix |
+|-------|-----|
+| `Cannot find module 'symbiont-cms/…'` | Re-run `pnpm -F symbiont-cms build` so QWER sees the compiled output. |
+| Homepage blank | Ensure `PUBLIC_NHOST_GRAPHQL_URL` is set, posts exist with `publish_at`, and no errors are logged during sync. |
+| Notion edits not appearing | Webhook not configured? Use the manual poll endpoint or double-check Notion integration permissions. |
+| Type mismatches in `+page.server.ts` | Import `Post` namespace as a value for enum access: `import { Post } from '$lib/types/post';` |
 
 ---
 
-## Files Modified Summary
+## 10. Reference material
 
-### Created (7 files)
-- `packages/symbiont-cms/src/lib/client.ts`
-- `packages/qwer-test/src/routes/+page.server.ts`
-- `packages/qwer-test/src/routes/[slug]/+page.server.ts`
-- `packages/qwer-test/src/routes/[slug]/+page.svelte`
-
-### Modified (8 files)
-- `packages/symbiont-cms/src/lib/client/queries.ts`
-- `packages/symbiont-cms/package.json`
-- `packages/qwer-test/src/lib/stores/posts.ts`
-- `packages/qwer-test/src/routes/+page.svelte`
-- `packages/qwer-test/src/routes/feed.json/+server.ts`
-- `packages/qwer-test/src/routes/sitemap.xml/+server.ts`
-- `packages/qwer-test/src/routes/atom.xml/+server.ts`
+- `symbiont-cms.md` – full package API and configuration notes
+- `TYPE_COMPATIBILITY.md` – extended mapping table
+- `markdown-compatibility.md` – supported syntax/features
+- `dynamic-file-management.md`, `image-optimization-strategy.md` – next-phase plans once assets go dynamic
 
 ---
 
-## Migration Checklist
-
-- [x] Add `GET_ALL_POSTS` query to symbiont
-- [x] Export client module from symbiont package
-- [x] Create server load function for homepage
-- [x] Update posts store to accept dynamic data
-- [x] Initialize posts from server in +page.svelte
-- [x] Create [slug] route for individual posts
-- [x] Update feed.json to use database
-- [x] Update sitemap.xml to use database
-- [x] Update atom.xml to use database
-- [ ] Build symbiont-cms package
-- [ ] Test qwer-test with live database
-- [ ] Remove static JSON generation (optional)
-
----
-
-## Related Documentation
-
-- **📦 [Symbiont CMS Complete Guide](symbiont-cms.md)** - Full system documentation
-- **🎯 [Zero-Rebuild CMS Vision](zero-rebuild-cms-vision.md)** - The big picture
-- **[Image Optimization Strategy](image-optimization-strategy.md)** - Image handling
-- **[Dynamic File Management](dynamic-file-management.md)** - File uploads
-- **[Dynamic Redirects Strategy](dynamic-redirects-strategy.md)** - URL management
-
----
-
-**Status:** ✅ Implementation Complete (Phase 1: Posts)
-**Last Updated:** October 5, 2025
+**Last refreshed:** October 8, 2025

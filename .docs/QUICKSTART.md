@@ -1,109 +1,81 @@
-# 🚀 Quick Start: Running QWER-Test with Symbiont Database
+# 🚀 Quick Start: QWER-Test + Symbiont CMS
+
+Spin up the demo stack (Symbiont CMS feeding the QWER theme) in minutes.
+
+---
 
 ## Prerequisites
-- Nhost project with GraphQL endpoint
-- Posts synced to your database (via Symbiont)
-- Node.js 18+ and pnpm installed
 
-## Step 1: Configure Environment
+- Node.js 18+ and `pnpm`
+- An Nhost project (grab the GraphQL endpoint + admin secret)
+- At least one published post in your Notion database synced to Nhost
 
-Create `.env` file in `packages/qwer-test/`:
+---
+
+## 1. Wire up environment variables
+
+Create `packages/qwer-test/.env` (copy `/.env.example` if present):
 
 ```bash
-PUBLIC_NHOST_GRAPHQL_URL=https://your-project.nhost.run/v1/graphql
+PUBLIC_NHOST_GRAPHQL_URL=https://YOUR-PROJECT.nhost.run/v1/graphql
+PUBLIC_SITE_URL=http://localhost:5173            # optional but handy for feeds
 ```
 
-💡 **Tip:** Copy from `.env.example` and fill in your values
+Keep secrets (`NHOST_ADMIN_SECRET`, `NOTION_API_KEY`) in the workspace root `.env` so server routes can access them.
 
-## Step 2: Build Symbiont Package
+---
 
-From workspace root:
+## 2. Build the Symbiont package (once per code change)
 
 ```bash
 pnpm -F symbiont-cms build
 ```
 
-Or from symbiont-cms directory:
+The QWER example consumes the built output from `packages/symbiont-cms/dist`. Re-run this command whenever you edit the package.
 
-```bash
-cd packages/symbiont-cms
-npm run build
-```
+---
 
-## Step 3: Run QWER-Test
-
-From workspace root:
+## 3. Start the QWER test app
 
 ```bash
 pnpm -F qwer-test dev
 ```
 
-Or from qwer-test directory:
+Visit `http://localhost:5173`:
 
-```bash
-cd packages/qwer-test
-npm run dev
-```
-
-## Step 4: Visit Your Site
-
-Open browser to: **http://localhost:5173**
-
-- Homepage: All posts from database
-- Individual post: `http://localhost:5173/[slug]`
-
-## 🎉 That's it!
-
-Your blog is now:
-- ✅ Pulling posts from Nhost database
-- ✅ Displaying with QWER's beautiful UI
-- ✅ Updating without rebuilds
-
-💡 **This is the foundation of the Zero-Rebuild CMS!** See `zero-rebuild-cms-vision.md` for the complete architecture vision.
-
-## Troubleshooting
-
-### No posts showing?
-
-1. Check browser console for errors
-2. Verify `PUBLIC_NHOST_GRAPHQL_URL` is correct
-3. Ensure posts exist in database with `publish_at` dates
-4. Try visiting GraphQL endpoint directly in browser
-
-### Module not found errors?
-
-```bash
-# Rebuild symbiont-cms
-pnpm -F symbiont-cms build
-
-# Reinstall dependencies
-pnpm install
-```
-
-### TypeScript errors?
-
-- Restart your editor/language server
-- Run `pnpm -F qwer-test check` to see actual errors
-- Some errors may resolve after first dev server start
-
-## Next Steps
-
-- [ ] Add your first post in Notion
-- [ ] Trigger Symbiont webhook to sync
-- [ ] Refresh your site to see new post
-- [ ] Customize the `[slug]/+page.svelte` styling
-- [ ] Set up pagination (see INTEGRATION_GUIDE.md)
-
-## Learn More
-
-- **Symbiont CMS Guide**: `.docs/symbiont-cms.md` 📦 - Complete guide
-- **Architecture vision**: `.docs/zero-rebuild-cms-vision.md` 🎯
-- Full integration guide: `.docs/INTEGRATION_GUIDE.md`
-- Image strategy: `.docs/image-optimization-strategy.md`
-- File management: `.docs/dynamic-file-management.md`
-- Redirects: `.docs/dynamic-redirects-strategy.md`
-- QWER documentation: `packages/qwer-test/README.md`
+- `/` – shows the latest posts pulled from Nhost via `getPosts`
+- `/[slug]` – server-rendered post page using `postLoad` + `PostPage`
+- `/feed.json`, `/sitemap.xml`, `/atom.xml` – all backed by live data
 
 ---
 
-**Need help?** Check the full integration guide for detailed architecture and troubleshooting!
+## 4. Sync new content
+
+Trigger a manual sync while the dev server runs:
+
+```bash
+curl http://localhost:5173/api/sync/poll-blog
+```
+
+Within a second or two the homepage should reflect your latest Notion changes. Use the webhook endpoint for real-time updates in production.
+
+---
+
+## Troubleshooting cheat sheet
+
+| Symptom | Try this |
+|---------|----------|
+| Empty homepage | Verify `PUBLIC_NHOST_GRAPHQL_URL`, ensure posts have `publish_at`, and rebuild `symbiont-cms`. |
+| `Cannot find module 'symbiont-cms/…'` | Run `pnpm -F symbiont-cms build` again – the QWER app reads the compiled output. |
+| Type errors in the editor | Restart the TS server or run `pnpm -F qwer-test check` after the first successful dev build. |
+| Sync endpoint 500s | Confirm `NHOST_ADMIN_SECRET` and `NOTION_API_KEY` exist in the root `.env`. |
+
+---
+
+## Where to go next
+
+- Walk through the full wiring in `INTEGRATION_GUIDE.md`
+- Review `TYPE_COMPATIBILITY.md` before mapping Symbiont posts into custom UIs
+- Start planning Phase 2 (dynamic assets) with `image-optimization-strategy.md`
+
+**Need deeper context?** The architectural rationale lives in `symbiont-cms.md` and `zero-rebuild-cms-vision.md`.

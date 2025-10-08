@@ -2,7 +2,8 @@ import type { LoadEvent } from '@sveltejs/kit';
 import { error } from '@sveltejs/kit';
 import type { GraphQLClient } from 'graphql-request';
 import { createSymbiontGraphQLClient, getPostBySlug } from '../client/queries.js';
-import { loadConfig } from '../client/load-config.js'; // don't need admin gql access
+import { loadConfig as loadPublicConfig } from '../client/load-config.js'; // don't need admin gql access for fetch
+import { loadConfig as loadServerConfig } from './load-config.js';
 import { parseMarkdown } from './markdown-processor.js';
 import type { Post } from '../types.js';
 
@@ -52,7 +53,7 @@ export function createPostLoad<Event extends PostLoadEvent = PostLoadEvent>(
 	
 	return async (event) => {
 		// Load config to get graphqlEndpoint if not provided
-		const config = await loadConfig();
+		const config = await loadPublicConfig();
 		const graphqlEndpoint = options.graphqlEndpoint ?? config.graphqlEndpoint;
 		const createClient = options.createClient ?? ((endpoint: string, event: Event) => defaultCreateClient(endpoint, event));
 		const fetchPost = options.fetchPost ?? ((client: GraphQLClient, slug: string, event: Event) => defaultFetchPost(client, slug));
@@ -84,7 +85,7 @@ export const load = createPostLoad();
 
 // Export ISR config if enabled
 export const config = (async () => {
-  const symbiontConfig = await loadConfig();
+	const symbiontConfig = await loadServerConfig();
   
   if (symbiontConfig.caching?.isr?.enabled) {
     // Note: Bypass tokens should be accessed from environment at runtime

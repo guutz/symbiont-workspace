@@ -1,39 +1,36 @@
-# Documentation Archive
+# Documentation Hub
 
-This folder contains AI-generated documentation created during development sessions.
+This folder is the living knowledge base for the Symbiont CMS workspace. The docs are grouped by intent so you can dive straight to architecture, implementation, or roadmap notes without wading through repetition.
 
-## 📚 Contents
+## Core Concepts
 
-### Core Documentation
-- **symbiont-cms.md** - 📦 **Complete Symbiont CMS Guide** - Philosophy, architecture, API, and examples
-- **zero-rebuild-cms-vision.md** - 🎯 **Transition strategy** - From static to fully dynamic CMS
+- **`symbiont-cms.md`** – System overview, architecture, configuration, and package API surface
+- **`zero-rebuild-cms-vision.md`** – The product vision and phased roadmap toward a zero-rebuild CMS
 
-### Implementation Guides
-- **QUICKSTART.md** - Quick start guide for running the integrated system
-- **INTEGRATION_GUIDE.md** - Comprehensive guide for QWER + Symbiont integration
-- **TYPE_COMPATIBILITY.md** - Type system improvements and compatibility details
-- **markdown-compatibility.md** - 📝 **Notion & Tiptap markdown syntax compatibility** reference
-- **notion-color-workaround.md** - 🎨 **Workaround for Notion text colors & highlights** (notion-to-md v3.1.9 limitation)
+## Implementation Guides
 
-### Strategy Documents
-- **image-optimization-strategy.md** - Image handling: Notion AWS S3 → Nhost Storage migration + Image zoom/lightbox feature
-- **dynamic-file-management.md** - File upload & storage strategy for dynamic CMS
-- **dynamic-redirects-strategy.md** - Database-driven redirects without rebuilds
+- **`QUICKSTART.md`** – Minimal steps to boot the workspace against Nhost
+- **`INTEGRATION_GUIDE.md`** – How Symbiont wires into QWER, including data transforms and store behaviour
+- **`TYPE_COMPATIBILITY.md`** – Snapshot of key type mappings and conventions (linked from the integration guide)
 
-## 🎯 Reading Order
+## Content Pipeline
 
-If you're new to this project, read in this order:
+- **`markdown-compatibility.md`** – Supported syntax, plugins, and testing guidance for Notion/Tiptap content
+- **`feature-detection-architecture.md`** – How and where feature flags are derived during ingestion
+- **`notion-color-workaround.md`** – Temporary instructions for text colour handling until notion-to-md v4 ships
 
-1. **symbiont-cms.md** - Understand the complete Symbiont CMS system (philosophy + API)
-2. **zero-rebuild-cms-vision.md** - Understand the dynamic CMS direction
-3. **QUICKSTART.md** - Get the system running locally
-4. **INTEGRATION_GUIDE.md** - Learn how QWER + Symbiont work together
-5. Dive into specific strategy docs as needed
+## Platform Strategy
 
-## 🔄 Regeneration
+- **`dynamic-file-management.md`** – File storage approach, bucket configuration, and migration phases
+- **`image-optimization-strategy.md`** – Concrete plan for normalising images into Nhost Storage with size hints
+- **`dynamic-redirects-strategy.md`** – Database-driven redirects, middleware patterns, and analytics follow-up
 
-These documents can be regenerated at any time by asking the AI assistant to recreate them. They capture point-in-time implementation details that may become outdated as the codebase evolves.
+## What Changed in This Refresh?
+
+- Consolidated overlapping guidance and removed deprecated documents (for example, the old server-side markdown v2 write-up)
+- Folded ID usage notes and type-alignment context into the integration and core docs
+- Updated statuses so "implemented" means shipped in the repo as of October 2025
 
 ---
 
-**Last Generated:** October 7, 2025
+**Last refreshed:** October 8, 2025

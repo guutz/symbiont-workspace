@@ -2,6 +2,8 @@
 
 > **Critical**: This document defines the markdown syntax contract between content sources (Notion, Tiptap) and the Symbiont CMS markdown processor
 
+> **Architecture Note**: Feature detection (syntax highlighting, math, images) should happen during content ingestion (Notion→DB or Tiptap→DB sync) and be stored in the database as feature flags. The markdown processor itself does NOT track features. See `.docs/feature-detection-architecture.md` for implementation details.
+
 ## Overview
 
 Symbiont CMS content comes from two sources:
@@ -153,13 +155,19 @@ Access raw Notion API blocks and transform color annotations before markdown con
 #### 6. **Images**
 ```markdown
 ![Alt text](https://notion-aws-s3-url.com/image.png)
+
+# With size hints for better performance (CLS)
+![Alt text](https://nhost-url.com/image.jpg =800x600)
 ```
 
-✅ **Supported** by `@mdit/plugin-figure` - wraps in `<figure>` + caption
-✅ **Supported** by `@mdit/plugin-img-lazyload` - adds loading="lazy"
+✅ **Supported** by `@mdit/plugin-figure` - wraps in `<figure>` + caption  
+✅ **Supported** by `@mdit/plugin-img-lazyload` - adds loading="lazy"  
+✅ **Supported** by `@mdit/plugin-img-size` - width/height hints (=WxH syntax)  
 ✅ **Optimized** by our custom image renderer (Nhost Storage URLs)
 
-#### 6. **Code Blocks with Language**
+**Recommended**: Append size hints during Notion sync for better Core Web Vitals (prevents layout shift).
+
+#### 7. **Code Blocks with Language**
 ```markdown
 \```typescript
 const x = 1;
@@ -280,6 +288,9 @@ Text with footnote[^1]
 5. ✅ **@mdit/plugin-abbr** - Abbreviations
 6. ✅ **@mdit/plugin-attrs** - Attributes ({#id .class})
 7. ✅ **@mdit/plugin-embed** - Auto-embed URLs
+8. ✅ **@mdit/plugin-figure** - Image figures with captions
+9. ✅ **@mdit/plugin-img-lazyload** - Lazy loading for images
+10. ✅ **@mdit/plugin-img-size** - Image dimensions (![](url =WxH))
 8. ✅ **@mdit/plugin-figure** - Image figures with captions
 9. ✅ **@mdit/plugin-img-lazyload** - Lazy loading for images
 

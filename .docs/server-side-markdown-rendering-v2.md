@@ -1,5 +1,15 @@
 # Server-Side Markdown Rendering Strategy
 
+> **⚠️ DEPRECATED**: This document describes an older architecture where `parseMarkdown` returned feature metadata. 
+> 
+> **See instead**: 
+> - `.docs/feature-detection-architecture.md` - Current architecture (features detected at ingestion, stored in database)
+> - `.docs/markdown-compatibility.md` - Markdown syntax compatibility reference
+>
+> This file is kept for historical reference only.
+
+---
+
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
 ## Overview
