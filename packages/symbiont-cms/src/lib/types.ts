@@ -72,6 +72,39 @@ type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
 /**
  * Database configuration blueprint.
  * Contains both public data (short_db_ID, notionDatabaseId) and private server-only rules.
+ * 
+ * Publishing Rules (work together, both optional with defaults):
+ * 
+ * - **isPublicRule**: Boolean gate - determines IF a page should be published
+ *   - Default: `() => true` (all pages pass the gate)
+ *   - Use for status checks, flags, or simple published/unpublished logic
+ * 
+ * - **publishDateRule**: Date extraction - determines WHEN a page should be published
+ *   - Default: uses `page.last_edited_time` (always present in Notion)
+ *   - Use for custom date properties or complex date logic
+ * 
+ * **Both rules must pass** for a page to be published:
+ * 1. isPublicRule must return true
+ * 2. publishDateRule must return a valid date (not null)
+ * 
+ * @example
+ * // Simple: just gate by status (uses default last_edited_time)
+ * {
+ *   isPublicRule: (page) => page.properties.Status?.select?.name === 'Published'
+ * }
+ * 
+ * @example
+ * // Custom date property (allows all pages through gate)
+ * {
+ *   publishDateRule: (page) => page.properties['Go Live']?.date?.start || null
+ * }
+ * 
+ * @example
+ * // Complex: both rules working together
+ * {
+ *   isPublicRule: (page) => page.properties.Ready?.checkbox === true,
+ *   publishDateRule: (page) => page.properties['Embargo Date']?.date?.start || null
+ * }
  */
 export interface DatabaseBlueprint {
     /** PUBLIC: A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-blog'. */
@@ -83,8 +116,51 @@ export interface DatabaseBlueprint {
     /** PRIVATE: Whether the Symbiont web editor should be exposed for this database. */
     webEditorEnabled?: boolean;
 
-    /** PRIVATE: A function that determines if a Notion page should be considered public. */
-    isPublicRule: (page: PageObjectResponse) => boolean;
+    /** 
+     * PRIVATE: Optional boolean gate that determines IF a page should be published.
+     * Works in combination with publishDateRule to determine final publish_at value.
+     * 
+     * Default: `() => true` (all pages pass the gate)
+     * 
+     * @example
+     * // Only publish pages marked as "Published"
+     * isPublicRule: (page) => page.properties.Status?.select?.name === 'Published'
+     * 
+     * @example
+     * // Only publish pages with a checked "Ready" checkbox
+     * isPublicRule: (page) => page.properties.Ready?.checkbox === true
+     */
+    isPublicRule?: (page: PageObjectResponse) => boolean;
+
+    /**
+     * PRIVATE: Optional function that extracts the publish date from a page.
+     * Works in combination with isPublicRule to determine final publish_at value.
+     * 
+     * Default: Uses `page.last_edited_time` (always present in Notion)
+     * 
+     * Return an ISO date string to publish at that date, or null to mark as unpublished.
+     * 
+     * @example
+     * // Use a custom "Go Live" date property
+     * publishDateRule: (page) => page.properties['Go Live']?.date?.start || null
+     * 
+     * @example
+     * // Use 'Publish Date' property with fallback to last_edited_time
+     * publishDateRule: (page) => {
+     *   return page.properties['Publish Date']?.date?.start || page.last_edited_time;
+     * }
+     * 
+     * @example
+     * // Use scheduled date only if status is "Scheduled"
+     * publishDateRule: (page) => {
+     *   const status = page.properties.Status?.select?.name;
+     *   if (status === 'Scheduled') {
+     *     return page.properties['Scheduled Date']?.date?.start || null;
+     *   }
+     *   return page.last_edited_time;
+     * }
+     */
+    publishDateRule?: (page: PageObjectResponse) => string | null;
 
     /** PRIVATE: A function that determines the source of truth for a page's content. */
     sourceOfTruthRule: (page: PageObjectResponse) => SourceOfTruth;

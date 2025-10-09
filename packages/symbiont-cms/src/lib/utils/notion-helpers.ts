@@ -23,11 +23,34 @@ export const getTags = (page: PageObjectResponse): string[] =>
 
 /**
  * Get publish date based on config rules
+ * 
+ * Uses complementary rules that work together:
+ * 1. isPublicRule (optional): Boolean gate - must return true to publish
+ *    - Default: () => true (all pages pass)
+ * 2. publishDateRule (optional): Date extraction - provides the publish date
+ *    - Default: uses page.last_edited_time (always present in Notion)
+ * 
+ * Both rules must pass for a page to be published:
+ * - isPublicRule must return true (or be undefined = default true)
+ * - publishDateRule must return non-null date (or be undefined = use default)
  */
-export const getPublishDate = (page: PageObjectResponse, config: HydratedDatabaseConfig): string | null => 
-	config.isPublicRule(page) 
-		? (page.properties['Publish Date'] as any)?.date?.start ?? new Date().toISOString()
-		: null;
+export const getPublishDate = (page: PageObjectResponse, config: HydratedDatabaseConfig): string | null => {
+	// Step 1: Check the boolean gate (default: allow all)
+	const isPublic = config.isPublicRule ? config.isPublicRule(page) : true;
+	
+	// If the gate is closed, don't publish
+	if (!isPublic) {
+		return null;
+	}
+	
+	// Step 2: Extract the publish date (default: page.last_edited_time)
+	if (config.publishDateRule) {
+		return config.publishDateRule(page);
+	}
+	
+	// Default date extraction: use Notion's last_edited_time (always present)
+	return page.last_edited_time;
+};
 
 /**
  * Default slug rule function that reads from the Slug property

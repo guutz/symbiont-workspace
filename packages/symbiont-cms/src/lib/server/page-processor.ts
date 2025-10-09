@@ -4,6 +4,7 @@ import { getTitle, getShortPostID, getTags, getPublishDate, defaultSlugRule } fr
 import { createSlug, generateUniqueSlugSync } from '../utils/slug-helpers.js';
 import { gqlAdminClient, UPSERT_POST_MUTATION, CHECK_SLUG_QUERY, type SlugCheckResponse } from './graphql.js';
 import { pageToMarkdown, syncSlugToNotion } from './notion.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * Process a page in batch mode (with pre-fetched data)
@@ -14,6 +15,12 @@ export async function processPageBatch(
 	existingPostsByPageId: Map<string, { id: string; slug: string }>,
 	usedSlugs: Set<string>
 ): Promise<void> {
+	const logger = createLogger({ 
+		operation: 'process_page_batch', 
+		databaseId: config.short_db_ID,
+		pageId: page.id
+	});
+	
 	const title = getTitle(page);
 	const short_post_ID = getShortPostID(page);
 	const mdString = await pageToMarkdown(page.id);
@@ -31,11 +38,19 @@ export async function processPageBatch(
 			if (usedSlugs.has(notionSlug)) {
 				const uniqueSlug = generateUniqueSlugSync(notionSlug, usedSlugs, page.id);
 				usedSlugs.add(uniqueSlug);
-				console.log(`[symbiont] Notion slug '${notionSlug}' conflicts, using '${uniqueSlug}' for page '${page.id}'`);
+				logger.warn({ 
+					event: 'slug_conflict_resolved', 
+					requested_slug: notionSlug, 
+					final_slug: uniqueSlug 
+				});
 				slug = uniqueSlug;
 			} else {
 				usedSlugs.add(notionSlug);
-				console.log(`[symbiont] Updating slug from '${existingPost.slug}' to '${notionSlug}' per Notion change`);
+				logger.info({ 
+					event: 'slug_updated', 
+					old_slug: existingPost.slug, 
+					new_slug: notionSlug 
+				});
 				slug = notionSlug;
 			}
 		} else {
@@ -52,7 +67,11 @@ export async function processPageBatch(
 
 	// Upsert post
 	await upsertPost(page, config, title, short_post_ID, slug, mdString);
-	console.log(`[symbiont] ${existingPost ? 'Updated' : 'Created'} post '${slug}' for page '${page.id}'`);
+	logger.info({ 
+		event: existingPost ? 'post_updated' : 'post_created', 
+		slug, 
+		title 
+	});
 }
 
 /**
@@ -63,6 +82,12 @@ export async function processPageWebhook(
 	config: HydratedDatabaseConfig,
 	existingPost: { id: string; slug: string } | null
 ): Promise<void> {
+	const logger = createLogger({ 
+		operation: 'process_page_webhook', 
+		databaseId: config.short_db_ID,
+		pageId: page.id
+	});
+	
 	const title = getTitle(page);
 	const short_post_ID = getShortPostID(page);
 	const mdString = await pageToMarkdown(page.id);
@@ -77,17 +102,25 @@ export async function processPageWebhook(
 		if (notionSlug && notionSlug !== existingPost.slug) {
 			// User wants to override - validate it's unique
 			const conflictCheck = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-				source_id: config.short_db_ID,
+				short_db_ID: config.short_db_ID,
 				slug: notionSlug
 			});
 			
 			if (conflictCheck.posts.length > 0) {
 				// Conflict - generate unique variant
 				const uniqueSlug = await resolveSlugConflict(page, config, notionSlug);
-				console.log(`[symbiont] Notion slug '${notionSlug}' conflicts, using '${uniqueSlug}' for page '${page.id}'`);
+				logger.warn({ 
+					event: 'slug_conflict_resolved', 
+					requested_slug: notionSlug, 
+					final_slug: uniqueSlug 
+				});
 				slug = uniqueSlug;
 			} else {
-				console.log(`[symbiont] Updating slug from '${existingPost.slug}' to '${notionSlug}' per Notion change`);
+				logger.info({ 
+					event: 'slug_updated', 
+					old_slug: existingPost.slug, 
+					new_slug: notionSlug 
+				});
 				slug = notionSlug;
 			}
 		} else {
@@ -104,7 +137,11 @@ export async function processPageWebhook(
 
 	// Upsert post
 	await upsertPost(page, config, title, short_post_ID, slug, mdString);
-	console.log(`[symbiont] ${existingPost ? 'Updated' : 'Created'} post '${slug}' for page '${page.id}'`);
+	logger.info({ 
+		event: existingPost ? 'post_updated' : 'post_created', 
+		slug, 
+		title 
+	});
 }
 
 /**
@@ -117,12 +154,17 @@ async function resolveNewSlugBatch(
 	shortId: string | null,
 	usedSlugs: Set<string>
 ): Promise<string> {
+	const logger = createLogger({ 
+		operation: 'resolve_slug_batch',
+		pageId: page.id 
+	});
+	
 	const slugRule = config.slugRule || defaultSlugRule;
 	const customSlug = slugRule(page);
 
 	if (customSlug && !usedSlugs.has(customSlug)) {
 		usedSlugs.add(customSlug);
-		console.log(`[symbiont] Using custom slug '${customSlug}'`);
+		logger.debug({ event: 'using_custom_slug', slug: customSlug });
 		return customSlug;
 	}
 
@@ -132,7 +174,7 @@ async function resolveNewSlugBatch(
 	// Try base slug first
 	if (!usedSlugs.has(baseSlug)) {
 		usedSlugs.add(baseSlug);
-		console.log(`[symbiont] Generated slug '${baseSlug}'`);
+		logger.debug({ event: 'generated_slug', slug: baseSlug });
 		return baseSlug;
 	}
 
@@ -141,7 +183,11 @@ async function resolveNewSlugBatch(
 		const slugWithId = `${baseSlug}-${shortId.toLowerCase()}`;
 		if (!usedSlugs.has(slugWithId)) {
 			usedSlugs.add(slugWithId);
-			console.log(`[symbiont] Slug '${baseSlug}' taken, using '${slugWithId}'`);
+			logger.debug({ 
+				event: 'slug_conflict_used_short_id', 
+				base_slug: baseSlug, 
+				final_slug: slugWithId 
+			});
 			return slugWithId;
 		}
 	}
@@ -149,7 +195,12 @@ async function resolveNewSlugBatch(
 	// Still conflict - use numbered suffix
 	const finalSlug = generateUniqueSlugSync(baseSlug, usedSlugs, page.id);
 	usedSlugs.add(finalSlug);
-	console.log(`[symbiont] Generated unique slug '${finalSlug}'${customSlug ? ` (custom '${customSlug}' was taken)` : ''}`);
+	logger.debug({ 
+		event: 'generated_unique_slug', 
+		base_slug: baseSlug,
+		final_slug: finalSlug,
+		custom_was_taken: !!customSlug
+	});
 	return finalSlug;
 }
 
@@ -161,6 +212,11 @@ async function resolveNewSlugWebhook(
 	config: HydratedDatabaseConfig,
 	title: string
 ): Promise<string> {
+	const logger = createLogger({ 
+		operation: 'resolve_slug_webhook',
+		pageId: page.id 
+	});
+	
 	const slugRule = config.slugRule || defaultSlugRule;
 	const customSlug = slugRule(page);
 
@@ -169,17 +225,17 @@ async function resolveNewSlugWebhook(
 
 	// Try base slug first
 	const baseCheck = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-		source_id: config.short_db_ID,
+		short_db_ID: config.short_db_ID,
 		slug: baseSlug
 	});
 
 	if (baseCheck.posts.length === 0) {
-		console.log(`[symbiont] Generated slug '${baseSlug}'`);
+		logger.debug({ event: 'generated_slug', slug: baseSlug });
 		return baseSlug;
 	}
 
 	// Still conflict - resolve with numbered suffix
-	console.log(`[symbiont] Slug '${baseSlug}' conflicts, generating unique variant...`);
+	logger.debug({ event: 'slug_conflict_detected', slug: baseSlug });
 	return resolveSlugConflict(page, config, baseSlug);
 }
 
@@ -195,7 +251,7 @@ async function resolveSlugConflict(
 	for (let i = 2; i <= 100; i++) {
 		const numberedSlug = `${baseSlug}-${i}`;
 		const result = await gqlAdminClient.request<SlugCheckResponse>(CHECK_SLUG_QUERY, {
-			source_id: config.short_db_ID,
+			short_db_ID: config.short_db_ID,
 			slug: numberedSlug
 		});
 

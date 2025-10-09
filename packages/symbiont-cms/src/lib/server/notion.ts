@@ -4,6 +4,7 @@ import { NotionToMarkdown } from 'notion-to-md';
 import { requireEnvVar } from '../utils/env.js';
 import { defaultSlugRule } from '../utils/notion-helpers.js';
 import { loadConfig } from './load-config.js';
+import { createLogger } from '../utils/logger.js';
 
 // Initialize Notion clients
 const NOTION_API_KEY = requireEnvVar('NOTION_API_KEY', 'Set NOTION_API_KEY in your environment.');
@@ -20,12 +21,19 @@ export async function syncSlugToNotion(
 	databaseConfigId: string,
 	finalSlug: string
 ): Promise<void> {
+	const logger = createLogger({ 
+		operation: 'sync_slug_to_notion',
+		pageId: page.id 
+	});
 
 	const config = await loadConfig();
 	const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === databaseConfigId);
 	
 	if (!dbConfig) {
-		console.warn(`[symbiont] Could not find database config '${databaseConfigId}' for slug sync`);
+		logger.warn({ 
+			event: 'database_config_not_found', 
+			databaseConfigId 
+		});
 		return;
 	}
 
@@ -52,15 +60,37 @@ export async function syncSlugToNotion(
 				}
 			}
 		});
-		console.log(`[symbiont] Synced Notion page ${page.id} property '${slugPropertyName}': '${currentSlug || '(empty)'}' → '${finalSlug}'`);
-	} catch (error) {
-		console.warn(`[symbiont] Failed to sync slug to Notion page ${page.id}:`, error);
+		logger.debug({ 
+			event: 'slug_synced_to_notion', 
+			property: slugPropertyName,
+			old_slug: currentSlug || null,
+			new_slug: finalSlug 
+		});
+	} catch (error: any) {
+		logger.warn({ 
+			event: 'slug_sync_failed', 
+			error: error?.message,
+			property: slugPropertyName 
+		});
 		// Don't throw - slug generation should continue even if Notion update fails
 	}
 }
 
 /**
  * Convert Notion page content to markdown string
+ * 
+ * TODO: This needs to become more sophisticated for markdown compatibility:
+ * - Handle Notion-specific features (callouts, toggles, databases, etc.)
+ * - Normalize markdown to match database schema expectations
+ * - Extract and process embedded media (images, files, videos)
+ * - Detect content features for database storage (syntax highlighting languages, math, etc.)
+ * - Transform Notion URLs to internal slugs/references
+ * - Handle custom transformations per database config
+ * 
+ * See:
+ * - `.docs/markdown-compatibility.md` for syntax requirements
+ * - `.docs/feature-detection-architecture.md` for feature extraction strategy
+ * - `.docs/image-optimization-strategy.md` for media handling (Phase 2)
  */
 export async function pageToMarkdown(pageId: string): Promise<string> {
 	

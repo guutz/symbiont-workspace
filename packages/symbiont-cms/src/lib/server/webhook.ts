@@ -8,6 +8,7 @@ import { gqlAdminClient, GET_EXISTING_POST_QUERY, type ExistingPostResponse } fr
 import { notion } from './notion.js';
 import { processPageWebhook } from './page-processor.js';
 import { syncFromNotion } from './sync.js';
+import { createLogger } from '../utils/logger.js';
 
 const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
 
@@ -15,12 +16,16 @@ const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authentica
  * Handle Notion webhook requests for page updates
  */
 export async function handleNotionWebhookRequest(event: RequestEvent) {
+	const logger = createLogger({ operation: 'webhook' });
 
 	try {
 		const payload = await event.request.json();
 
 		if (payload.event !== 'page.update' || !payload.page?.id || !payload.page.parent?.data_source_id) {
-			console.log('[symbiont] Received a non-page-update webhook or invalid payload. Ignoring.');
+			logger.debug({ 
+				event: 'webhook_ignored', 
+				reason: 'non_page_update_or_invalid_payload' 
+			});
 			return json({ message: 'Ignoring non-page-update event' }, { status: 200 });
 		}
 
@@ -31,11 +36,18 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === notionDatabaseId);
 
 		if (!dbConfig) {
-			console.warn(`[symbiont] Received webhook for an unknown database ID: ${notionDatabaseId}.`);
+			logger.warn({ 
+				event: 'webhook_database_not_found', 
+				notionDatabaseId 
+			});
 			return json({ message: `Database ID ${notionDatabaseId} not configured` }, { status: 404 });
 		}
 
-		console.log(`[symbiont] Webhook received for page '${pageId}' in database '${dbConfig.short_db_ID}'.`);
+		logger.info({ 
+			event: 'webhook_received', 
+			pageId, 
+			databaseId: dbConfig.short_db_ID 
+		});
 
 		// Check if post exists (efficient single query)
 		const existingPostResult = await gqlAdminClient.request<ExistingPostResponse>(GET_EXISTING_POST_QUERY, {
@@ -48,9 +60,14 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 		await processPageWebhook(page, dbConfig, existingPost);
 
+		logger.info({ event: 'webhook_processed_successfully', pageId });
 		return json({ message: `Successfully processed page ${pageId}` }, { status: 200 });
 	} catch (error: any) {
-		console.error('[symbiont] Critical error during Notion webhook processing:', error);
+		logger.error({ 
+			event: 'webhook_processing_failed', 
+			error: error?.message,
+			stack: error?.stack
+		});
 		return json({ error: error.message ?? 'Unknown error' }, { status: 500 });
 	}
 }
@@ -59,6 +76,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
  * Handle polling/cron sync requests
  */
 export async function handlePollBlogRequest(event: RequestEvent) {
+	const logger = createLogger({ operation: 'poll_sync' });
 
 	try {
 		const providedSecret =
@@ -67,7 +85,7 @@ export async function handlePollBlogRequest(event: RequestEvent) {
 			'';
 
 		if (providedSecret !== CRON_SECRET) {
-			console.warn('[symbiont] Unauthorized sync attempt blocked.');
+			logger.warn({ event: 'unauthorized_sync_attempt' });
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
@@ -81,7 +99,11 @@ export async function handlePollBlogRequest(event: RequestEvent) {
 		const hasError = result.summaries.some((s) => s.status === 'error');
 		return json(result, { status: hasError ? 500 : 200 });
 	} catch (error: any) {
-		console.error('[symbiont] Critical error during Notion sync:', error);
+		logger.error({ 
+			event: 'sync_failed', 
+			error: error?.message,
+			stack: error?.stack
+		});
 		return json({ error: error.message ?? 'Unknown error' }, { status: 500 });
 	}
 }

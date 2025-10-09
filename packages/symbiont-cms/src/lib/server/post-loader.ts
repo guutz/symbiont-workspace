@@ -6,6 +6,7 @@ import { loadConfig as loadPublicConfig } from '../client/load-config.js'; // do
 import { loadConfig as loadServerConfig } from './load-config.js';
 import { parseMarkdown } from './markdown-processor.js';
 import type { Post } from '../types.js';
+import { createLogger } from '../utils/logger.js';
 
 type PostLoadEvent = {
 	params: { slug: string };
@@ -67,8 +68,13 @@ export function createPostLoad<Event extends PostLoadEvent = PostLoadEvent>(
 			}
 
 			return { post };
-		} catch (err) {
-			console.error('Error fetching post:', err);
+		} catch (err: any) {
+			const logger = createLogger({ operation: 'load_post', slug: event.params.slug });
+			logger.error({ 
+				event: 'post_load_failed', 
+				error: err?.message,
+				stack: err?.stack
+			});
 			throw error(500, 'Failed to load post');
 		}
 	};

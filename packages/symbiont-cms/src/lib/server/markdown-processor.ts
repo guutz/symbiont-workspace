@@ -22,6 +22,7 @@
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
 import type { MarkdownConfig, SymbiontConfig } from '../types.js';
+import { createLogger } from '../utils/logger.js';
 
 // @mdit plugins
 import { abbr } from '@mdit/plugin-abbr';
@@ -56,11 +57,16 @@ function loadPrismLanguage(lang: string): void {
     return;
   }
   
+  const logger = createLogger({ operation: 'load_prism_language' });
   try {
     loadLanguages([lang]);
     loadedLanguages.add(lang);
-  } catch (e) {
-    console.warn(`Failed to load Prism language: ${lang}`);
+  } catch (e: any) {
+    logger.warn({ 
+      event: 'prism_language_load_failed', 
+      language: lang,
+      error: e?.message
+    });
   }
 }
 
@@ -129,7 +135,8 @@ export async function parseMarkdown(
   md.use(mark);     // Highlights: ==text==
   md.use(spoiler);  // Spoilers: ||text||
   md.use(figure);   // Wrap images in <figure> with <figcaption>
-  md.use(embed);    // Embed videos/content
+  // NOTE: embed plugin disabled for now - requires provider config
+  // md.use(embed, []); // Embed videos/content
   md.use(imgSize);  // Image size syntax: ![alt](url =WxH)
   
   // Add lazy loading for images if enabled

@@ -26,5 +26,11 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 	}
 	
 	const module = await import(/* @vite-ignore */ configPath);
-	return module.default;
+	const config: SymbiontConfig = module.default;
+	
+	// No validation needed - both rules are optional and work together
+	// isPublicRule defaults to () => true
+	// publishDateRule defaults to reading 'Publish Date' property
+	
+	return config;
 }

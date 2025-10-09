@@ -13,6 +13,7 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 - **`QUICKSTART.md`** – Minimal steps to boot the workspace against Nhost
 - **`INTEGRATION_GUIDE.md`** – How Symbiont wires into QWER, including data transforms and store behaviour
 - **`TYPE_COMPATIBILITY.md`** – Snapshot of key type mappings and conventions (linked from the integration guide)
+- **`publishing-rules.md`** – Comprehensive guide to `isPublicRule` and `publishDateRule` configuration
 
 ## Content Pipeline
 

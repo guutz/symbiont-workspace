@@ -22,10 +22,38 @@ const config = defineConfig({
 			// PRIVATE: Server-only function to determine if a page is published
 			isPublicRule: (page) => {
 				const status = page.properties.Status;
-				// @ts-ignore - Notion types are complex, this is safe at runtime
-				return status.select?.name === 'Published';
+				const tags = page.properties.Tags;
+				// @ts-ignore
+				return status?.status?.name === 'Published' && !tags?.multi_select?.some(tag => tag.name === 'Print Only');
 			},
-			
+
+			// PRIVATE: Server-only function to determine the publish date
+			publishDateRule: (page) => {
+				// @ts-ignore - Notion types are complex, this is safe at runtime
+				const issueProperty = page.properties.Issue?.select?.name;
+				
+				if (!issueProperty) {
+					return null; // No issue date = unpublished
+				}
+				
+				try {
+					// Parse "7 October 2025" format
+					// Append time and timezone to ensure we get 7am Pacific
+					const dateString = `${issueProperty} 07:00:00 GMT-0700`;
+					const date = new Date(dateString);
+					
+					if (isNaN(date.getTime())) {
+						console.warn(`Invalid date format in Issue property: "${issueProperty}"`);
+						return null;
+					}
+					
+					return date.toISOString();
+				} catch (error) {
+					console.error(`Error parsing Issue property "${issueProperty}":`, error);
+					return null;
+				}
+			},			
+		
 			// PRIVATE: Server-only function to determine content source
 			sourceOfTruthRule: () => 'NOTION',
 			
