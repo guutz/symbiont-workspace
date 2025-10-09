@@ -2,14 +2,18 @@
 
 > **📖 Part of Phase 1.5 Enhancement** - Design is complete, partial implementation exists
 
-> **⚠️ IMPLEMENTATION STATUS: PARTIALLY IMPLEMENTED**  
+> **⚠️ IMPLEMENTATION STATUS: PARTIALLY IMPLEMENTED (October 2025)**  
 > - ✅ TypeScript interface exists (`ContentFeatures` in `markdown-processor.ts`)
 > - ✅ Markdown processor accepts optional `features` parameter for optimization
-> - ❌ Database schema doesn't have `features` JSONB column yet
+> - ✅ Server-side Prism language loading works (lazy or preloaded via features)
+> - ❌ Database schema doesn't have `features JSONB` column yet
 > - ❌ No feature detection code during sync process
 > - ❌ No backfill for existing content
+> - 🟡 Client-side uses static CSS imports (~25KB total) - works fine, just not optimal
 > 
-> This document describes the **recommended architecture** for feature detection. See `.docs/IMPLEMENTATION_STATUS.md` for tracking.
+> **Current Reality:** Static imports work well enough. This optimization is deferred to Phase 1.5.
+> 
+> This document describes the **recommended architecture** for feature detection when you're ready to implement it. See `.docs/IMPLEMENTATION_STATUS.md` for current status.
 
 ## Design Decision
 

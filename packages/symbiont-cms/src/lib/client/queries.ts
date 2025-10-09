@@ -1,5 +1,5 @@
 import { GraphQLClient, gql } from 'graphql-request';
-import { loadConfig } from '../client/load-config.js';
+import { loadConfig } from './load-config.js';
 import type { Post, PublicSymbiontConfig } from '../types.js';
 
 export const GET_POST_BY_SLUG = gql`

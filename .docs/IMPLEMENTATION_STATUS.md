@@ -53,9 +53,11 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
-| GraphQL client | ✅ | `src/lib/client/graphql.ts` | Urql-based |
-| Post queries | ✅ | `src/lib/client/posts.ts` | `getPosts`, `getAllPosts` |
-| Post loader | ✅ | `src/lib/server/post-loader.ts` | For `+page.server.ts` |
+| GraphQL admin client | ✅ | `src/lib/server/graphql.ts` | Lazy singleton with admin secret |
+| GraphQL public client | ✅ | `src/lib/client/queries.ts` | SSR-safe, per-request |
+| Server query wrappers | ✅ | `src/lib/server/queries.ts` | Clean `getPostBySlug`, `getAllPosts` |
+| Post loader | ✅ | `src/lib/server/post-loader.ts` | Simplified for `+page.server.ts` |
+| Client helpers | ✅ | `src/lib/client/queries.ts` | `getPosts`, `getPost` for components |
 
 ### ✅ UI Components (Shipped)
 
@@ -63,7 +65,32 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 |-----------|--------|----------|-------|
 | Renderer | ✅ | `src/lib/components/Renderer.svelte` | Markdown → HTML with classMap |
 | PostPage | ✅ | `src/lib/components/PostPage.svelte` | Complete post layout |
-| TOC component | 🟡 | Part of Renderer | Works but basic styling |
+| TOC generation | ✅ | `src/lib/server/markdown-processor.ts` | Server-side, returned with HTML |
+
+### 🟡 Markdown & Feature Detection (Partial)
+
+| Component | Status | Location | Notes |
+|-----------|--------|----------|-------|
+| Markdown processor | ✅ | `src/lib/server/markdown-processor.ts` | Full markdown-it with plugins |
+| Prism language loading | ✅ | Same file | Server-side lazy loading |
+| TOC generation | ✅ | Same file | Configurable heading levels |
+| Feature detection interface | ✅ | Same file | `ContentFeatures` type defined |
+| Features parameter | ✅ | Same file | `parseMarkdown` accepts features |
+| **Database features column** | ❌ | N/A | No `features JSONB` in posts table yet |
+| **Sync-time detection** | ❌ | N/A | Not detecting features during sync |
+| **Client asset loading** | 🟡 | User's route components | Static imports (works, not optimal) |
+
+**Current Approach:**
+- ✅ Server-side Prism languages load on-demand (or via features if provided)
+- ✅ Client-side CSS (Prism + KaTeX ~25KB) loaded statically
+- ❌ No feature detection in database (deferred to Phase 1.5)
+- ❌ No conditional client asset loading (deferred to Phase 1.5)
+
+**Future Enhancement (Phase 1.5):**
+- Add `features JSONB` column to posts table
+- Implement feature detection during Notion sync
+- Optional `<FeatureLoader>` component for conditional asset loading
+- See `.docs/feature-detection-architecture.md` for full design
 
 ### ⚠️ Phase 1 Gaps (Needs Attention)
 
@@ -127,6 +154,29 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 ---
 
 ## Phase 4+: Future Concepts
+
+### 💭 CLI Tool (Conceptual)
+
+**Design:** `.docs/symbiont-cli-design.md`
+
+- Interactive config initialization (`symbiont init`)
+- Config validation and editing
+- Code generation (sync endpoints, routes)
+- Diagnostics and testing (`symbiont doctor`)
+- Dry-run sync testing
+
+**Why:** Dramatically improve onboarding and developer experience
+
+### 💭 Rendering Strategies (Conceptual)
+
+**Design:** `.docs/rendering-strategy.md`
+
+- Configurable SSR/Hybrid/Client rendering
+- Progressive enhancement components
+- Prerendering configuration
+- Client-side features (search, infinite scroll, live updates)
+
+**Why:** Give users control over performance vs. interactivity tradeoffs
 
 ### 💭 Advanced Sync (Conceptual)
 

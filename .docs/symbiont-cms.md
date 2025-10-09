@@ -473,12 +473,16 @@ Tiptap wrapper for collaborative, Markdown-native editing:
 
 ### GraphQL Client Utilities
 
-Query your content directly from any SvelteKit load function:
+Symbiont provides **three layers** of GraphQL clients for different use cases:
+
+#### Layer 1: Client-Side Queries (Public)
+
+For components and client-side load functions:
 
 ```typescript
-import { getPosts, getPostBySlug } from 'symbiont-cms';
+import { getPosts, getPost } from 'symbiont-cms';
 
-// In +page.server.ts
+// In +page.ts (client-side) or +page.server.ts
 export const load = async ({ fetch }) => {
   // Get posts from primary database
   const posts = await getPosts({ 
@@ -490,18 +494,26 @@ export const load = async ({ fetch }) => {
 };
 
 // Get posts from specific database
-export const load = async ({ fetch }) => {
-  const docs = await getPosts({ 
-    fetch,
-    limit: 20,
-    shortDbId: 'documentation' 
-  });
-  
-  return { docs };
-};
+const docs = await getPosts({ 
+  fetch,
+  limit: 20,
+  shortDbId: 'documentation' 
+});
 
 // Get specific post by slug
+const post = await getPost(params.slug, { fetch });
+```
+
+#### Layer 2: Server-Side Queries (Server-Only)
+
+For `+page.server.ts` and API routes with cleaner API:
+
+```typescript
+import { getPostBySlug, getAllPosts } from 'symbiont-cms/server';
+
+// In +page.server.ts
 export const load = async ({ params, fetch }) => {
+  // Simpler API - no client creation needed
   const post = await getPostBySlug(params.slug, { fetch });
   
   if (!post) {
@@ -510,7 +522,35 @@ export const load = async ({ params, fetch }) => {
   
   return { post };
 };
+
+// Get all posts with pagination
+export const load = async ({ fetch }) => {
+  const posts = await getAllPosts({ 
+    fetch,
+    limit: 20,
+    offset: 0,
+    shortDbId: 'blog' // optional
+  });
+  
+  return { posts };
+};
 ```
+
+#### Layer 3: Admin Client (Server-Only)
+
+For sync operations and admin mutations:
+
+```typescript
+import { gqlAdminClient } from 'symbiont-cms/server';
+
+// Requires NHOST_ADMIN_SECRET env var
+const result = await gqlAdminClient.request(MUTATION, variables);
+```
+
+**Architecture Summary:**
+- **`symbiont-cms`** (client) → Public queries, works client-side and SSR
+- **`symbiont-cms/server`** (server) → Clean wrappers, auto-config loading
+- **`gqlAdminClient`** (server) → Admin operations, lazy singleton
 
 **Why pass `fetch`?** SvelteKit's special `fetch` function enables:
 - Cookie/session forwarding for auth

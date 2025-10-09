@@ -7,13 +7,21 @@ export { createPostLoad, load as postLoad } from './server/post-loader.js';
 export { requireEnvVar } from './utils/env.js';
 export { parseMarkdown } from './server/markdown-processor.js';
 
+// GraphQL query functions (server-side)
+export { getPostBySlug, getAllPosts } from './server/queries.js';
+
 // Config loading (server-only, returns full SymbiontConfig with rules/functions)
 export { loadConfig } from './server/load-config.js';
 
 export type {
 	PostServerLoad,
-	PostLoadOptions
+	PostLoadResult
 } from './server/post-loader.js';
+
+export type {
+	GetPostOptions,
+	GetAllPostsOptions
+} from './server/queries.js';
 
 export type {
 	ContentFeatures,
