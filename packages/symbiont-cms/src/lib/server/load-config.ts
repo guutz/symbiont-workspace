@@ -28,7 +28,19 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 	const module = await import(/* @vite-ignore */ configPath);
 	const config: SymbiontConfig = module.default;
 	
-	// No validation needed - both rules are optional and work together
+	// Validate databases array exists and has at least one entry
+	if (!config.databases || config.databases.length === 0) {
+		throw new Error(
+			'symbiont.config.js must have at least one database configured in the databases array.'
+		);
+	}
+	
+	// Set primaryShortDbId to first database's short_db_ID if not explicitly set
+	if (!config.primaryShortDbId) {
+		config.primaryShortDbId = config.databases[0].short_db_ID;
+	}
+	
+	// No validation needed for rules - both are optional and work together
 	// isPublicRule defaults to () => true
 	// publishDateRule defaults to reading 'Publish Date' property
 	

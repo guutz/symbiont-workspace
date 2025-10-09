@@ -11,8 +11,7 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 ## Implementation Guides
 
 - **`QUICKSTART.md`** – Minimal steps to boot the workspace against Nhost
-- **`HYBRID_STRATEGY.md`** – **⭐ Why Symbiont uses 4-file hybrid rendering (justification & performance)**
-- **`RENDERING_GUIDE.md`** – Complete SvelteKit routing reference + when to use each file type
+- **`HYBRID_STRATEGY.md`** – **⭐ Complete guide: SvelteKit file types + why Symbiont uses 4-file hybrid rendering**
 - **`INTEGRATION_GUIDE.md`** – How Symbiont wires into QWER, including data transforms and store behaviour
 - **`TYPE_COMPATIBILITY.md`** – Snapshot of key type mappings and conventions (linked from the integration guide)
 - **`publishing-rules.md`** – Comprehensive guide to `isPublicRule` and `publishDateRule` configuration
@@ -35,10 +34,14 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
+- **Oct 9, 2025:** Major documentation consolidation
+  - **Deleted `rendering-strategy.md`** - Content merged into HYBRID_STRATEGY.md (configuration + bandwidth adaptation)
+  - **Deleted `RENDERING_GUIDE.md`** - SvelteKit reference table merged into HYBRID_STRATEGY.md
+  - **Updated HYBRID_STRATEGY.md** - Now includes SvelteKit file types reference + complete rendering guide
+  - **One source of truth** - All rendering documentation in one place
 - **Oct 9, 2025:** Split rendering docs into focused guides
-  - **Created `HYBRID_STRATEGY.md`** - Focused justification for Symbiont's 3-file approach
-  - **Kept `RENDERING_GUIDE.md`** - General SvelteKit routing reference
-  - Separated "why" (strategy/justification) from "what" (file type reference)
+  - **Created `HYBRID_STRATEGY.md`** - Focused justification for Symbiont's 4-file approach
+  - Separated "why" (strategy/justification) from general reference material
 - **Oct 8, 2025:** Major documentation cleanup and accuracy update
   - Deleted `server-side-markdown-rendering-v2.md` (1435 lines, deprecated)
   - Deleted `id-usage-guide.md` (info covered in symbiont-cms.md)

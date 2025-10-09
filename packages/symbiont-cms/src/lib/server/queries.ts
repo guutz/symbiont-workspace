@@ -17,7 +17,7 @@ import type { Post } from '../types.js';
 const GET_POST_BY_SLUG = gql`
 	query GetPostBySlug($slug: String!) {
 		posts(where: { slug: { _eq: $slug } }) {
-			sql_id
+			sql_id: id
 			title
 			slug
 			content
@@ -37,7 +37,7 @@ const GET_ALL_POSTS = gql`
 			limit: $limit
 			offset: $offset
 		) {
-			sql_id
+			sql_id: id
 			title
 			slug
 			content

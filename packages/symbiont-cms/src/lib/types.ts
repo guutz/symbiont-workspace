@@ -49,7 +49,7 @@ export type ClassMap = {
  * Extended to be compatible with QWER post type for seamless integration.
  */
 export type Post = {
-    sql_id: string; // UUID
+    sql_id: string; // UUID from database (aliased from 'id' in GraphQL)
     title: string | null;
     slug: string;
     content: string | null; // The markdown content
@@ -62,6 +62,14 @@ export type Post = {
     description?: string;
     language?: string;
     cover?: string;
+    
+    // Features detected during content processing (optional)
+    features?: {
+        hasCodeBlocks?: boolean;
+        hasMath?: boolean;
+        hasMermaid?: boolean;
+        [key: string]: any;
+    };
     
     // Allow any other properties from your schema
     [key: string]: any;

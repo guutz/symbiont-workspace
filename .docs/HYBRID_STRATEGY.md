@@ -5,6 +5,34 @@
 
 ---
 
+## Quick Reference: SvelteKit File Types
+
+### Page Files (Per-Route)
+
+| File | Runs Where | Purpose | When To Use |
+|------|-----------|---------|-------------|
+| **+page.svelte** | Server + Client | Display the page | Always (required) |
+| **+page.ts** | Server + Client | Universal load (runs both places) | Need data in browser (SPA navigation) |
+| **+page.server.ts** | Server only | Server-only load | Need database/secrets/private APIs |
+| **+server.ts** | Server only | API endpoint (no page) | Create REST/JSON APIs |
+
+### Layout Files (Shared Across Routes)
+
+| File | Runs Where | Purpose | When To Use |
+|------|-----------|---------|-------------|
+| **+layout.svelte** | Server + Client | Wrap child pages (nav, footer) | Always for shared UI |
+| **+layout.ts** | Server + Client | Universal load for layouts | Shared data needed client-side |
+| **+layout.server.ts** | Server only | Server-only load for layouts | Auth checks, shared database queries |
+
+### Key Rules
+
+1. **+page.server.ts and +page.ts CAN coexist** (server runs first, universal receives its data)
+2. **+server.ts is for APIs** (returns JSON/data, not HTML pages)
+3. **+layout files apply to all child routes** (nested layouts inherit from parents)
+4. **Server files can't be imported by client code** (build will fail)
+
+---
+
 ## The Strategy
 
 Symbiont uses **four files working together** for each post route:
@@ -453,6 +481,38 @@ return json(post);
 
 ---
 
+## Bandwidth Adaptation Strategy
+
+### How Caching Helps Slow Connections
+
+**With 60-second cache:**
+
+1. **First visit:** Fetch from server (~600ms on slow connection)
+2. **Subsequent pages:** Cached response (~50ms)
+3. **Revisiting page:** Browser cache (~10ms)
+
+**Result:** Site feels fast even on slow connections after first page
+
+### Cache Headers Strategy
+
+```typescript
+// SSR pages (ISR)
+'cache-control': 'public, max-age=60, s-maxage=60'
+
+// API routes
+'cache-control': 'public, max-age=60, s-maxage=60'
+
+// Static assets
+'cache-control': 'public, max-age=31536000, immutable'
+```
+
+**Why 60 seconds?**
+- Long enough to benefit repeat visitors
+- Short enough to see updates quickly
+- Configurable for different use cases
+
+---
+
 ## Performance Comparison
 
 | Metric | Direct Client Rendering | Hybrid Strategy (Ours) |
@@ -840,6 +900,79 @@ Array<{
   { level: 3, text: "Getting Started", id: "getting-started" },
   { level: 2, text: "Conclusion", id: "conclusion" }
 ]
+```
+
+---
+
+## Configuration Design
+
+### Minimal, Focused Configuration
+
+**DON'T make configurable (one good way to do it):**
+- ❌ Rendering strategy (always hybrid)
+- ❌ Client vs server queries (always server)
+- ❌ Whether to generate files (user adds them manually)
+
+**DO make configurable:**
+- ✅ Cache duration (ISR + HTTP cache)
+- ✅ API route path (for custom routing)
+- ✅ Enable/disable client navigation enhancement
+
+### Config Schema
+
+```typescript
+export interface SymbiontConfig {
+  graphqlEndpoint: string;
+  primaryShortDbId?: string;
+  databases: DatabaseBlueprint[];
+  markdown?: MarkdownConfig;
+  
+  /** Caching configuration for ISR and API routes */
+  caching?: {
+    /** ISR caching for SSR pages */
+    isr?: {
+      enabled: boolean;
+      revalidate: number; // seconds
+    };
+    
+    /** HTTP caching for API routes */
+    api?: {
+      enabled: boolean;
+      maxAge: number; // seconds
+    };
+  };
+  
+  /** Client-side navigation enhancement */
+  navigation?: {
+    /** Enable fast client-side navigation (default: true) */
+    enabled: boolean;
+    
+    /** API route path pattern (default: /api/posts/[slug]) */
+    apiPath?: string;
+  };
+}
+```
+
+### Default Configuration (Zero Config)
+
+```typescript
+// Default behavior if no config provided
+{
+  caching: {
+    isr: {
+      enabled: true,
+      revalidate: 60 // Cache SSR pages for 60 seconds
+    },
+    api: {
+      enabled: true,
+      maxAge: 60 // Cache API responses for 60 seconds
+    }
+  },
+  navigation: {
+    enabled: true,
+    apiPath: '/api/posts/[slug]'
+  }
+}
 ```
 
 ---

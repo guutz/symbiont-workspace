@@ -1,10 +1,11 @@
-import { getPosts, type Post as SymbiontPost } from 'symbiont-cms';
+import { getAllPosts } from 'symbiont-cms/server';
+import type { Post as SymbiontPost } from 'symbiont-cms';
 import type { Post } from '$lib/types/post';
 
 export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
 	try {
 		// Fetch posts using the new simple API - config loaded automatically!
-		const postsFromDb = await getPosts({ fetch, limit: 100 });
+		const postsFromDb = await getAllPosts({ fetch, limit: 100 });
 
 		// Transform Symbiont posts to QWER Post format
 		// Most fields pass through directly thanks to type compatibility!

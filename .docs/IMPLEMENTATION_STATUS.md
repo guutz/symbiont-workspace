@@ -49,23 +49,31 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 | Triggers | ✅ | Same migration | Auto-update `updated_at` |
 | Unique constraints | ✅ | Same migration | `source_id` + `slug`/`notion_page_id`/`notion_short_id` |
 
-### ✅ Client Utilities (Shipped)
+### ✅ Server Utilities (Shipped)
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
 | GraphQL admin client | ✅ | `src/lib/server/graphql.ts` | Lazy singleton with admin secret |
-| GraphQL public client | ✅ | `src/lib/client/queries.ts` | SSR-safe, per-request |
 | Server query wrappers | ✅ | `src/lib/server/queries.ts` | Clean `getPostBySlug`, `getAllPosts` |
 | Post loader | ✅ | `src/lib/server/post-loader.ts` | Simplified for `+page.server.ts` |
-| Client helpers | ✅ | `src/lib/client/queries.ts` | `getPosts`, `getPost` for components |
+| Markdown processor | ✅ | `src/lib/server/markdown-processor.ts` | Server-side rendering with TOC |
 
-### ✅ UI Components (Shipped)
+### � UI Helper Components (Designed)
 
-| Component | Status | Location | Notes |
-|-----------|--------|----------|-------|
-| Renderer | ✅ | `src/lib/components/Renderer.svelte` | Markdown → HTML with classMap |
-| PostPage | ✅ | `src/lib/components/PostPage.svelte` | Complete post layout |
-| TOC generation | ✅ | `src/lib/server/markdown-processor.ts` | Server-side, returned with HTML |
+> **Architecture:** Symbiont uses a [4-file hybrid rendering strategy](HYBRID_STRATEGY.md) where markdown is always rendered server-side and returned as HTML. Users render `{@html data.html}` directly with optional helper components.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| PostHead | 📋 | SEO meta tags helper (optional) |
+| PostMeta | 📋 | Date/tags display helper (optional) |
+| TOC | 📋 | Table of contents renderer (optional) |
+
+**Recommended Pattern:**
+- Use `+page.server.ts` with `loadPost()` → returns `{ meta, html, toc }`
+- Render `{@html data.html}` directly in `+page.svelte`
+- Style with CSS (Tailwind prose, scoped `:global()`, or global CSS)
+- Optional helpers: `<PostHead>`, `<PostMeta>`, `<TOC>` for common patterns
+- See [HYBRID_STRATEGY.md](HYBRID_STRATEGY.md) for complete guide
 
 ### 🟡 Markdown & Feature Detection (Partial)
 
@@ -169,14 +177,17 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ### 💭 Rendering Strategies (Conceptual)
 
-**Design:** `.docs/rendering-strategy.md`
+**Design:** `.docs/HYBRID_STRATEGY.md` (current implementation documented)
 
-- Configurable SSR/Hybrid/Client rendering
-- Progressive enhancement components
-- Prerendering configuration
-- Client-side features (search, infinite scroll, live updates)
+- ✅ Hybrid SSR + Client Navigation (implemented)
+- 📋 Configurable SSR/Client rendering modes
+- 📋 Progressive enhancement components
+- 📋 Prerendering configuration
+- 📋 Client-side features (search, infinite scroll, live updates)
 
 **Why:** Give users control over performance vs. interactivity tradeoffs
+
+**Note:** Current hybrid strategy is working well. Additional rendering modes are conceptual future enhancements.
 
 ### 💭 Advanced Sync (Conceptual)
 
