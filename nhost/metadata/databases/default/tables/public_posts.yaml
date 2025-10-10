@@ -5,8 +5,10 @@ select_permissions:
   - role: public
     permission:
       columns:
+        - author
         - content
         - created_at
+        - features
         - id
         - notion_page_id
         - notion_short_id
@@ -16,7 +18,6 @@ select_permissions:
         - tags
         - title
         - updated_at
-        - features
       filter:
         _and:
           - publish_at:

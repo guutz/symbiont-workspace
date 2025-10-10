@@ -147,11 +147,7 @@
               </p>
             </button>
             <p class="text-xs mx2 op80 flex items-center">
-              <AuthorAvatar
-                width="16px"
-                height="16px"
-                class="inline-block !w4 !h4 object-cover aspect-1 rounded-full hover:rotate-[360deg] transition-transform duration-1000 ease-in-out" />
-              <span class="font-semibold mx1">{siteConfig.author.name}</span>
+              <span class="font-semibold mx1">{siteConfig.title}</span>
               <span class="font-semibold mx1">·</span>
               {lastUpdated}
             </p>

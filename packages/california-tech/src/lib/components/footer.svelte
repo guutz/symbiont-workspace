@@ -40,9 +40,7 @@
         </div>
         <p itemprop="copyrightNotice">
           Copyright © <span itemprop="copyrightYear">{copyrightYear}</span>
-          <a href={siteConfig.author.github} rel="external author">
-            <span itemprop="copyrightHolder">{siteConfig.author.name}</span>
-          </a>
+            <span itemprop="copyrightHolder">{siteConfig.title}</span>
         </p>
         <div class="">
           Powered by

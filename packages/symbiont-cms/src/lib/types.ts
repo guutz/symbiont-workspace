@@ -79,6 +79,7 @@ export type Post = {
     publish_at: string | null; // ISO 8601 date string
     updated_at?: string | null; // Last updated timestamp
     tags?: string[] | any[] | null;
+    author?: string | null;
     
     // Optional QWER-compatible fields
     summary?: string;

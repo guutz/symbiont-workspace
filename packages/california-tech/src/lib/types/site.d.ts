@@ -24,7 +24,7 @@ export namespace Site {
     /** path to a custom layout component file (relative to src/lib/components/) */
     customLayoutComponent?: string;
 
-    author: Author;
+    author?: Author;
 
     cover: string;
   }

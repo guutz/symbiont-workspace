@@ -5,6 +5,7 @@ export namespace Post {
     title: string;
     language: string;
     description: string;
+    author?: string;
     summary?: string;
     content?: string;
     html?: string;

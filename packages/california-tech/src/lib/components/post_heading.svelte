@@ -18,15 +18,18 @@
       {new URL(data.slug, siteConfig.url).href}
     </a>
     <div class="p-author h-card flex items-center gap-1 pl-0 shrink-0">
+    {#if data.author}
       <AuthorAvatar
         width="32px"
         height="32px"
         class="inline-block !w-8 !h-8 mr-1 object-cover aspect-1 rounded-full hover:rotate-[360deg] transition-transform duration-1000 ease-in-out" />
       <span class="font-bold text-base">
-        <a use:tippy aria-label="Github Page" rel="author external" href={siteConfig.author.github} class="u-url u-uid">
-          <span class="p-name">{siteConfig.author.name}</span>
+        <!-- TODO: replace with author index -->
+        <a rel="author" href={siteConfig.url} class="u-url u-uid"> 
+          <span class="p-name">{data.author}</span>
         </a>
       </span>
+    {/if}
     </div>
     <div class="flex flex-col gap1 text-right text-sm font-semibold op80">
       <time

@@ -31,7 +31,7 @@
   <meta property="og:url" content={new URL(post.slug, siteConfig.url).href} />
   <meta property="twitter:url" content={new URL(post.slug, siteConfig.url).href} />
 
-  <meta property="article:author" content={siteConfig.author.name} />
+  <meta property="article:author" content={post.author ?? siteConfig.title} />
   <meta property="article:published_time" content={post.published} />
   <meta property="article:modified_time" content={post.updated} />
 
@@ -63,8 +63,7 @@
       author: [
         {
           '@type': 'Person',
-          name: siteConfig.author.name,
-          url: siteConfig.author.github,
+          name: post.author ?? siteConfig.title
         },
       ],
     }) + '<'

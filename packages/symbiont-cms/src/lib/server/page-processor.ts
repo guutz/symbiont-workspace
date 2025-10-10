@@ -66,7 +66,7 @@ export async function processPageBatch(
 	await syncSlugToNotion(page, config.notionDatabaseId, slug);
 
 	// Upsert post
-	await upsertPost(page, config, title, short_post_ID, slug, mdString);
+	await upsertPost(page, config, title, short_post_ID, slug, author, features, mdString);
 	logger.info({ 
 		event: existingPost ? 'post_updated' : 'post_created', 
 		slug, 
@@ -136,7 +136,7 @@ export async function processPageWebhook(
 	await syncSlugToNotion(page, config.notionDatabaseId, slug);
 
 	// Upsert post
-	await upsertPost(page, config, title, short_post_ID, slug, mdString);
+	await upsertPost(page, config, title, short_post_ID, slug, author, features, mdString);
 	logger.info({ 
 		event: existingPost ? 'post_updated' : 'post_created', 
 		slug, 
@@ -273,6 +273,8 @@ async function upsertPost(
 	title: string,
 	short_post_ID: string | null,
 	slug: string,
+	author: string | null,
+	features: string[],
 	mdString: string
 ): Promise<void> {
 	const postData = {
@@ -282,6 +284,8 @@ async function upsertPost(
 		title,
 		slug,
 		tags: getTags(page),
+		author,
+		features,
 		updated_at: page.last_edited_time,
 		publish_at: getPublishDate(page, config),
 		content: mdString

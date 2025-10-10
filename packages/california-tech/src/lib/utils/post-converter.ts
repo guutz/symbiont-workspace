@@ -15,6 +15,7 @@ export function symbiontToQwerPost(post: SymbiontPost, html?: string, toc?: any[
 		language: post.language ?? 'en',
 		cover: post.cover,
 		tags: Array.isArray(post.tags) ? post.tags : [],
+		author: post.author ?? undefined,
 		
 		// Date field mapping
 		published: post.publish_at ?? new Date().toISOString(),

@@ -7,9 +7,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="black" />
-  <meta name="author" content={siteConfig.author.name} />
 
-  <link rel="apple-touch-icon" href={siteConfig.author.avatar_192_png} sizes="192x192" type="image/png" />
+  <link rel="apple-touch-icon" href="/favicon.png" type="image/png" />
   <link rel="shortcut icon" href="/favicon.png" type="image/png" />
 
   <meta
