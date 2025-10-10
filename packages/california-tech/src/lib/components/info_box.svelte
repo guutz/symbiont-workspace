@@ -19,7 +19,7 @@
         class:i-ic-round-warning-amber={statusType === 'caution'}
         class:i-ic-round-error-outline={statusType === 'error'}
         class:i-ic-outline-dangerous={statusType === 'danger'}
-        class="w5 h5" />
+        class="w5 h5"></div>
       <p class="font-600">
         {#if statusName}
           {statusName}

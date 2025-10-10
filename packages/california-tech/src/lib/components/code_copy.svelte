@@ -56,7 +56,7 @@
           out:fade|global={{ duration: 300 }}
           class:i-carbon-document-blank={!copied}
           class:i-carbon-document-tasks={copied}
-          class="!w5 !h5 color-white m-auto" />
+          class="!w5 !h5 color-white m-auto"></div>
       {/key}
     </button>
   {/if}

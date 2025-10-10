@@ -43,7 +43,7 @@ export const UPSERT_POST_MUTATION = gql`
 			object: $post
 			on_conflict: {
 				constraint: posts_source_id_notion_page_id_key
-				update_columns: [title, content, slug, publish_at, tags, updated_at, notion_short_id, features, author]
+				update_columns: [title, content, slug, publish_at, tags, updated_at, notion_short_id, features, authors]
 			}
 		) {
 			id

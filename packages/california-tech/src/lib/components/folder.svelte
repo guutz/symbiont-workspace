@@ -22,7 +22,7 @@
     }
   }}>
   <div
-    class="{expanded ? 'i-fluent-emoji-flat-open-file-folder' : 'i-fluent-emoji-flat-file-folder'} !w8 !h8 shrink-0" />
+    class="{expanded ? 'i-fluent-emoji-flat-open-file-folder' : 'i-fluent-emoji-flat-file-folder'} !w8 !h8 shrink-0"></div>
   <div class="px2">
     {name}
   </div>

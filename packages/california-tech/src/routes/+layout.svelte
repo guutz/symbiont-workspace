@@ -3,7 +3,6 @@
   import '@unocss/reset/sanitize/assets.css';
   import '@unocss/reset/tailwind.css';
   import '$lib/styles/defaultTheme.scss';
-  import '$config/userTheme.scss';
   import '$lib/styles/global.scss';
   import 'uno.css';
   import 'tippy.js/dist/tippy.css';
@@ -30,6 +29,7 @@
   import { onMount } from 'svelte';
   import { partytownSnippet } from '@qwik.dev/partytown/integration';
   let scriptEl: any;
+  
   onMount(() => {
     if (scriptEl) {
       scriptEl.textContent = partytownSnippet();
@@ -57,7 +57,7 @@
   <div
     in:fly|global={{ y: 100, duration: 300, delay: 300 }}
     out:fly|global={{ y: -100, duration: 300 }}
-    class="pt-[4rem] min-h-75vh">
+    class="min-h-75vh">
     <slot />
   </div>
 {/key}

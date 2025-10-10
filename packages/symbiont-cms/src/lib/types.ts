@@ -205,6 +205,8 @@ export interface DatabaseBlueprint {
      * Defaults to 'Slug' if not specified.
      */
     slugPropertyName?: string;
+
+    authorsPropertyName?: string;
 }
 
 /**

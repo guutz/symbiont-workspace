@@ -1,5 +1,4 @@
 export namespace Site {
-  export type IndexLayout = 'default' | 'posts-only' | 'profile-only' | 'custom';
 
   export interface Config {
     /** site url  without tailing slash. for example: `https://example.com` */

@@ -273,7 +273,7 @@ async function upsertPost(
 	title: string,
 	short_post_ID: string | null,
 	slug: string,
-	author: string | null,
+	authors: string[],
 	features: string[],
 	mdString: string
 ): Promise<void> {
@@ -284,7 +284,7 @@ async function upsertPost(
 		title,
 		slug,
 		tags: getTags(page),
-		author,
+		authors,
 		features,
 		updated_at: page.last_edited_time,
 		publish_at: getPublishDate(page, config),

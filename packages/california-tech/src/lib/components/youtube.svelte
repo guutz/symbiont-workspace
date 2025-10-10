@@ -30,5 +30,5 @@
     allowtransparency
     loading="lazy"
     allow="autoplay"
-    class="w-full h-auto aspect-video" />
+    class="w-full h-auto aspect-video"></iframe>
 </div>

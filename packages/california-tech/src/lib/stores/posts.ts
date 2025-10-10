@@ -1,4 +1,4 @@
-import { readable, writable, get } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import type { Post } from '$lib/types/post';
 import { tagsCur } from '$stores/tags';
 import { result } from '$lib/search/stores';
@@ -10,21 +10,6 @@ export const postsAll = writable<Map<string, Post.Post>>(new Map());
 export function initializePostsFromServer(posts: Post.Post[]) {
   const postMap = new Map(posts.map((post) => [post.slug, post]));
   postsAll.set(postMap);
-}
-
-// Keep backward compatibility: try to load from generated file if available
-let _allposts: [string, Post.Post][] = [];
-try {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - This import might not exist in dynamic mode
-  const postsjson = await import('$generated/posts.json');
-  _allposts = postsjson.default as [string, Post.Post][];
-  if (_allposts && _allposts.length > 0) {
-    postsAll.set(new Map(_allposts));
-  }
-} catch (e) {
-  // No generated posts.json - will be initialized from server
-  console.log('[posts store] No static posts.json found, waiting for server data');
 }
 
 export const postsShow = (() => {

@@ -1,10 +1,12 @@
 :root {
-  --qwer-bg-color: #e1e3dd;
+  --qwer-bg-color: #ebebeb;
   --qwer-text-color: black;
-  --qwer-btn-hover-color: #8c8c8c;
+  --qwer-btn-hover-color: #dfdfdf;
 
   --qwer-bg-img-light: none;
   --qwer-bg-img-dark: none;
+
+  font-family: Georgia, Arial, sans-serif;
 
   body::after {
     --qwer-bg-repeat: repeat;
@@ -13,11 +15,20 @@
   }
 
   #header {
-    --qwer-bg-color: transparent;
+    --qwer-bg-color: #ebebeb;
     --qwer-text-color: inherit;
+    background-color: var(--qwer-bg-color);
+    color: var(--qwer-text-color);
 
     input:focus {
       --qwer-input-outline-color: black;
+      --at-apply: '!border-transparent';
+      outline-color: var(--qwer-input-outline-color) !important;
+    }
+
+    kbd {
+      --at-apply: 'border-1 px2 py1 rounded';
+      border-color: var(--qwer-text-color);
     }
   }
 
@@ -51,7 +62,7 @@
   }
 
   .index-post {
-    --qwer-bg-color: #faf9f6;
+    --qwer-bg-color: #fcfcfc;
     --qwer-text-color: inherit;
     --qwer-title-color: inherit;
     --qwer-title-hover-color: white;
@@ -115,11 +126,11 @@
   --qwer-divider-color: rgba(0, 0, 0, 0.25);
 
   #nprogress {
-    --qwer-bg-color: rgb(56, 221, 34);
-    --qwer-box-shadow-1: rgb(56, 221, 34);
-    --qwer-box-shadow-2: rgb(56, 221, 34);
-    --qwer-border-top-color: rgb(56, 221, 34);
-    --qwer-border-left-color: rgb(56, 221, 34);
+    --qwer-bg-color: #ff6c0c;
+    --qwer-box-shadow-1: #ff6c0c;
+    --qwer-box-shadow-2: #ff6c0c;
+    --qwer-border-top-color: #ff6c0c;
+    --qwer-border-left-color: #ff6c0c;
   }
 }
 
@@ -135,7 +146,7 @@
   }
 
   #header {
-    --qwer-bg-color: transparent;
+    --qwer-bg-color: black;
     --qwer-text-color: inherit;
 
     input:focus {
@@ -228,10 +239,10 @@
   --qwer-divider-color: #8a8a8a;
 
   #nprogress {
-    --qwer-bg-color: rgb(56, 221, 34);
-    --qwer-box-shadow-1: rgb(56, 221, 34);
-    --qwer-box-shadow-2: rgb(56, 221, 34);
-    --qwer-border-top-color: rgb(56, 221, 34);
-    --qwer-border-left-color: rgb(56, 221, 34);
+    --qwer-bg-color: #ff6c0c;
+    --qwer-box-shadow-1: #ff6c0c;
+    --qwer-box-shadow-2: #ff6c0c;
+    --qwer-border-top-color: #ff6c0c;
+    --qwer-border-left-color: #ff6c0c;
   }
 }

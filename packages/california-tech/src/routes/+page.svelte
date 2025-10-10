@@ -2,16 +2,13 @@
   import { tagsCur, tagsShowMobile, tagsShowDesktop, initializeTagsFromPosts } from '$stores/tags';
   import { postsShow, initializePostsFromServer } from '$stores/posts';
   import { siteConfig } from '$config/site';
-  import { getLayoutComponent } from '$lib/components/LayoutMapper';
+  import PostsOnlyLayout from '$lib/components/layouts/PostsOnlyLayout.svelte';
 
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import type { PageData } from './$types';
 
   export let data: PageData;
-
-  // Get the appropriate layout component
-  const LayoutComponent = getLayoutComponent(siteConfig.indexLayout);
 
   onMount(() => {
     // Initialize posts from server data
@@ -60,5 +57,4 @@
   <meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
-<!-- Dynamic Layout Component -->
-<svelte:component this={LayoutComponent} />
+<PostsOnlyLayout />

@@ -1,40 +1,12 @@
-import { readable, writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 import type { Tags } from '$lib/types/tags';
 import { UserConfig } from '$config/QWER.config';
 import type { Post } from '$lib/types/post';
 
-// Try to load static tags if available (backward compatibility)
-let initialTags: Tags.Category[] = [];
-try {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  const tagsjson = await import('$generated/tags.json');
-  initialTags = Object.entries(tagsjson.default)
-    .map((e: [string, unknown]) => {
-      return {
-        name: e[0],
-        tags: Object.entries(e[1] as object).map((c) => {
-          return { name: c[0], category: e[0] };
-        }),
-      };
-    })
-    .sort((a, b) => {
-      const aIsTags = a.name === 'tags';
-      const bIsTags = b.name === 'tags';
-      if (aIsTags && bIsTags) return 0;
-      if (aIsTags) return -1;
-      if (bIsTags) return 1;
-      return String(a.name).localeCompare(String(b.name));
-    });
-} catch (e) {
-  // No generated tags.json - will be initialized from server
-  console.log('[tags store] No static tags.json found, waiting for server data');
-}
-
 export const tagsShowMobile = writable(false);
 export const tagsShowDesktop = writable(UserConfig.DefaultDesktopShowTagFilter);
 
-export const tagsAll = writable<Tags.Category[]>(initialTags);
+export const tagsAll = writable<Tags.Category[]>([]);
 
 // Initialize tags from posts (for dynamic CMS mode)
 export function initializeTagsFromPosts(posts: Post.Post[]) {
