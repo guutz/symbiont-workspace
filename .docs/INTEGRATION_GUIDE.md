@@ -1,18 +1,25 @@
 # QWER-Test + Symbiont Integration Guide
 
-> Phase 1 of the zero-rebuild roadmap: the QWER demo app consumes live content from Symbiont CMS instead of generated JSON.
+> **Phase 1 Complete:** The QWER demo app now consumes live content from Symbiont CMS using a production-ready 4-file hybrid rendering pattern.  
+> **Last Updated:** October 9, 2025
 
 ---
 
 ## 1. What lives where?
 
-- **Symbiont CMS (`packages/symbiont-cms`)** – exposes sync handlers, markdown rendering, GraphQL helpers, and UI components.
-- **QWER Test App (`packages/qwer-test`)** – consumes the package and renders the blog using QWER’s layouts/stores.
+- **Symbiont CMS (`packages/symbiont-cms`)** – exposes sync handlers, markdown rendering, GraphQL helpers, server utilities, and type definitions.
+- **QWER Test App (`packages/qwer-test`)** – consumes the package and renders the blog using QWER's layouts with Symbiont data.
 - **Nhost** – stores posts in `public.posts`; GraphQL queries filter by `source_id` (`short_db_ID`).
 
 ```
-Notion page ─→ Symbiont sync ─→ Nhost Postgres ─→ `getPosts` / `postLoad` ─→ QWER UI
+Notion page ─→ Symbiont sync ─→ Nhost Postgres ─→ SvelteKit SSR/API ─→ QWER UI
 ```
+
+**Key Pattern:** 4-file hybrid rendering strategy
+- SSR for initial page load (SEO-friendly)
+- Client-side navigation via API (SPA-like speed)
+- Progressive enhancement (works without JS)
+- See `packages/qwer-test/docs/HYBRID_IMPLEMENTATION.md` for full details
 
 ---
 
@@ -28,78 +35,198 @@ Notion page ─→ Symbiont sync ─→ Nhost Postgres ─→ `getPosts` / `post
 
 ## 3. Data flow inside QWER
 
-### Homepage
+### Homepage (`/`)
 
-`src/routes/+page.server.ts`
+**Route:** `src/routes/+page.server.ts`
 
 ```ts
-import { getPosts } from 'symbiont-cms/client';
-import type { PageServerLoad } from './$types';
+import { getAllPosts } from 'symbiont-cms/server';
+import { symbiontToQwerPost } from '$lib/utils/post-converter';
 
-export const load: PageServerLoad = async ({ fetch }) => {
-	const posts = await getPosts({ fetch, limit: 50 });
-	return { posts }; // serialised to the client
+export const load = async ({ fetch }) => {
+	const postsFromDb = await getAllPosts({ fetch, limit: 100 });
+	const qwerPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+	return { posts: qwerPosts };
 };
 ```
 
-`src/routes/+page.svelte`
+**Component:** `src/routes/+page.svelte`
+- Receives `data.posts` already in QWER format
+- No need for stores or conversion
+- Renders post list with QWER components
 
-```svelte
-import { onMount } from 'svelte';
-import { initializePostsFromServer } from '$lib/stores/posts';
-
-export let data;
-
-onMount(() => initializePostsFromServer(data.posts));
-```
-
-`src/lib/stores/posts.ts`
-
-- falls back to `$generated/posts.json` if present
-- otherwise uses the SSR payload supplied via `initializePostsFromServer`
-
-### Individual post pages
-
-`src/routes/[slug]/+page.server.ts`
-
-```ts
-export { postLoad as load } from 'symbiont-cms/server';
-```
-
-`postLoad` queries Hasura with the slug, runs `parseMarkdown`, and returns `{ post, html, toc, features }`. `PostPage` handles the layout while QWER-specific styling is passed through `classMap`.
-
-### Feeds (Atom / JSON / Sitemap)
-
-Each feed route shares a helper:
-
-```ts
-import { createSymbiontGraphQLClient, getAllPosts } from 'symbiont-cms/client';
-import { loadConfig } from 'virtual:symbiont/config';
-
-async function fetchPosts(fetch?: typeof globalThis.fetch) {
-	const config = await loadConfig();
-	const client = createSymbiontGraphQLClient(config.graphqlEndpoint, { fetch });
-	return getAllPosts(client, { short_db_ID: config.primaryShortDbId });
-}
-```
-
-The routes then map Symbiont posts into the format required by each feed.
+**Key Pattern:**
+- ✅ Uses `getAllPosts` from Symbiont
+- ✅ Converts with shared `post-converter` utility
+- ✅ Returns QWER-compatible format
+- ✅ SSR-ready, no client-side transformation needed
 
 ---
 
-## 4. Type alignment snapshot
+### Individual Post Pages (`/[slug]`)
 
-| Symbiont (`Post`) | QWER (`Post.Post`) | Notes |
-|--------------------|--------------------|-------|
-| `slug` | `slug` | Used as the canonical key on both sides. |
-| `title` (nullable) | `title` (string) | Provide a fallback when mapping. |
-| `content` | `content` | Markdown string rendered by QWER components. |
-| `publish_at` | `published` | Use `publish_at ?? new Date().toISOString()`. |
-| `updated_at` | `updated` | Fall back to `publish_at` if null. |
-| `tags` | `tags` | QWER expects an array; ensure you coerce to `[]`. |
-| `summary`/`description` (optional) | `summary`/`description` | Populate if you extend the schema. |
+**Architecture:** 4-file hybrid rendering pattern
 
-See `TYPE_COMPATIBILITY.md` for the full table and enum mapping (`Post.CoverStyle`, etc.).
+#### File 1: `src/routes/[slug=slug]/+page.server.ts` (SSR)
+```ts
+import { postLoad } from 'symbiont-cms/server';
+import { symbiontToQwerPost } from '$lib/utils/post-converter';
+
+export const load = async (event) => {
+	const data = await postLoad(event);
+	const qwerPost = symbiontToQwerPost(data.post, data.html, data.toc);
+	return { post: qwerPost, html: data.html, toc: data.toc };
+};
+```
+
+#### File 2: `src/routes/[slug=slug]/+page.ts` (Client Navigation)
+```ts
+export const load = async ({ params, fetch }) => {
+	const response = await fetch(`/api/posts/${params.slug}`);
+	return await response.json();
+};
+```
+
+#### File 3: `src/routes/api/posts/[slug]/+server.ts` (JSON API)
+```ts
+import { getPostBySlug, renderMarkdown } from 'symbiont-cms/server';
+import { symbiontToQwerPost } from '$lib/utils/post-converter';
+
+export const GET = async ({ params, fetch, setHeaders }) => {
+	const post = await getPostBySlug(params.slug, { fetch });
+	const { html, toc } = await renderMarkdown(post.content ?? '');
+	const qwerPost = symbiontToQwerPost(post, html, toc);
+	
+	setHeaders({ 'cache-control': 'public, max-age=60' });
+	return json({ post: qwerPost, html, toc });
+};
+```
+
+#### File 4: `src/routes/[slug=slug]/+page.svelte` (Display)
+```svelte
+<script lang="ts">
+	export let data;
+	$: post = data.post; // Already in QWER format
+</script>
+
+<PostHeading data={post} />
+<div class="prose">{@html data.html}</div>
+<PostToc toc={post.toc} />
+<TagsSection tags={post.tags} />
+<Giscuss />
+```
+
+**Key Innovations:**
+- ✅ SSR for initial load (SEO)
+- ✅ Client navigation via API (fast SPA transitions)
+- ✅ Shared converter utility (consistency)
+- ✅ Route param matcher prevents `.xml` from matching
+- ✅ Works without JavaScript (progressive enhancement)
+
+**See:** `packages/qwer-test/docs/HYBRID_IMPLEMENTATION.md` for complete guide
+
+---
+
+### Feeds (Atom / JSON / Sitemap)
+
+Each feed route uses the same pattern:
+
+```ts
+import { getAllPosts } from 'symbiont-cms/server';
+
+async function fetchPosts(fetch: typeof globalThis.fetch) {
+	return await getAllPosts({ fetch, limit: 100 });
+}
+```
+
+**Routes:**
+- `src/routes/atom.xml/+server.ts` - Atom feed with `data-sveltekit-reload`
+- `src/routes/sitemap.xml/+server.ts` - XML sitemap with `data-sveltekit-reload`
+- `src/routes/feed.json/+server.ts` - JSON feed
+
+**Navigation Fix:**
+- Footer links have `data-sveltekit-reload` attribute
+- Param matcher (`src/params/slug.ts`) prevents `[slug=slug]` from matching `.xml`
+- Both approaches ensure proper XML handling
+
+---
+
+## 4. Type alignment & Post Converter Utility
+
+### Shared Converter Pattern ⭐ NEW
+
+**Location:** `packages/qwer-test/src/lib/utils/post-converter.ts`
+
+All routes use this single utility for Symbiont → QWER conversion:
+
+```ts
+import type { Post as SymbiontPost } from 'symbiont-cms';
+import type { Post } from '$lib/types/post';
+
+export function symbiontToQwerPost(
+  post: SymbiontPost, 
+  html?: string, 
+  toc?: any[]
+): Post.Post {
+  return {
+    slug: post.slug,
+    title: post.title ?? 'Untitled',
+    content: post.content ?? '',
+    summary: post.summary ?? post.content?.substring(0, 200) ?? '',
+    description: post.description ?? '',
+    language: post.language ?? 'en',
+    cover: post.cover,
+    tags: Array.isArray(post.tags) ? post.tags : [],
+    
+    // Date mapping
+    published: post.publish_at ?? new Date().toISOString(),
+    updated: post.updated_at ?? post.publish_at ?? new Date().toISOString(),
+    created: post.publish_at ?? new Date().toISOString(),
+    
+    // Rendered content
+    html: html ?? '',
+    toc: toc as any,
+    
+    // QWER-specific defaults
+    coverStyle: 'NONE' as Post.CoverStyle,
+    coverInPost: true,
+    coverCaption: undefined,
+    options: [],
+    series_tag: undefined,
+    series_title: undefined,
+    prev: undefined,
+    next: undefined,
+  };
+}
+```
+
+**Benefits:**
+- ✅ Single source of truth for field mapping
+- ✅ Used by homepage, post pages, and API endpoints
+- ✅ Type-safe with proper TypeScript types
+- ✅ Easy to extend with new fields
+
+### Field Mapping Table
+
+| Symbiont (`Post`) | QWER (`Post.Post`) | Conversion Notes |
+|--------------------|--------------------|------------------|
+| `slug` | `slug` | Direct pass-through |
+| `title` (nullable) | `title` (string) | Fallback: `'Untitled'` |
+| `content` | `content` | Markdown string |
+| `publish_at` | `published`, `created` | ISO string fallback |
+| `updated_at` | `updated` | Falls back to `publish_at` |
+| `tags` | `tags` | Ensures array (default: `[]`) |
+| `summary` | `summary` | Fallback: first 200 chars of content |
+| `description` | `description` | Direct pass-through |
+| `cover` | `cover` | Image URL |
+| `language` | `language` | Fallback: `'en'` |
+| N/A | `html` | From `renderMarkdown()` |
+| N/A | `toc` | From `renderMarkdown()` |
+| N/A | `coverStyle` | QWER default: `'NONE'` |
+
+**Type Note:** Use `'NONE' as Post.CoverStyle` instead of `Post.CoverStyle.NONE` when importing types (can't use enum values with `import type`).
+
+See `TYPE_COMPATIBILITY.md` for the full type comparison.
 
 ---
 
@@ -125,10 +252,48 @@ In feeds, pass `short_db_ID` explicitly to `getAllPosts`. The QWER stores alread
 
 ## 7. Optional enhancements
 
-- **Pagination** – extend `getPosts({ limit, offset })` and feed into QWER’s filtering/ordering utilities.
-- **Caching** – wrap GraphQL calls with an LRU cache or SvelteKit `depends` to avoid re-fetching on every request.
-- **Search** – repoint the search worker to query Nhost instead of static JSON once you enable full-text indexing.
-- **Preview mode** – expose a draft-only endpoint by filtering on `is_public` or status column in Hasura.
+- **Pagination** – extend `getAllPosts({ limit, offset })` and feed into QWER's filtering/ordering utilities.
+- **Caching** – API endpoints use 60s HTTP cache headers; extend with CDN caching in production.
+- **Search** – integrate with Nhost full-text search or use a search service like Algolia.
+- **Preview mode** – filter on draft status or use separate database for previews.
+- **Prev/Next Navigation** – implement post ordering and store for sequential navigation (TODO).
+
+---
+
+## 8. New Features in QWER Integration
+
+### Route Param Matcher 🔒
+**Location:** `src/params/slug.ts`
+
+Prevents `[slug=slug]` route from matching files with extensions:
+
+```ts
+export function match(param: string): boolean {
+  return !/\.[a-z0-9]+$/i.test(param);
+}
+```
+
+**Why:** Ensures `/sitemap.xml` and `/atom.xml` are handled by dedicated `+server.ts` files, not the post route.
+
+### 4-File Hybrid Pattern
+- `+page.server.ts` - SSR for initial load
+- `+page.ts` - Client navigation via API
+- `+server.ts` - JSON API with caching
+- `+page.svelte` - Display with QWER components
+
+**Benefits:**
+- SEO-friendly server rendering
+- Fast SPA transitions
+- Progressive enhancement
+- Cacheable API responses
+
+### Testing Infrastructure ✅
+**Location:** `packages/symbiont-cms/src/lib/server/queries.test.ts`
+
+- 12 comprehensive tests for query functions
+- Mocked GraphQL client for isolation
+- Tests pagination, errors, edge cases
+- Run: `pnpm test queries.test.ts`
 
 ---
 
@@ -159,7 +324,3 @@ In feeds, pass `short_db_ID` explicitly to `getAllPosts`. The QWER stores alread
 - `TYPE_COMPATIBILITY.md` – extended mapping table
 - `markdown-compatibility.md` – supported syntax/features
 - `dynamic-file-management.md`, `image-optimization-strategy.md` – next-phase plans once assets go dynamic
-
----
-
-**Last refreshed:** October 8, 2025

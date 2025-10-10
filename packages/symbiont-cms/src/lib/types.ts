@@ -42,6 +42,29 @@ export type ClassMap = {
 };
 
 /**
+ * Features detected in content during processing.
+ * Stored as JSONB in database for efficient querying.
+ */
+export interface ContentFeatures {
+    syntaxHighlighting?: string[];  // Languages detected: ['javascript', 'python']
+    math?: boolean;                 // KaTeX math expressions detected
+    images?: boolean;               // Images present in content
+    mermaid?: boolean;              // Mermaid diagrams detected
+    [key: string]: any;             // Allow additional custom features
+}
+
+/**
+ * Table of contents item with nested structure.
+ * Generated during markdown processing for navigation.
+ */
+export interface TocItem {
+    id: string;         // Heading ID for anchor links (e.g., 'getting-started')
+    text: string;       // Heading text content
+    level: number;      // Heading level (1-6)
+    children?: TocItem[]; // Nested headings
+}
+
+/**
  * Represents the structure of a single post or article.
  * This type should mirror the data fetched from your Nhost/Supabase backend,
  * ensuring that component props are strongly typed.
@@ -63,13 +86,8 @@ export type Post = {
     language?: string;
     cover?: string;
     
-    // Features detected during content processing (optional)
-    features?: {
-        hasCodeBlocks?: boolean;
-        hasMath?: boolean;
-        hasMermaid?: boolean;
-        [key: string]: any;
-    };
+    // Features detected during content processing (stored as JSONB)
+    features?: ContentFeatures;
     
     // Allow any other properties from your schema
     [key: string]: any;

@@ -21,7 +21,7 @@
 
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
-import type { MarkdownConfig, SymbiontConfig } from '../types.js';
+import type { MarkdownConfig, SymbiontConfig, ContentFeatures } from '../types.js';
 import { createLogger } from '../utils/logger.js';
 
 // @mdit plugins
@@ -75,13 +75,6 @@ interface TOCItem {
   heading: string;
   slug: string;
   child?: TOCItem[];
-}
-
-export interface ContentFeatures {
-  syntaxHighlighting?: string[];  // ['javascript', 'python', 'rust']
-  math?: boolean;
-  images?: boolean;
-  // ... other features as needed
 }
 
 export interface MarkdownResult {

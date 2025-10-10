@@ -27,7 +27,7 @@ The Symbiont CMS is a **reusable framework** for building headless content syste
 ### Core Principles
 
 1. **The User-Defined Rulebook**  
-   The system imposes no rigid structure. A central `symbiont.config.ts` file teaches the CMS how to interpret your existing Notion properties, making the system an extension of your unique workflow.
+   The system imposes no rigid structure. A central `symbiont.config.js` file teaches the CMS how to interpret your existing Notion properties, making the system an extension of your unique workflow.
 
 2. **Notion as the Control Panel**  
    Notion serves as the beautiful, high-level user interface for managing content metadata and, when desired, the content itself. It is the human-facing dashboard.
@@ -46,7 +46,7 @@ The Symbiont CMS is a **reusable framework** for building headless content syste
 ✅ **Notion Integration** - Write in Notion, publish to your site  
 ✅ **Zero-Rebuild** - Content updates appear instantly without rebuilds  
 ✅ **Type-Safe** - Full TypeScript support with type-safe configuration  
-✅ **Flexible Rules** - Define your own sync logic via `symbiont.config.ts`  
+✅ **Flexible Rules** - Define your own sync logic via `symbiont.config.js`  
 ✅ **GraphQL Client** - Built-in utilities for querying your content  
 ✅ **SSR Support** - Server-side rendering for SEO and performance  
 ✅ **Customizable UI** - Full styling control via `classMap` props  
@@ -65,7 +65,7 @@ The system is a decoupled, modern web architecture. Your frontend platform (Verc
                                 │  - API Routes           │       │  - Hasura GraphQL      │
                                 │  - Sync Handlers        │       │  - Storage (S3)        │
                                 └─────────────────────────┘       │  - Authentication      │
-                                          ▲                        └────────────────────────┘
+                                          ▲                       └────────────────────────┘
                                           │
                                           ▼
                                 ┌─────────────────────────┐
@@ -85,7 +85,7 @@ The system is a decoupled, modern web architecture. Your frontend platform (Verc
   - Authentication & permissions
   - Serverless functions (future: Hocuspocus for real-time editing)
 
-- **The Sync Service**: The intelligent bridge between Notion and Nhost. It runs on-demand via API routes, reads the `symbiont.config.ts` rules, and synchronizes data.
+- **The Sync Service**: The intelligent bridge between Notion and Nhost. It runs on-demand via API routes, reads the `symbiont.config.js` rules, and synchronizes data.
 
 - **The Control Panel (Notion)**: The human interface for managing content metadata, rich text editing, and workflow (draft/published status).
 
@@ -385,6 +385,8 @@ const config = defineSymbiontConfig({
 
 ## V. Package API Reference
 
+> **Updated:** October 9, 2025 - Added testing infrastructure, improved query utilities, and 4-file hybrid pattern examples
+
 ### Package Structure
 
 The package provides **three main entry points** to ensure proper code splitting:
@@ -392,129 +394,198 @@ The package provides **three main entry points** to ensure proper code splitting
 ```
 symbiont-cms
 ├── 📦 symbiont-cms (Client exports)
-│   ├── <Renderer /> - Markdown to HTML
-│   ├── <PostPage /> - Complete post rendering component
-│   ├── <Editor /> - Tiptap editor (planned)
-│   ├── GraphQL utilities (getPosts, getPostBySlug, getAllPosts)
-│   └── Type definitions (SymbiontPost, SymbiontConfig)
+│   ├── UI Components
+│   │   ├── PostHead - SEO meta tags (Open Graph, Twitter cards)
+│   │   ├── PostMeta - Date/tags display with reading time
+│   │   ├── TOC - Table of contents with active highlighting
+│   │   └── FeatureLoader - Conditional CSS loading (Prism, KaTeX)
+│   ├── Type definitions (Post, ContentFeatures, TocItem)
+│   └── Core types for client-side usage
 │
 ├── 📦 symbiont-cms/server (Server-only exports)
-│   ├── handlePollBlogRequest() - Manual sync handler
-│   ├── handleNotionWebhookRequest() - Webhook handler
-│   ├── syncFromNotion() - Core sync logic
-│   ├── loadConfig() - Config loader
-│   ├── postLoad() - Pre-built load function
-│   └── createPostLoad() - Custom load factory
+│   ├── Sync Handlers
+│   │   ├── handlePollBlogRequest() - Manual sync handler
+│   │   ├── handleNotionWebhookRequest() - Webhook handler
+│   │   └── syncFromNotion() - Core sync logic
+│   ├── Query Utilities
+│   │   ├── getAllPosts() - Get all posts with pagination ✅ TESTED
+│   │   ├── getPostBySlug() - Get single post by slug ✅ TESTED
+│   │   └── postLoad() - Pre-built load function for +page.server.ts
+│   ├── Markdown Processing
+│   │   └── renderMarkdown() - Server-side markdown → HTML with TOC
+│   ├── Configuration
+│   │   └── loadConfig() - Config loader with auto-defaults
+│   └── GraphQL Client
+│       └── gqlAdminClient() - Admin GraphQL client (lazy singleton)
 │
 └── 📦 symbiont-cms/config (Config helper)
     └── defineConfig() - Type-safe config helper for .js files
 ```
 
-### Client-Side Components
+**What's New (Oct 2025):**
+- ✅ **UI Helper Components** - PostHead, PostMeta, TOC, FeatureLoader
+- ✅ Test coverage for query utilities (12 passing tests)
+- ✅ Simplified query API (no manual client creation needed)
+- ✅ `postLoad()` wrapper for easy +page.server.ts integration
+- ✅ Auto-defaulting `primaryShortDbId` in config
+- ✅ GraphQL field aliasing for `sql_id`
 
-#### `<Renderer />` - Markdown Renderer
+### UI Helper Components ⭐ NEW
 
-Safely renders Markdown content with full styling control:
+These optional components handle common patterns. All support full styling customization via `classMap` props.
+
+#### `<PostHead />` - SEO Meta Tags
+
+Generates all necessary SEO tags in `<svelte:head>`:
 
 ```svelte
 <script>
-  import { Renderer } from 'symbiont-cms';
+  import { PostHead } from 'symbiont-cms';
   export let data;
 </script>
 
-<Renderer 
-  markdown={data.post.content} 
-  classMap={{
-    h1: 'text-4xl font-bold',
-    h2: 'text-3xl font-semibold mt-8',
-    p: 'my-4 text-gray-700',
-    code: 'bg-gray-100 px-2 py-1 rounded',
-    pre: 'bg-gray-900 text-white p-4 rounded-lg overflow-x-auto'
-  }}
+<PostHead 
+  post={data.post}
+  siteName="My Blog"
+  baseUrl="https://example.com"
+  author="John Doe"
+  twitterHandle="@johndoe"
 />
 ```
 
-#### `<PostPage />` - Complete Post Component
+**Generates:**
+- Primary meta tags (title, description, author)
+- Open Graph tags (og:title, og:description, og:image, og:url)
+- Twitter Card tags (twitter:card, twitter:title, twitter:image)
+- Article tags (article:published_time, article:modified_time, article:tag)
+- Canonical URL
 
-Renders a complete post page with built-in formatting:
+#### `<PostMeta />` - Date & Tags Display
+
+Displays post metadata with optional reading time:
 
 ```svelte
 <script>
-  import { PostPage } from 'symbiont-cms';
+  import { PostMeta } from 'symbiont-cms';
   export let data;
 </script>
 
-<PostPage 
+<PostMeta 
   post={data.post}
+  showReadingTime={true}
+  showUpdated={true}
+  showTags={true}
   formatDate={(date) => new Date(date).toLocaleDateString()}
   classMap={{
-    title: 'text-4xl font-bold mb-4',
-    date: 'text-gray-500 mb-8',
-    content: 'prose lg:prose-xl'
+    container: 'my-custom-meta',
+    publishDate: 'text-gray-600',
+    tag: 'badge badge-primary'
   }}
 />
 ```
 
-#### `<Editor />` - Rich Text Editor (Planned)
+**Features:**
+- Automatic reading time calculation (~200 words/min)
+- Shows "Updated" date if significantly different from publish date
+- Fully customizable date formatting
+- Complete styling control via `classMap`
 
-Tiptap wrapper for collaborative, Markdown-native editing:
+#### `<TOC />` - Table of Contents
+
+Renders nested table of contents with active section tracking:
 
 ```svelte
 <script>
-  import { Editor } from 'symbiont-cms';
+  import { TOC } from 'symbiont-cms';
+  export let data;
 </script>
 
-<Editor 
-  postId={data.post.id}
-  initialContent={data.post.content}
-  on:save={handleSave}
+<TOC 
+  items={data.toc}
+  highlightActive={true}
+  classMap={{
+    container: 'sticky top-4',
+    link: 'text-gray-600 hover:text-gray-900',
+    activeLink: 'text-blue-600 font-semibold'
+  }}
 />
 ```
 
-### GraphQL Client Utilities
+**Features:**
+- Nested structure (supports h1-h6)
+- Active section highlighting via IntersectionObserver
+- Smooth scroll to anchors
+- Sticky positioning support
+- Fully customizable styling
 
-Symbiont provides **three layers** of GraphQL clients for different use cases:
+#### `<FeatureLoader />` - Conditional Asset Loading
 
-#### Layer 1: Client-Side Queries (Public)
+Loads CSS assets only when needed based on content features:
 
-For components and client-side load functions:
+```svelte
+<script>
+  import { FeatureLoader } from 'symbiont-cms';
+  export let data;
+</script>
+
+<FeatureLoader 
+  features={data.post.features}
+  prismTheme="prism-tomorrow"
+  prismCdnUrl="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes"
+  katexCdnUrl="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+/>
+```
+
+**What it loads:**
+- Prism CSS - Only if `features.syntaxHighlighting` present
+- KaTeX CSS - Only if `features.math === true`
+- Mermaid CSS - Only if `features.mermaid === true`
+
+**Benefits:**
+- Reduces initial page size (~25KB saved if no code/math)
+- Improves performance for content-only pages
+- Automatic detection from `features` object
+
+### Server-Side Query Utilities ⭐ UPDATED
+
+**New simplified API** - No manual client creation needed!
+
+#### `getAllPosts()` - Get All Posts
 
 ```typescript
-import { getPosts, getPost } from 'symbiont-cms';
+import { getAllPosts } from 'symbiont-cms/server';
 
-// In +page.ts (client-side) or +page.server.ts
+// In +page.server.ts
 export const load = async ({ fetch }) => {
-  // Get posts from primary database
-  const posts = await getPosts({ 
+  const posts = await getAllPosts({ 
     fetch,
-    limit: 10 
+    limit: 20,     // optional, default: 10
+    offset: 0,     // optional, default: 0
+    shortDbId: 'blog' // optional, uses primaryShortDbId if omitted
   });
   
   return { posts };
 };
-
-// Get posts from specific database
-const docs = await getPosts({ 
-  fetch,
-  limit: 20,
-  shortDbId: 'documentation' 
-});
-
-// Get specific post by slug
-const post = await getPost(params.slug, { fetch });
 ```
 
-#### Layer 2: Server-Side Queries (Server-Only)
+**Features:**
+- ✅ Automatic config loading (primaryShortDbId defaults to first database)
+- ✅ Filters by `publish_at` (only published posts)
+- ✅ Sorted by publish date (newest first)
+- ✅ Pagination support
+- ✅ Comprehensive test coverage (12/12 tests passing)
 
-For `+page.server.ts` and API routes with cleaner API:
+#### `getPostBySlug()` - Get Single Post
 
 ```typescript
-import { getPostBySlug, getAllPosts } from 'symbiont-cms/server';
+import { getPostBySlug } from 'symbiont-cms/server';
+import { error } from '@sveltejs/kit';
 
-// In +page.server.ts
 export const load = async ({ params, fetch }) => {
-  // Simpler API - no client creation needed
-  const post = await getPostBySlug(params.slug, { fetch });
+  const post = await getPostBySlug(params.slug, { 
+    fetch,
+    shortDbId: 'blog' // optional
+  });
   
   if (!post) {
     throw error(404, 'Post not found');
@@ -522,32 +593,75 @@ export const load = async ({ params, fetch }) => {
   
   return { post };
 };
+```
 
-// Get all posts with pagination
-export const load = async ({ fetch }) => {
-  const posts = await getAllPosts({ 
-    fetch,
-    limit: 20,
-    offset: 0,
-    shortDbId: 'blog' // optional
-  });
+**Features:**
+- ✅ Returns `null` if not found (not an error)
+- ✅ Filters by slug and source_id
+- ✅ Tested with edge cases (empty slugs, network failures)
+
+#### `postLoad()` - Complete Page Loader ⭐ RECOMMENDED
+
+Pre-built load function that handles everything:
+
+```typescript
+import { postLoad } from 'symbiont-cms/server';
+
+// Simplest approach - just export it!
+export { postLoad as load };
+
+// Or wrap it if you need custom logic
+export const load = async (event) => {
+  const data = await postLoad(event);
   
-  return { posts };
+  // Add your custom data
+  return {
+    ...data,
+    customField: 'value'
+  };
 };
 ```
 
-#### Layer 3: Admin Client (Server-Only)
+**What it does:**
+- ✅ Fetches post from database
+- ✅ Renders markdown to HTML (server-side)
+- ✅ Generates table of contents
+- ✅ Detects content features (syntax highlighting, math, etc.)
+- ✅ Returns structured data ready for components
 
-For sync operations and admin mutations:
-
+**Returns:**
 ```typescript
-import { gqlAdminClient } from 'symbiont-cms/server';
-
-// Requires NHOST_ADMIN_SECRET env var
-const result = await gqlAdminClient.request(MUTATION, variables);
+{
+  post: Post,           // Post metadata
+  html: string,         // Rendered HTML
+  toc: TocItem[],       // Table of contents
+  features: ContentFeatures  // Feature detection
+}
 ```
 
-**Architecture Summary:**
+#### `renderMarkdown()` - Markdown Processing
+
+Server-side markdown rendering with advanced features:
+
+```typescript
+import { renderMarkdown } from 'symbiont-cms/server';
+
+const { html, toc, features } = await renderMarkdown(content, {
+  features: {
+    syntaxHighlighting: true,
+    math: true,
+    mermaid: false,
+    images: true
+  }
+});
+```
+
+**Features:**
+- ✅ Prism syntax highlighting (server-side)
+- ✅ KaTeX math rendering
+- ✅ Mermaid diagrams
+- ✅ Automatic TOC generation
+- ✅ Feature detection for conditional asset loading
 - **`symbiont-cms`** (client) → Public queries, works client-side and SSR
 - **`symbiont-cms/server`** (server) → Clean wrappers, auto-config loading
 - **`gqlAdminClient`** (server) → Admin operations, lazy singleton
@@ -657,6 +771,97 @@ import { defineConfig } from 'symbiont-cms/config';
 
 ## VI. Advanced Usage
 
+### 4-File Hybrid Rendering Pattern ⭐ RECOMMENDED
+
+The recommended pattern for building post pages with Symbiont CMS combines SSR, client-side navigation, and API routes for optimal performance and UX.
+
+**Example: Complete Post Page Implementation**
+
+```
+src/routes/
+├── [slug=slug]/                    🔒 Protected by param matcher
+│   ├── +page.server.ts            # SSR load
+│   ├── +page.ts                   # Client navigation
+│   └── +page.svelte               # Display
+└── api/posts/[slug]/
+    └── +server.ts                 # JSON API
+```
+
+**File 1: `[slug=slug]/+page.server.ts` (SSR)**
+```typescript
+import { postLoad } from 'symbiont-cms/server';
+export { postLoad as load };
+
+// Or with custom transformation:
+export const load = async (event) => {
+  const data = await postLoad(event);
+  return {
+    ...data,
+    readingTime: calculateReadingTime(data.post.content)
+  };
+};
+```
+
+**File 2: `[slug=slug]/+page.ts` (Client Navigation)**
+```typescript
+export const load = async ({ params, fetch }) => {
+  const response = await fetch(`/api/posts/${params.slug}`);
+  if (!response.ok) throw new Error('Failed to load post');
+  return await response.json();
+};
+```
+
+**File 3: `api/posts/[slug]/+server.ts` (API)**
+```typescript
+import { getPostBySlug, renderMarkdown } from 'symbiont-cms/server';
+import { json } from '@sveltejs/kit';
+
+export const GET = async ({ params, fetch, setHeaders }) => {
+  const post = await getPostBySlug(params.slug, { fetch });
+  const { html, toc } = await renderMarkdown(post.content ?? '');
+  
+  setHeaders({ 'cache-control': 'public, max-age=60' });
+  return json({ post, html, toc });
+};
+```
+
+**File 4: `[slug=slug]/+page.svelte` (Display)**
+```svelte
+<script lang="ts">
+  export let data;
+</script>
+
+<article>
+  <h1>{data.post.title}</h1>
+  {@html data.html}
+</article>
+```
+
+**Benefits:**
+- ✅ Initial load via SSR (SEO-friendly)
+- ✅ Fast client-side navigation (SPA-like)
+- ✅ Cacheable API responses
+- ✅ Progressive enhancement (works without JS)
+
+**See Also:** `.docs/INTEGRATION_GUIDE.md` and `packages/qwer-test/docs/HYBRID_IMPLEMENTATION.md`
+
+### Route Param Matchers
+
+Prevent post routes from matching files with extensions:
+
+```typescript
+// src/params/slug.ts
+export function match(param: string): boolean {
+  return !/\.[a-z0-9]+$/i.test(param);
+}
+```
+
+Then use `[slug=slug]` instead of `[slug]` in your route:
+```
+src/routes/[slug=slug]/+page.svelte  ✅ Won't match /sitemap.xml
+src/routes/[slug]/+page.svelte        ❌ Would match /sitemap.xml
+```
+
 ### Custom Post Transformation
 
 ```typescript
@@ -726,9 +931,9 @@ From Notion page to database:
 
 ## VII. Implementation Status
 
-> **Last Updated:** October 8, 2025
+> **Last Updated:** October 9, 2025
 
-### ✅ Production Ready (Phase 1)
+### ✅ Production Ready (Phase 1 - 86% Complete)
 
 **Core Sync Engine**
 - ✅ Notion API integration with `notion-to-md`
@@ -742,17 +947,13 @@ From Notion page to database:
 - ✅ Type-safe config helper with JSDoc
 - ✅ Environment variable separation (secrets in `.env`)
 - ✅ Multi-database support via `source_id`
-
-**UI Components**
-- ✅ `<Renderer />` with classMap styling
-- ✅ `<PostPage />` complete component
-- ✅ SSR-first architecture
-- ✅ Markdown rendering with plugins
+- ✅ Auto-defaulting `primaryShortDbId`
 
 **Server Utilities**
 - ✅ Pre-built sync handlers (`handlePollBlogRequest`)
-- ✅ Post loader functions (`postLoad`)
-- ✅ GraphQL client helpers (`getPosts`, `getAllPosts`)
+- ✅ Post loader functions (`postLoad()`)
+- ✅ Simplified query wrappers (`getAllPosts`, `getPostBySlug`)
+- ✅ Markdown rendering with TOC (`renderMarkdown()`)
 - ✅ Full TypeScript type exports
 
 **Database Schema**
@@ -760,6 +961,20 @@ From Notion page to database:
 - ✅ Unique constraints on slug, notion_page_id, notion_short_id
 - ✅ Indexes for performance
 - ✅ Auto-update triggers for `updated_at`
+- ✅ GraphQL field aliasing (`sql_id: id`)
+
+**Testing Infrastructure** ⭐ NEW
+- ✅ Vitest setup with coverage reports
+- ✅ Query function tests (12/12 passing)
+- ✅ Mock GraphQL client for isolated testing
+- ✅ Edge case coverage (pagination, errors, empty states)
+
+**Integration Examples** ⭐ NEW
+- ✅ Complete QWER integration (`packages/qwer-test/`)
+- ✅ 4-file hybrid rendering pattern
+- ✅ Route param matchers for file handling
+- ✅ Shared post converter utilities
+- ✅ Feed generation (Atom, Sitemap)
 
 ### ⚠️ Missing from Phase 1 (Needs Implementation)
 

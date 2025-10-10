@@ -531,17 +531,15 @@ describe('page-processor', () => {
 
 			await processPageWebhook(page, mockConfig, null);
 
-			// Should check if slug exists
-			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(
-				1,
-				'MOCK_CHECK_SLUG_QUERY',
-				{
-					source_id: 'test-blog',
-					slug: 'webhook-test'
-				}
-			);
-
-			// Should upsert
+		// Should check if slug exists
+		expect(gqlAdminClient.request).toHaveBeenNthCalledWith(
+			1,
+			'MOCK_CHECK_SLUG_QUERY',
+			{
+				short_db_ID: 'test-blog',
+				slug: 'webhook-test'
+			}
+		);			// Should upsert
 			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(
 				2,
 				'MOCK_UPSERT_MUTATION',
@@ -583,17 +581,15 @@ describe('page-processor', () => {
 
 			await processPageWebhook(page, mockConfig, null);
 
-			// Should check 'conflict', then 'conflict-2'
-			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(1, 'MOCK_CHECK_SLUG_QUERY', {
-				source_id: 'test-blog',
-				slug: 'conflict'
-			});
-			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(2, 'MOCK_CHECK_SLUG_QUERY', {
-				source_id: 'test-blog',
-				slug: 'conflict-2'
-			});
-
-			// Should upsert with 'conflict-2'
+		// Should check 'conflict', then 'conflict-2'
+		expect(gqlAdminClient.request).toHaveBeenNthCalledWith(1, 'MOCK_CHECK_SLUG_QUERY', {
+			short_db_ID: 'test-blog',
+			slug: 'conflict'
+		});
+		expect(gqlAdminClient.request).toHaveBeenNthCalledWith(2, 'MOCK_CHECK_SLUG_QUERY', {
+			short_db_ID: 'test-blog',
+			slug: 'conflict-2'
+		});			// Should upsert with 'conflict-2'
 			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(
 				3,
 				'MOCK_UPSERT_MUTATION',
@@ -647,13 +643,12 @@ describe('page-processor', () => {
 
 			await processPageWebhook(page, mockConfig, existingPost);
 
-			// Should check new slug availability
-			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(1, 'MOCK_CHECK_SLUG_QUERY', {
-				source_id: 'test-blog',
-				slug: 'new-webhook-slug'
-			});
 
-			// Should upsert with new slug
+		// Should check new slug availability
+		expect(gqlAdminClient.request).toHaveBeenNthCalledWith(1, 'MOCK_CHECK_SLUG_QUERY', {
+			short_db_ID: 'test-blog',
+			slug: 'new-webhook-slug'
+		});			// Should upsert with new slug
 			expect(gqlAdminClient.request).toHaveBeenNthCalledWith(
 				2,
 				'MOCK_UPSERT_MUTATION',

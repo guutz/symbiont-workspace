@@ -16,6 +16,7 @@ select_permissions:
         - tags
         - title
         - updated_at
+        - features
       filter:
         _and:
           - publish_at:

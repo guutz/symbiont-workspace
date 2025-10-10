@@ -24,7 +24,9 @@ export type {
 } from './server/queries.js';
 
 export type {
-	ContentFeatures,
 	MarkdownOptions,
 	MarkdownResult
 } from './server/markdown-processor.js';
+
+// Re-export ContentFeatures from types for convenience
+export type { ContentFeatures } from './types.js';

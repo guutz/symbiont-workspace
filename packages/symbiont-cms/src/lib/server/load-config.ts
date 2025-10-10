@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { SymbiontConfig } from '../types.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * Loads the full symbiont.config.js (including server-only rules and functions).
@@ -10,6 +11,7 @@ import type { SymbiontConfig } from '../types.js';
  * @returns Full configuration including database rules and functions
  */
 export async function loadConfig(): Promise<SymbiontConfig> {
+	const logger = createLogger({ operation: 'load_config' });
 	const cwd = process.cwd();
 	const configPaths = [
 		path.resolve(cwd, 'symbiont.config.js'),
@@ -19,17 +21,27 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 	const configPath = configPaths.find(p => fs.existsSync(p));
 	
 	if (!configPath) {
+		logger.error({ 
+			event: 'config_not_found',
+			searched_paths: configPaths
+		});
 		throw new Error(
 			'Could not find symbiont.config.js in project root.\n' +
 			'Create a symbiont.config.js file to configure Symbiont CMS.'
 		);
 	}
 	
+	logger.debug({ event: 'config_found', path: configPath });
+	
 	const module = await import(/* @vite-ignore */ configPath);
 	const config: SymbiontConfig = module.default;
 	
 	// Validate databases array exists and has at least one entry
 	if (!config.databases || config.databases.length === 0) {
+		logger.error({ 
+			event: 'config_invalid',
+			reason: 'No databases configured'
+		});
 		throw new Error(
 			'symbiont.config.js must have at least one database configured in the databases array.'
 		);
@@ -38,6 +50,10 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 	// Set primaryShortDbId to first database's short_db_ID if not explicitly set
 	if (!config.primaryShortDbId) {
 		config.primaryShortDbId = config.databases[0].short_db_ID;
+		logger.debug({ 
+			event: 'primary_db_defaulted',
+			primaryShortDbId: config.primaryShortDbId
+		});
 	}
 	
 	// No validation needed for rules - both are optional and work together

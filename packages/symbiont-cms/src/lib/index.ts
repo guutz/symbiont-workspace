@@ -1,6 +1,10 @@
 // Client-side exports for symbiont-cms
 
 export { default as Editor } from './components/Editor.svelte';
+export { default as PostHead } from './components/PostHead.svelte';
+export { default as PostMeta } from './components/PostMeta.svelte';
+export { default as TOC } from './components/TOC.svelte';
+export { default as FeatureLoader } from './components/FeatureLoader.svelte';
 
 // Config helper for type-safe .js configs
 export { defineConfig } from './config.js';
@@ -8,6 +12,8 @@ export { defineConfig } from './config.js';
 export type {
 	ClassMap,
 	Post,
+	ContentFeatures,
+	TocItem,
 	SyncSummary,
 	SymbiontConfig,
 	DatabaseBlueprint,
