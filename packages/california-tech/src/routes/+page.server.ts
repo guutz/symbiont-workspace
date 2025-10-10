@@ -13,7 +13,7 @@ export const load = async ({ fetch }: { fetch: typeof globalThis.fetch }) => {
 			posts: qwerPosts
 		};
 	} catch (error) {
-		console.error('[qwer-test] Error fetching posts from database:', error);
+		console.error('[+page.server] Error fetching posts from database:', error);
 		return {
 			posts: []
 		};

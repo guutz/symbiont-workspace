@@ -1,17 +1,9 @@
 {
-  "name": "qwer-test",
+  "name": "california-tech",
   "version": "1.1.0",
   "type": "module",
   "license": "MIT",
   "private": true,
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kwchang0831/svelte-qwer.git"
-  },
-  "bugs": {
-    "url": "https://github.com/kwchang0831/svelte-qwer/issues"
-  },
-  "author": "kwchang0831",
   "scripts": {
     "dev:sveltekit": "cross-env MODE=development vite dev --host",
     "dev:QWER": "node --no-warnings QWER watch",

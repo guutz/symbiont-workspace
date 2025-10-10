@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev:guutz": "pnpm build:package && pnpm --filter guutz-blog dev",
-    "dev:qwer": "pnpm build:package && pnpm --filter qwer-test dev",
+    "dev:tech": "pnpm build:package && pnpm --filter california-tech dev",
     "build:package": "pnpm --filter symbiont-cms build"
   },
   "devDependencies": {
