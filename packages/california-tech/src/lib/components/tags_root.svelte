@@ -2,6 +2,7 @@
   import { strings } from '$lib/strings';
   import { slide, fly } from 'svelte/transition';
   import TagsCategory from '$lib/components/tags_category.svelte';
+  import type { Tags } from '$lib/types/tags';
   let scrollY = 0;
   let className: string | undefined = undefined;
   export { className as class };
@@ -22,13 +23,13 @@
 
     if (!input || input.length === 0) return;
 
-    curTags.map((c: { tags: any[] }) => {
+    curTags.map((c: { tags: Tags.Tag[] }) => {
       c.tags = c.tags.filter((tag) => {
         return tag.name.toLowerCase().includes(input.toLowerCase());
       });
       return c;
     });
-    curTags = curTags.filter((c: { tags: any[] }) => {
+    curTags = curTags.filter((c: { tags: Tags.Tag[] }) => {
       return c.tags.length > 0;
     });
   }

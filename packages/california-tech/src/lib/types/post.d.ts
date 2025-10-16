@@ -1,4 +1,5 @@
 import type { TOC } from '$lib/types/toc';
+import type { Tags } from '$lib/types/tags';
 export namespace Post {
   export type Post = {
     slug: string;
@@ -22,7 +23,7 @@ export namespace Post {
     prev?: string;
     next?: string;
     toc?: TOC.Heading[];
-    tags?: Array<>;
+    tags?: Array<Tags.Tag | string>;
   };
 
   export enum CoverStyle {

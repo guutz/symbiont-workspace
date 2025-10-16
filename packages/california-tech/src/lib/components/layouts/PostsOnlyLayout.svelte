@@ -1,6 +1,7 @@
 <script lang="ts">
   import IndexPosts from '$lib/components/index_posts.svelte';
   import Tags from '$lib/components/tags_root.svelte';
+  import FilterBar from '$lib/components/FilterBar.svelte';
   import { tagsShowMobile, tagsShowDesktop } from '$stores/tags';
   import { fly } from 'svelte/transition';
 </script>
@@ -45,6 +46,7 @@
   <div class="min-w-12rem max-w-screen-md flex-1 relative mr6">
     {#if $tagsShowDesktop}
       <Tags class="hidden max-w-[20rem] my4 rounded-2xl p4 xl:(flex flex-col min-w-[12rem] sticky top-[4rem])" />
+      <!-- <FilterBar tags={data.allTags} currentQuery={data.query} currentTag={data.tag} /> -->
     {/if}
   </div>
 </div>

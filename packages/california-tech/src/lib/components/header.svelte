@@ -8,7 +8,6 @@
   import Masthead from '$lib/components/masthead.svelte';
   import ScrollButtons from '$lib/components/scroll_buttons.svelte';
   import DefaultNav from '$lib/components/header/DefaultNav.svelte';
-  import SearchNav from '$lib/components/header/SearchNav.svelte';
 
   // Scroll-related state for ScrollButtons
   let scrollY: number;
@@ -73,23 +72,7 @@
 <header id="header" class="w-screen z-40" aria-label="Header Navigation">
   <Masthead />
   
-  <!-- 
-    This container uses CSS transitions instead of Svelte transitions to avoid 
-    the overlap issue. One view fades/slides out while the other fades/slides in.
-  -->
   <div class="relative py-2 min-h-4rem max-h-16">
-    <!-- Search Bar View -->
-    <div
-      class="absolute inset-0 transition-all duration-300 ease-in-out"
-      class:opacity-100={$searching}
-      class:opacity-0={!$searching}
-      class:pointer-events-auto={$searching}
-      class:pointer-events-none={!$searching}
-      class:translate-x-0={$searching}
-      class:translate-x-12={!$searching}
-    >
-      <SearchNav />
-    </div>
 
     <!-- Default Navigation View -->
     <div
