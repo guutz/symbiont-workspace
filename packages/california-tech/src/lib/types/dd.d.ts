@@ -1,3 +1,4 @@
+// packages/california-tech/src/lib/types/dd.d.ts
 export namespace DD {
   export enum Orientation {
     TOP = 0,

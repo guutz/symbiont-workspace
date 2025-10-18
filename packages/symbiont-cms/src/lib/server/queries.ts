@@ -25,7 +25,7 @@ const GET_POST_BY_SLUG = gql`
 			updated_at
 			tags
 			features
-			author
+			authors
 		}
 	}
 `;
@@ -46,7 +46,7 @@ const GET_ALL_POSTS = gql`
 			updated_at
 			tags
 			features
-			author
+			authors
 		}
 	}
 `;

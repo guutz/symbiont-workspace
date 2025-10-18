@@ -27,27 +27,27 @@
   import { browser } from '$app/environment';
   import { siteConfig } from '$config/site';
   import { onMount } from 'svelte';
-  import { partytownSnippet } from '@qwik.dev/partytown/integration';
-  let scriptEl: any;
+  // import { partytownSnippet } from '@qwik.dev/partytown/integration';
+  // let scriptEl: any;
   
   onMount(() => {
-    if (scriptEl) {
-      scriptEl.textContent = partytownSnippet();
-    }
+    // if (scriptEl) {
+    //   scriptEl.textContent = partytownSnippet();
+    // }
     if (browser) {
       document.documentElement.setAttribute('lang', siteConfig.lang);
     }
   });
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
   <script>
     partytown = {
       forward: ['plausible', 'dataLayer.push'],
     };
   </script>
   <script bind:this={scriptEl}></script>
-</svelte:head>
+</svelte:head> -->
 
 <Head />
 

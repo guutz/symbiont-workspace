@@ -13,7 +13,7 @@ export const techConfig: TechConfig = {
     src: '/tech.svg',
     alt: 'The California Tech',
   },
-  volume: 'Vol. CXXVIII',
+  volume: 'Vol. CXXIX',
   location: 'Pasadena, CA',
   email: 'tech@caltech.edu',
 };

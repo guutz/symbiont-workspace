@@ -9,7 +9,7 @@ import transformerVariantGroup from '@unocss/transformer-variant-group';
 import transformerCompileClass from '@unocss/transformer-compile-class';
 import { imagetools } from 'vite-imagetools';
 import path from 'path';
-import { partytownVite } from '@qwik.dev/partytown/utils';
+// import { partytownVite } from '@qwik.dev/partytown/utils';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { defineConfig } from 'vite';
@@ -70,9 +70,9 @@ export default defineConfig({
     }),
     imagetools(),
     sveltekit(),
-    partytownVite({
-      dest: path.join(__dirname, outputFolderPath, '~partytown'),
-    }),
+    // partytownVite({
+    //   dest: path.join(__dirname, outputFolderPath, '~partytown'),
+    // }),
   ],
   resolve: {
     alias: {

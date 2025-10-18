@@ -1,3 +1,4 @@
+// packages/california-tech/src/lib/stores/themes.ts
 import type { Theme } from '$lib/types/themes';
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';

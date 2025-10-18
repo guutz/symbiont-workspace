@@ -1,25 +1,44 @@
 <!-- packages/california-tech/src/lib/components/header/ThemeToggleButton.svelte -->
 <script lang="ts">
-  import { theme } from '$stores/themes';
-  import { browser } from '$app/environment';
+	import { page } from '$app/stores';
+	import { enhance } from '$app/forms';
+	import { theme } from '$lib/stores/themes';
+
+	// For JS-enabled clients, use the store directly for an instant update.
+	function toggleThemeClientSide() {
+		theme.toggle();
+	}
 </script>
 
-{#if browser}
-  <button
-    aria-label="Toggle Dark Mode"
-    on:click={theme.toggle}
-    class="btn active:translate-y-px duration-500 ease-out group"
-  >
-    <div class="!w-8 !h-8 i-line-md-sunny-outline-loop dark:i-line-md-moon group-hover:scale-120 transition-transform"></div>
-  </button>
-{:else}
-  <form action="/?/toggleTheme" method="POST">
-    <button
-      aria-label="Toggle Dark Mode"
-      class="btn active:translate-y-px duration-500 ease-out group"
-    >
-      <div class="!w-8 !h-8 i-line-md-sunny-outline-loop dark:i-line-md-moon group-hover:scale-120 transition-transform"></div>
-    </button>
-  </form>
-{/if}
+<!-- 
+  This component uses progressive enhancement.
+  - With JS: The `enhance` action intercepts the form submission. We call our
+    client-side theme.toggle() for an instant UI update and prevent the form from submitting.
+  - Without JS: The form posts to our dedicated API endpoint, which sets a cookie
+    and redirects, causing a full page reload with the new theme.
+-->
+<form
+	action="/api/toggle-theme?theme={$theme === 'dark' ? 'light' : 'dark'}&redirectTo={$page.url.pathname}"
+	method="POST"
+	use:enhance={() => {
+		toggleThemeClientSide();
+
+		// Return a callback that cancels the default form submission
+		return async ({ update }) => {
+			// We don't need to update the page, so this can be empty.
+		};
+	}}
+>
+	<button
+		type="submit"
+		aria-label="Toggle Dark Mode"
+		class="btn active:translate-y-2 duration-600 ease-out group"
+	>
+		{#key $theme}
+			<div
+				class="!w-8 !h-8 i-line-md-sunny-outline-loop dark:i-line-md-moon group-hover:(transition-transform duration-300 scale-120 ease-in-out)"
+			></div>
+		{/key}
+	</button>
+</form>
 
