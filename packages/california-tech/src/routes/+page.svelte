@@ -14,13 +14,27 @@
 	let query = $state(data.query || '');
 	let activeTag = $state(data.tag || '');
 
-	// Show/hide states for mobile and desktop
-	let tagsShowMobile = $state(false);
+	// Show/hide tags sidebar
 	let tagsShowDesktop = $state(true);
 
-	// Client-side filtering
+	// Listen for tags toggle event from navbar (JS only)
+	$effect(() => {
+		if (!browser) return;
+		
+		const handleToggleTags = () => {
+			tagsShowDesktop = !tagsShowDesktop;
+		};
+		
+		window.addEventListener('toggleTags', handleToggleTags);
+		
+		return () => {
+			window.removeEventListener('toggleTags', handleToggleTags);
+		};
+	});
+
+	// Client-side filtering (with JS)
 	const displayedPosts = $derived(
-		data.allPosts.filter((post) => {
+		browser ? data.allPosts.filter((post) => {
 			const byQuery = query
 				? (post.title?.toLowerCase() || '').includes(query.toLowerCase()) ||
 					(post.summary?.toLowerCase() || '').includes(query.toLowerCase()) ||
@@ -28,14 +42,14 @@
 				: true;
 
 			const byTag = activeTag
-				? post.tags?.some((tag) => typeof tag === 'string' && tag === activeTag)
+				? post.tags?.some((tag) => typeof tag === 'string' && tag === activeTag) // Case-sensitive
 				: true;
 
 			return byQuery && byTag;
-		})
+		}) : data.posts // Server-filtered posts (no JS)
 	);
 
-	// Sync state changes to URL
+	// Sync state changes to URL (JS only)
 	$effect(() => {
 		if (!browser) return;
 
@@ -63,64 +77,35 @@
 	});
 </script>
 
-<!-- Mobile View: Show either tags or posts -->
-{#if tagsShowMobile}
-	<div
-		in:fly|global={{ x: -100, y: -100, duration: 300, delay: 300 }}
-		out:fly|global={{ x: -100, y: -100, duration: 300 }}
-		class="mx-6 my-4 xl:hidden"
-	>
-		<FilterBar 
-			bind:query 
-			bind:activeTag 
-			tags={data.allTags} 
-			class="flex flex-col min-w-[12rem]" 
-		/>
-	</div>
-{:else}
-	<div
-		in:fly|global={{ y: 100, duration: 300, delay: 300 }}
-		out:fly|global={{ y: 100, duration: 300 }}
-		itemscope
-		itemtype="https://schema.org/Blog"
-		itemprop="blog"
-		class="flex flex-nowrap justify-center flex-col items-center xl:hidden"
-	>
-		<div class="h-feed min-h-[50vh] w-full">
-			<IndexPosts posts={displayedPosts} />
-		</div>
-	</div>
-{/if}
-
 <!-- Desktop View: Two-column layout -->
 <div
 	itemscope
 	itemtype="https://schema.org/Blog"
 	itemprop="blog"
-	class="flex-nowrap justify-center flex-col items-center hidden xl:(flex flex-row items-stretch)"
+	class="flex flex-col md:flex-row justify-center items-start max-w-[100rem] mx-auto px-4 gap-4"
 >
-	<!-- Center Column: Posts -->
+	<!-- Center Column: Posts (flex to take available space) -->
 	<div
 		in:fly|global={{ y: 100, duration: 300, delay: 300 }}
 		out:fly|global={{ y: -100, duration: 300 }}
-		class="h-feed min-h-[50vh] flex-1 w-full md:(rounded-2xl max-w-[50rem] mx-2)"
+		class="h-feed min-h-[50vh] w-full md:flex-1 md:max-w-[55rem]"
 	>
 		<IndexPosts posts={displayedPosts} />
 	</div>
 
-	<!-- Right Column: Filter Bar (Tags) -->
-	<div
-		in:fly|global={{ x: 100, y: -100, duration: 300, delay: 300 }}
-		out:fly|global={{ x: 100, y: 100, duration: 300 }}
-		class="min-w-[12rem] max-w-screen-md flex-1 relative mr-6"
-	>
-		{#if tagsShowDesktop}
+	<!-- Right Column: Filter Bar (Tags) - fixed width on desktop -->
+	{#if tagsShowDesktop}
+		<div
+			in:fly|global={{ x: 100, y: -100, duration: 300, delay: 300 }}
+			out:fly|global={{ x: 100, y: 100, duration: 300 }}
+			class="w-full md:w-[20rem] lg:w-[22rem] flex-shrink-0"
+		>
 			<FilterBar
 				bind:query
 				bind:activeTag
 				tags={data.allTags}
-				class="hidden max-w-[20rem] my-4 rounded-2xl p-4 xl:(flex flex-col min-w-[12rem] sticky top-[4rem])"
+				class="my-4 rounded-2xl p-4 flex flex-col sticky top-[5rem] max-h-[calc(100vh-6rem)] overflow-hidden"
 			/>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>

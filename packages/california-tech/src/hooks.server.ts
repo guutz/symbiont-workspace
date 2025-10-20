@@ -7,8 +7,12 @@ const themeHandler: Handle = async ({ event, resolve }) => {
   event.locals.theme = theme;
 
   const response = await resolve(event, {
-    transformPageChunk: ({ html }) =>
-      html.replace('data-theme="light"', `data-theme="${theme}"`),
+    transformPageChunk: ({ html }) => {
+      // Apply theme to both data-theme attribute AND body class
+      return html
+        .replace('data-theme="light"', `data-theme="${theme}"`)
+        .replace('<body', `<body class="${theme}"`);
+    },
   });
 
   return response;

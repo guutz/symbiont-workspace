@@ -41,14 +41,14 @@ export async function load({ fetch, url, cookies }) {
     });
 
     const query = url.searchParams.get('q')?.toLowerCase() || '';
-    const tag = url.searchParams.get('tag')?.toLowerCase() || '';
+    const tag = url.searchParams.get('tag') || ''; // Preserve case!
 
     let posts: Post.Post[] = allPosts;
 
     if (tag) {
       posts = posts.filter(post => (post.tags ?? []).some(postTag => {
-        if (typeof postTag === 'string') return postTag.toLowerCase() === tag;
-        if (typeof postTag === 'object' && postTag !== null) return Object.values(postTag).flat().some(t => String(t).toLowerCase() === tag);
+        if (typeof postTag === 'string') return postTag === tag; // Case-sensitive
+        if (typeof postTag === 'object' && postTag !== null) return Object.values(postTag).flat().some(t => String(t) === tag);
         return false;
       }));
     }
@@ -73,4 +73,3 @@ export async function load({ fetch, url, cookies }) {
     return { allPosts: [], posts: [], allTags: [], query: '', tag: '', theme: 'light' };
   }
 }
-

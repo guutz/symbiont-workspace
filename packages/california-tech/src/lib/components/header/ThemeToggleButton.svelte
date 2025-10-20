@@ -14,18 +14,18 @@
   This component uses progressive enhancement.
   - With JS: The `enhance` action intercepts the form submission. We call our
     client-side theme.toggle() for an instant UI update and prevent the form from submitting.
-  - Without JS: The form posts to our dedicated API endpoint, which sets a cookie
-    and redirects, causing a full page reload with the new theme.
+  - Without JS: The form posts to our dedicated API endpoint, which reads the current
+    theme from cookies, toggles it, and redirects back.
 -->
 <form
-	action="/api/toggle-theme?theme={$theme === 'dark' ? 'light' : 'dark'}&redirectTo={$page.url.pathname}"
+	action="/api/toggle-theme?redirectTo={$page.url.pathname}"
 	method="POST"
 	use:enhance={() => {
 		toggleThemeClientSide();
 
-		// Return a callback that cancels the default form submission
-		return async ({ update }) => {
-			// We don't need to update the page, so this can be empty.
+		// Cancel the actual form submission since we've already toggled client-side
+		return async () => {
+			// Don't call update() - we don't need the server response
 		};
 	}}
 >
@@ -41,4 +41,3 @@
 		{/key}
 	</button>
 </form>
-

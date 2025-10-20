@@ -29,7 +29,18 @@
 </script>
 
 <!-- Banner linking to home -->
-<a href="/" class="block w-full px-4" aria-label="Return to home">
+<a 
+	href="/" 
+	class="block w-full px-4" 
+	aria-label="Return to home"
+	onclick={(e) => {
+		// Clear any active filters when going home
+		if (typeof window !== 'undefined') {
+			e.preventDefault();
+			window.location.href = '/';
+		}
+	}}
+>
 	<div
 		id="banner"
 		class="max-w-7xl mx-auto overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"

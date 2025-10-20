@@ -1,19 +1,35 @@
 <script lang="ts">
-  export let topPercent: number = 0.05; // Show button after 5% scroll
-  export let botPercent: number = 0.95; // Show button until 95% scroll
-  export let scrollingUp: boolean = true; // true: show "to top" button, false: show "to bottom" button
-  export let scrollPercent: number = 0; // Current scroll percent (0 to 1)
-  export let scrollHeight: number = 0; // Total scroll height
   import { fly } from 'svelte/transition';
-</script>
 
+  let {
+    topPercent = 0.05,
+    botPercent = 0.95,
+    scrollingUp = true,
+    scrollPercent = 0,
+    scrollHeight = 0,
+    scrollY = $bindable(0)
+  }: {
+    topPercent?: number;
+    botPercent?: number;
+    scrollingUp?: boolean;
+    scrollPercent?: number;
+    scrollHeight?: number;
+    scrollY?: number;
+  } = $props();
+
+  function scrollToTop() {
+    scrollY = 0;
+  }
+
+  function scrollToBottom() {
+    scrollY = scrollHeight;
+  }
+</script>
 
 {#if scrollingUp && scrollPercent > topPercent && scrollPercent < botPercent}
   <button
     id="totop"
-    on:click={() => {
-      scrollY = 0;
-    }}
+    onclick={scrollToTop}
     aria-label="scroll to top"
     in:fly|global={{ y: 50, duration: 300, delay: 300 }}
     out:fly|global={{ y: 50, duration: 300 }}
@@ -37,15 +53,12 @@
       </svg>
     </div>
   </button>
-  
 {/if}
 
 {#if !scrollingUp && scrollPercent > topPercent && scrollPercent < botPercent}
   <button
-    id="tobotoom"
-    on:click={() => {
-      scrollY = scrollHeight;
-    }}
+    id="tobottom"
+    onclick={scrollToBottom}
     aria-label="scroll to bottom"
     in:fly|global={{ y: 50, duration: 300, delay: 300 }}
     out:fly|global={{ y: 50, duration: 300 }}
@@ -69,5 +82,4 @@
       </svg>
     </div>
   </button>
-  
 {/if}

@@ -39,8 +39,12 @@
 		{/each}
 	</div>
 
-	<div class="ml-auto">
+  <div class="ml-auto flex items-center gap-2">
+		<!-- Tags Toggle Button (works without JS via checkbox) -->
+		<label for="tags-toggle" class="btn active:translate-y-2 duration-600 ease-out group cursor-pointer hidden md:block">
+			<div class="!w-8 !h-8 i-mdi-tag-multiple group-hover:(transition-transform duration-300 scale-120 ease-in-out)"></div>
+		</label>
+		
 		<ThemeToggleButton />
 	</div>
 </div>
-

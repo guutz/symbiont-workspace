@@ -5,16 +5,31 @@
   </head>
   <body itemscope itemtype="https://schema.org/WebPage" data-sveltekit-prefetch>
     <script>
-      const themeLocalStorageKey = 'theme';
-      if (
-        !!localStorage.getItem(themeLocalStorageKey)
-          ? localStorage.getItem(themeLocalStorageKey) === 'dark'
-          : window.matchMedia('(prefers-color-scheme: dark)').matches
-      ) {
-        document.body.classList.add('dark');
-      } else {
-        document.body.classList.add('light');
+      // Helper to get cookie value
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
       }
+      
+      const themeLocalStorageKey = 'theme';
+      const themeCookie = getCookie('theme');
+      
+      // Priority: Cookie (server-side) > LocalStorage (legacy) > System preference
+      let theme;
+      if (themeCookie) {
+        theme = themeCookie;
+        // Sync to localStorage for consistency
+        localStorage.setItem(themeLocalStorageKey, themeCookie);
+      } else if (localStorage.getItem(themeLocalStorageKey)) {
+        theme = localStorage.getItem(themeLocalStorageKey);
+      } else {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      
+      // Apply theme class (server-side should have already set this, but ensure it's correct)
+      document.body.classList.remove('light', 'dark');
+      document.body.classList.add(theme);
     </script>
     <div style="display: contents">%sveltekit.body%</div>
   </body>

@@ -1,7 +1,6 @@
 <!-- packages/california-tech/src/lib/components/index_post.svelte -->
 <script lang="ts">
 	import type { Post } from '$lib/types/post';
-	import { fly } from 'svelte/transition';
 	import { dateConfig } from '$config/site';
 	import { UserConfig } from '$config/QWER.config';
 	import ImgBanner from '$lib/components/image_banner.svelte';
@@ -25,8 +24,6 @@
 		itemscope
 		itemtype="https://schema.org/BlogPosting"
 		itemprop="blogPost"
-		in:fly|global={{ x: index % 2 ? 100 : -100, duration: 300, delay: 300 }}
-		out:fly|global={{ x: index % 2 ? -100 : 100, duration: 300 }}
 		class="index-post flex flex-col relative w-full overflow-hidden group shadow-xl hover:(shadow-2xl) transform transition duration-300 md:(w-3xl rounded-lg hover:(scale-105))"
 	>
 		{#if data.series_tag && data.series_title}
