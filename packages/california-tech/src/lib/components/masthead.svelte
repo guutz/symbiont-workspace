@@ -43,9 +43,9 @@
 >
 	<div
 		id="banner"
-		class="max-w-7xl mx-auto overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+		class="max-w-4xl mx-auto overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
 	>
-		<TechLogo className="w-full h-auto object-cover pt-4" />
+		<TechLogo className="w-full h-auto object-cover pt-8 px-8" />
 	</div>
 </a>
 

@@ -28,13 +28,13 @@
 		{#each posts as p, index (p.slug)}
 			{@const year = new Date(p.published).getFullYear()}
 			{#if !isNaN(year) && !years.includes(year)}
-				<div
-					in:fade={{ duration: 300, delay: 300 }}
-					out:fade={{ duration: 300 }}
-					class="year-divider"
-				>
-					{years.push(year) && year}
-				</div>
+				{#key year}
+					<div
+						class="year-divider"
+					>
+						{years.push(year) && year}
+					</div>
+				{/key}
 			{/if}
 			<IndexPost data={p} {index} />
 		{/each}
@@ -57,4 +57,3 @@
 		}
 	}
 </style>
-

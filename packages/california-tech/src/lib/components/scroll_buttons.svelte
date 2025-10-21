@@ -1,21 +1,39 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { fly } from 'svelte/transition';
 
-  let {
-    topPercent = 0.05,
-    botPercent = 0.95,
-    scrollingUp = true,
-    scrollPercent = 0,
-    scrollHeight = 0,
-    scrollY = $bindable(0)
-  }: {
-    topPercent?: number;
-    botPercent?: number;
-    scrollingUp?: boolean;
-    scrollPercent?: number;
-    scrollHeight?: number;
-    scrollY?: number;
-  } = $props();
+  // Configurable thresholds
+  const topPercent = 0.025;
+  const botPercent = 0.975;
+
+  // Scroll state
+  let scrollY = $state(0);
+  let innerHeight = $state(0);
+  let scrollHeight = $state(0);
+  let lastY = 0;
+  let scrollingUp = $state(false);
+
+  // Reactive calculations
+  const scrollThresholdStep = $derived(innerHeight * 0.1);
+  const pageEndTopBound = $derived(scrollHeight - innerHeight);
+  const scrollPercent = $derived(scrollY / pageEndTopBound || 0);
+
+  // Track scroll direction (debounced by threshold)
+  $effect(() => {
+    if (browser) {
+      if (Math.abs(lastY - scrollY) > scrollThresholdStep) {
+        scrollingUp = lastY - scrollY > 0;
+        lastY = scrollY;
+      }
+    }
+  });
+
+  // Update scroll height when document changes
+  $effect(() => {
+    if (browser) {
+      scrollHeight = document.documentElement.scrollHeight;
+    }
+  });
 
   function scrollToTop() {
     scrollY = 0;
@@ -25,6 +43,8 @@
     scrollY = scrollHeight;
   }
 </script>
+
+<svelte:window bind:scrollY bind:innerHeight />
 
 {#if scrollingUp && scrollPercent > topPercent && scrollPercent < botPercent}
   <button

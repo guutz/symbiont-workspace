@@ -5,31 +5,28 @@
 	import { browser } from '$app/environment';
 	import { fly } from 'svelte/transition';
 
-	import FilterBar from '$lib/components/header/FilterBar.svelte';
 	import IndexPosts from '$lib/components/index_posts.svelte';
 
 	let { data } = $props();
 
-	// State is now owned by the page component.
+	// Initialize state from URL params
 	let query = $state(data.query || '');
 	let activeTag = $state(data.tag || '');
 
-	// Show/hide tags sidebar
-	let tagsShowDesktop = $state(true);
-
-	// Listen for tags toggle event from navbar (JS only)
+	// Sync URL params to state when they change (external navigation)
 	$effect(() => {
 		if (!browser) return;
 		
-		const handleToggleTags = () => {
-			tagsShowDesktop = !tagsShowDesktop;
-		};
+		const urlQuery = $page.url.searchParams.get('q') || '';
+		const urlTag = $page.url.searchParams.get('tag') || '';
 		
-		window.addEventListener('toggleTags', handleToggleTags);
-		
-		return () => {
-			window.removeEventListener('toggleTags', handleToggleTags);
-		};
+		// Only update if URL changed (avoid infinite loop)
+		if (urlQuery !== query) {
+			query = urlQuery;
+		}
+		if (urlTag !== activeTag) {
+			activeTag = urlTag;
+		}
 	});
 
 	// Client-side filtering (with JS)
@@ -42,16 +39,24 @@
 				: true;
 
 			const byTag = activeTag
-				? post.tags?.some((tag) => typeof tag === 'string' && tag === activeTag) // Case-sensitive
+				? post.tags?.some((tag) => typeof tag === 'string' && tag === activeTag)
 				: true;
 
 			return byQuery && byTag;
 		}) : data.posts // Server-filtered posts (no JS)
 	);
 
-	// Sync state changes to URL (JS only)
+	// Sync state changes to URL (when user interacts with filters)
+	// Skip initial mount to avoid overwriting URL params
+	let isInitialMount = true;
 	$effect(() => {
 		if (!browser) return;
+		
+		// Skip the first run (initial mount)
+		if (isInitialMount) {
+			isInitialMount = false;
+			return;
+		}
 
 		const url = new URL($page.url);
 		const params = url.searchParams;
@@ -59,6 +64,7 @@
 		const currentQuery = params.get('q') || '';
 		const currentTag = params.get('tag') || '';
 
+		// Only update URL if our state is different
 		if (query !== currentQuery || activeTag !== currentTag) {
 			if (query) {
 				params.set('q', query);
@@ -77,35 +83,18 @@
 	});
 </script>
 
-<!-- Desktop View: Two-column layout -->
+<!-- Single-column centered layout -->
 <div
 	itemscope
 	itemtype="https://schema.org/Blog"
 	itemprop="blog"
-	class="flex flex-col md:flex-row justify-center items-start max-w-[100rem] mx-auto px-4 gap-4"
+	class="flex justify-center items-start max-w-[55rem] mx-auto px-4"
 >
-	<!-- Center Column: Posts (flex to take available space) -->
 	<div
 		in:fly|global={{ y: 100, duration: 300, delay: 300 }}
 		out:fly|global={{ y: -100, duration: 300 }}
-		class="h-feed min-h-[50vh] w-full md:flex-1 md:max-w-[55rem]"
+		class="h-feed min-h-[50vh] w-full"
 	>
 		<IndexPosts posts={displayedPosts} />
 	</div>
-
-	<!-- Right Column: Filter Bar (Tags) - fixed width on desktop -->
-	{#if tagsShowDesktop}
-		<div
-			in:fly|global={{ x: 100, y: -100, duration: 300, delay: 300 }}
-			out:fly|global={{ x: 100, y: 100, duration: 300 }}
-			class="w-full md:w-[20rem] lg:w-[22rem] flex-shrink-0"
-		>
-			<FilterBar
-				bind:query
-				bind:activeTag
-				tags={data.allTags}
-				class="my-4 rounded-2xl p-4 flex flex-col sticky top-[5rem] max-h-[calc(100vh-6rem)] overflow-hidden"
-			/>
-		</div>
-	{/if}
 </div>
