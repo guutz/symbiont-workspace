@@ -2,7 +2,7 @@
  * Tests for Notion helper utilities
  */
 import { describe, it, expect } from 'vitest';
-import { getTitle, getShortPostID, getTags, getPublishDate, defaultSlugRule, buildPostLookups } from './notion-helpers.js';
+import { getTitle, getShortPostID, getTags, getPublishDate, defaultSlugRule, buildPostLookups } from './notion-helpers.server.js';
 import { createMockNotionPage } from '../../__tests__/utils.js';
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig } from '../types.js';
@@ -156,7 +156,7 @@ describe('notion-helpers', () => {
 
 	describe('getPublishDate', () => {
 		const mockConfig: HydratedDatabaseConfig = {
-			short_db_ID: 'test-blog',
+			dbNickname: 'test-blog',
 			notionDatabaseId: 'test-db',
 			isPublicRule: (page: PageObjectResponse) => {
 				const status = page.properties.Status;
@@ -207,7 +207,7 @@ describe('notion-helpers', () => {
 
 		it('should use default gate (always pass) when no isPublicRule', () => {
 			const configNoGate: HydratedDatabaseConfig = {
-				short_db_ID: 'test-blog',
+				dbNickname: 'test-blog',
 				notionDatabaseId: 'test-db',
 				sourceOfTruthRule: () => 'NOTION' as const
 			};
@@ -222,7 +222,7 @@ describe('notion-helpers', () => {
 	describe('getPublishDate with publishDateRule', () => {
 		it('should use custom publishDateRule with default gate', () => {
 			const mockConfig: HydratedDatabaseConfig = {
-				short_db_ID: 'test-blog',
+				dbNickname: 'test-blog',
 				notionDatabaseId: 'test-db',
 				publishDateRule: (page: PageObjectResponse) => {
 					const goLive = (page.properties['Go Live'] as any)?.date?.start;
@@ -252,7 +252,7 @@ describe('notion-helpers', () => {
 
 		it('should return null when publishDateRule returns null (even if gate passes)', () => {
 			const mockConfig: HydratedDatabaseConfig = {
-				short_db_ID: 'test-blog',
+				dbNickname: 'test-blog',
 				notionDatabaseId: 'test-db',
 				publishDateRule: () => null,
 				sourceOfTruthRule: () => 'NOTION' as const
@@ -265,7 +265,7 @@ describe('notion-helpers', () => {
 
 		it('should combine isPublicRule gate with publishDateRule date extraction', () => {
 			const mockConfig: HydratedDatabaseConfig = {
-				short_db_ID: 'test-blog',
+				dbNickname: 'test-blog',
 				notionDatabaseId: 'test-db',
 				isPublicRule: (page) => (page.properties.Ready as any)?.checkbox === true,
 				publishDateRule: (page) => (page.properties['Go Live'] as any)?.date?.start || null,
@@ -311,7 +311,7 @@ describe('notion-helpers', () => {
 
 		it('should support complex publishDateRule with gate', () => {
 			const mockConfig: HydratedDatabaseConfig = {
-				short_db_ID: 'test-blog',
+				dbNickname: 'test-blog',
 				notionDatabaseId: 'test-db',
 				isPublicRule: (page) => (page.properties.Status as any)?.select?.name === 'Published',
 				publishDateRule: (page: PageObjectResponse) => {

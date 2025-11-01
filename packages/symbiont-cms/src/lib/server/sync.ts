@@ -1,9 +1,9 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig, SyncSummary } from '../types.js';
-import { buildPostLookups } from '../utils/notion-helpers.js';
+import { buildPostLookups } from '../utils/notion-helpers.server.js';
 import { gqlAdminClient, GET_ALL_POSTS_FOR_DATABASE_QUERY, DELETE_POSTS_BY_SOURCE_MUTATION, type AllPostsResponse, type DeletePostsResponse } from './graphql.js';
 import { notion } from './notion.js';
-import { processPageBatch } from './page-processor.js';
+import { ingestNotionPage } from './notion-ingest.js';
 import { loadConfig } from './load-config.js';
 import { createLogger, SyncMetrics } from '../utils/logger.js';
 
@@ -32,7 +32,7 @@ export async function syncFromNotion(
 
 	const summaries: SyncSummary[] = [];
 	for (const dbConfig of targetDatabases) {
-		const dbLogger = logger.child({ databaseId: dbConfig.short_db_ID });
+		const dbLogger = logger.child({ databaseId: dbConfig.dbNickname });
 		try {
 			summaries.push(await syncDatabase(dbConfig, sinceIso, options.wipe || false, dbLogger));
 		} catch (err: any) {
@@ -43,7 +43,7 @@ export async function syncFromNotion(
 				stack: err?.stack 
 			});
 			summaries.push({
-				short_db_ID: dbConfig.short_db_ID,
+				dbNickname: dbConfig.dbNickname,
 				notionDatabaseId: dbConfig.notionDatabaseId,
 				processed: 0,
 				skipped: 0,
@@ -77,7 +77,7 @@ async function syncDatabase(
 	if (wipe) {
 		logger.info({ event: 'wipe_started' });
 		const deleteResult = await gqlAdminClient.request<DeletePostsResponse>(DELETE_POSTS_BY_SOURCE_MUTATION, {
-			short_db_ID: config.short_db_ID
+			dbNickname: config.dbNickname
 		});
 		logger.info({ 
 			event: 'wipe_completed', 
@@ -121,7 +121,7 @@ async function syncDatabase(
 
 	if (allPages.length === 0) {
 		logger.info({ event: 'no_changes' });
-		return { short_db_ID: config.short_db_ID, notionDatabaseId: config.notionDatabaseId, processed: 0, skipped: 0, status: 'no-changes' };
+		return { dbNickname: config.dbNickname, notionDatabaseId: config.notionDatabaseId, processed: 0, skipped: 0, status: 'no-changes' };
 	}
 
 	logger.info({ 
@@ -132,7 +132,7 @@ async function syncDatabase(
 
 	// Batch query: Get all existing posts and build lookup maps
 	const allPostsResult = await gqlAdminClient.request<AllPostsResponse>(GET_ALL_POSTS_FOR_DATABASE_QUERY, {
-		short_db_ID: config.short_db_ID
+		dbNickname: config.dbNickname
 	});
 	const { byPageId: existingPostsByPageId, slugs: usedSlugs } = buildPostLookups(allPostsResult.posts);
 
@@ -159,7 +159,7 @@ async function syncDatabase(
 	// Log final metrics
 	metrics.logSummary(logger);
 
-	return { short_db_ID: config.short_db_ID, notionDatabaseId: config.notionDatabaseId, processed, skipped, status: 'ok' };
+	return { dbNickname: config.dbNickname, notionDatabaseId: config.notionDatabaseId, processed, skipped, status: 'ok' };
 }
 
 /**
@@ -171,5 +171,5 @@ function getTargetDatabases(
 ): HydratedDatabaseConfig[] {
 
 	if (!filterId) return databases;
-	return databases.filter((db) => db.short_db_ID === filterId || db.notionDatabaseId === filterId);
+	return databases.filter((db) => db.dbNickname === filterId || db.notionDatabaseId === filterId);
 }

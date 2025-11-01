@@ -42,18 +42,6 @@ export type ClassMap = {
 };
 
 /**
- * Features detected in content during processing.
- * Stored as JSONB in database for efficient querying.
- */
-export interface ContentFeatures {
-    syntaxHighlighting?: string[];  // Languages detected: ['javascript', 'python']
-    math?: boolean;                 // KaTeX math expressions detected
-    images?: boolean;               // Images present in content
-    mermaid?: boolean;              // Mermaid diagrams detected
-    [key: string]: any;             // Allow additional custom features
-}
-
-/**
  * Table of contents item with nested structure.
  * Generated during markdown processing for navigation.
  */
@@ -87,8 +75,7 @@ export type Post = {
     language?: string;
     cover?: string;
     
-    // Features detected during content processing (stored as JSONB)
-    features?: ContentFeatures;
+    layout?: FrontMatterLayout;
     
     // Allow any other properties from your schema
     [key: string]: any;
@@ -98,7 +85,7 @@ type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
 
 /**
  * Database configuration blueprint.
- * Contains both public data (short_db_ID, notionDatabaseId) and private server-only rules.
+ * Contains both public data (dbNickname, notionDatabaseId) and private server-only rules.
  * 
  * Publishing Rules (work together, both optional with defaults):
  * 
@@ -135,7 +122,7 @@ type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
  */
 export interface DatabaseBlueprint {
     /** PUBLIC: A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-blog'. */
-    short_db_ID: string;
+    dbNickname: string;
 
     /** PUBLIC: The Notion database ID. This is NOT secret - it's just an identifier. */
     notionDatabaseId: string;
@@ -206,7 +193,15 @@ export interface DatabaseBlueprint {
      */
     slugPropertyName?: string;
 
+    /** PRIVATE: The name of the Notion property where authors are stored. Defaults to 'Authors'. */
     authorsPropertyName?: string;
+
+    /** PRIVATE: The name of the Notion property where tags are stored. Defaults to 'Tags'. */
+    tagsPropertyName?: string;
+
+    titlePropertyName?: string;
+
+    coverImagePropertyName?: string;
 }
 
 /**
@@ -239,21 +234,15 @@ export interface PublicSymbiontConfig {
 	/** GraphQL endpoint URL */
 	graphqlEndpoint: string;
 	
-	/** Primary database short_db_ID (first configured database) */
+	/** Primary database dbNickname (first configured database) */
 	primaryShortDbId: string;
 	
-	/** All configured database short_db_IDs */
+	/** All configured database dbNicknames */
 	shortDbIds: string[];
 }
 
 /** Markdown configuration block from symbiont.config.js */
 export interface MarkdownConfig {
-    syntaxHighlighting?: {
-        enabled: boolean;
-        theme?: string;
-        showLineNumbers?: boolean;
-        languages?: string[];
-    };
     math?: {
         enabled: boolean;
         inlineDelimiters?: [string, string];
@@ -308,7 +297,7 @@ export interface HydratedSymbiontConfig {
  */
 export type SyncSummary = {
     /** The configured source_id for this database in GraphQL */
-    short_db_ID: string;
+    dbNickname: string;
     /** The actual Notion database ID */
     notionDatabaseId: string;
     /** Number of pages processed */
@@ -321,3 +310,66 @@ export type SyncSummary = {
     details?: string;
 };
 
+
+// LAYOUT TYPES
+
+/**
+ * String literal types for card templates.
+ * This ensures type safety and autocompletion for template names.
+ */
+export type CardTemplate = 'standard' | 'featured' | 'compact';
+
+/**
+ * String literal types for print layout templates.
+ */
+export type PrintTemplate = 'StandardFlow' | 'FullPageSpread' | 'Sidebar';
+
+/**
+ * Defines the layout instructions for the 'web' (Svelte) engine.
+ */
+export interface WebLayoutTarget {
+  card_template: CardTemplate;
+  cover_image: string | null;
+  show_summary: boolean;
+}
+
+/**
+ * Defines the layout instructions for the 'print' (InDesign) engine.
+ */
+export interface PrintLayoutTarget {
+  template: PrintTemplate;
+  emphasis: number; // e.g., 1-10 scale
+}
+
+/**
+ * This interface represents the final, merged layout object.
+ * Your Svelte code (like the +page.server.js) will produce this
+ * by merging the defaults with the partial front matter.
+ */
+export interface LayoutConfig {
+  weight: number;
+  targets: {
+    web: WebLayoutTarget;
+    print: PrintLayoutTarget;
+  };
+}
+
+/**
+ * A utility type to make all properties of an object,
+ * and its nested objects, optional.
+ */
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+/**
+ * This is the type you should use for your markdown front matter's 'layout' field.
+ * It's a deep partial of the LayoutConfig, so every single field is optional.
+ *
+ * @example
+ * ---
+ * title: "My Post"
+ * layout: { weight: 99, targets: { web: { card_template: 'featured' } } }
+ * ---
+ */
+export type FrontMatterLayout = DeepPartial<LayoutConfig>;

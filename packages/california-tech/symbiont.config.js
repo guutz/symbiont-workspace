@@ -14,7 +14,7 @@ const config = defineConfig({
 	databases: [
 		{
 			// PUBLIC: Unique identifier for GraphQL queries
-			short_db_ID: 'tech-article-staging',
+			dbNickname: 'tech-article-staging',
 			
 			// PUBLIC: Notion database ID (not secret, just an identifier)
 			notionDatabaseId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',

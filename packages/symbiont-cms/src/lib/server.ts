@@ -23,10 +23,4 @@ export type {
 	GetAllPostsOptions
 } from './server/queries.js';
 
-export type {
-	MarkdownOptions,
-	MarkdownResult
-} from './server/markdown-processor.js';
-
-// Re-export ContentFeatures from types for convenience
-export type { ContentFeatures } from './types.js';
+export type { MarkdownResult } from './server/markdown-processor.js';

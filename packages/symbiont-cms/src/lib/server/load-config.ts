@@ -47,9 +47,9 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 		);
 	}
 	
-	// Set primaryShortDbId to first database's short_db_ID if not explicitly set
+	// Set primaryShortDbId to first database's dbNickname if not explicitly set
 	if (!config.primaryShortDbId) {
-		config.primaryShortDbId = config.databases[0].short_db_ID;
+		config.primaryShortDbId = config.databases[0].dbNickname;
 		logger.debug({ 
 			event: 'primary_db_defaulted',
 			primaryShortDbId: config.primaryShortDbId
@@ -61,4 +61,24 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 	// publishDateRule defaults to reading 'Publish Date' property
 	
 	return config;
+}
+
+export async function loadDatabaseConfig(shortDbId: string) : Promise<SymbiontConfig['databases'][0] | void> {
+	const logger = createLogger({ 
+		operation: 'load_database_config',
+		shortDbId 
+	});
+	
+	const config = await loadConfig();
+	const dbConfig = config.databases.find(db => db.dbNickname === shortDbId);
+	
+	if (!dbConfig) {
+		logger.error({ 
+			event: 'database_config_not_found', 
+			shortDbId 
+		});
+		return;
+	}
+	
+	return dbConfig;
 }

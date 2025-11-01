@@ -1,5 +1,5 @@
 :root {
-  --qwer-bg-color: #ebebeb;
+  --qwer-bg-color: #ffffff;
   --qwer-text-color: black;
   --qwer-btn-hover-color: #dfdfdf;
 
@@ -15,7 +15,7 @@
   }
 
   #header {
-    --qwer-bg-color: #ebebeb;
+    --qwer-bg-color: #ffffff;
     --qwer-text-color: inherit;
     background-color: var(--qwer-bg-color);
     color: var(--qwer-text-color);
@@ -62,7 +62,7 @@
   }
 
   .index-post {
-    --qwer-bg-color: #fcfcfc;
+    --qwer-bg-color: #f8f8f8;
     --qwer-text-color: inherit;
     --qwer-title-color: inherit;
     --qwer-title-hover-color: white;
@@ -71,7 +71,7 @@
     --qwer-series-bg-hover-color: rgb(251, 191, 36);
     --qwer-series-tag-text-color: inherit;
     --qwer-series-title-text-color: inherit;
-    --qwer-border-mobile: 1px solid black;
+    --qwer-border-mobile: 0px none transparent;
     --qwer-border-desktop: 0px none transparent;
 
     --qwer-min-height: fit-content;
@@ -192,7 +192,7 @@
     --qwer-series-bg-hover-color: rgb(251, 191, 36);
     --qwer-series-tag-text-color: black;
     --qwer-series-title-text-color: white;
-    --qwer-border-mobile: 1px solid white;
+    --qwer-border-mobile: 0px none transparent;
     --qwer-border-desktop: 0px none transparent;
   }
 

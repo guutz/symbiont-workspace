@@ -2,8 +2,8 @@ import type { PageObjectResponse } from '@notionhq/client';
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import { requireEnvVar } from '../utils/env.js';
-import { defaultSlugRule } from '../utils/notion-helpers.js';
-import { loadConfig } from './load-config.js';
+import { defaultSlugRule } from '../utils/notion-helpers.server.js';
+import { loadDatabaseConfig } from './load-config.js';
 import { createLogger } from '../utils/logger.js';
 
 // Initialize Notion clients
@@ -26,16 +26,8 @@ export async function syncSlugToNotion(
 		pageId: page.id 
 	});
 
-	const config = await loadConfig();
-	const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === databaseConfigId);
-	
-	if (!dbConfig) {
-		logger.warn({ 
-			event: 'database_config_not_found', 
-			databaseConfigId 
-		});
-		return;
-	}
+	const dbConfig = await loadDatabaseConfig(databaseConfigId);
+	if (!dbConfig) return;
 
 	const slugPropertyName = dbConfig.slugPropertyName || 'Slug';
 	const slugRule = dbConfig.slugRule || defaultSlugRule;

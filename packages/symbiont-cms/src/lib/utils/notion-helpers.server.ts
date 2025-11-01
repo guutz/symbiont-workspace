@@ -1,11 +1,58 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { HydratedDatabaseConfig } from '../types.js';
 
+export const getMeta = (page: PageObjectResponse, config: HydratedDatabaseConfig): 
+	{ 
+		tags: string[]; 
+		authors: string[];
+		title: string;
+		coverImageURI: string | null;
+		shortPostID: string | null;
+		publishDate: string | null;
+	} => {
+	const tagsPropertyName = config.tagsPropertyName || 'Tags';
+	const tagsProperty = page.properties[tagsPropertyName] as any;
+
+	const authorsPropertyName = config.authorsPropertyName || 'Authors';
+	const authorsProperty = page.properties[authorsPropertyName] as any;
+
+	const titlePropertyName = config.titlePropertyName || 'Name';
+	const titleProperty = page.properties[titlePropertyName] as any;
+
+	const coverImagePropertyName = config.coverImagePropertyName || 'Cover Image';
+	const coverImageProperty = page.properties[coverImagePropertyName] as any;
+
+	return {
+		authors: authorsProperty && Array.isArray(authorsProperty.multi_select)
+			? authorsProperty.multi_select.map((tag: { name: string }) => tag.name)
+			: [],
+		tags: tagsProperty && Array.isArray(tagsProperty.multi_select)
+			? tagsProperty.multi_select.map((tag: { name: string }) => tag.name)
+			: [],
+		title: titleProperty?.title?.[0]?.plain_text ?? 'Untitled',
+		coverImageURI: coverImageProperty?.files?.[0]?.file?.url || null,
+		shortPostID: getShortPostID(page),
+		publishDate: getPublishDate(page, config)
+	};
+}
+
+
 /**
  * Extract page title from Notion page properties
  */
 export const getTitle = (page: PageObjectResponse): string => 
 	(page.properties.Name as any).title?.[0]?.plain_text ?? 'Untitled';
+
+/**
+ * Extract authors from Notion page properties
+ */
+export const getAuthors = (page: PageObjectResponse): string[] => {
+	const authorsProperty = page.properties.Authors as any;
+	if (!authorsProperty || !Array.isArray(authorsProperty.multi_select)) {
+		return [];
+	}
+	return authorsProperty.multi_select.map((tag: { name: string }) => tag.name);
+};
 
 /**
  * Extract short ID from Notion page properties (with optional prefix)

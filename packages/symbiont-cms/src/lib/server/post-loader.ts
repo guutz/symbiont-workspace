@@ -70,10 +70,7 @@ export function createPostLoad<Event extends PostLoadEvent = PostLoadEvent>(): P
 
 			// Render markdown to HTML with TOC
 			const markdownContent = post.content || '';
-			const { html, toc } = await parseMarkdown(markdownContent, {
-				config: config.markdown,
-				features: post.features, // Use pre-detected features if available (optional)
-			});
+			const { html, toc } = await parseMarkdown(markdownContent, config.markdown);
 
 			return { post, html, toc };
 		} catch (err: any) {

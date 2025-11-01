@@ -14,7 +14,7 @@ import type { SymbiontConfig } from './types.js';
  *   graphqlEndpoint: 'https://your-project.nhost.run/v1/graphql',
  *   databases: [
  *     {
- *       short_db_ID: 'blog',
+ *       dbNickname: 'blog',
  *       notionDatabaseId: 'abc123...',
  *       // ... full autocomplete here!
  *     }

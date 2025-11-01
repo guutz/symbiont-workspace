@@ -2,11 +2,11 @@ import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { Client } from '@notionhq/client';
 import { readEnvVar } from '../utils/env.js';
-import { loadConfig } from './load-config.js';
+import { loadDatabaseConfig } from './load-config.js';
 import { requireEnvVar } from '../utils/env.js';
 import { gqlAdminClient, GET_EXISTING_POST_QUERY, type ExistingPostResponse } from './graphql.js';
 import { notion } from './notion.js';
-import { processPageWebhook } from './page-processor.js';
+import { ingestNotionPage } from './notion-ingest.js';
 import { syncFromNotion } from './sync.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -32,8 +32,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const pageId = payload.page.id;
 		const notionDatabaseId = payload.page.parent.data_source_id;
 
-		const config = await loadConfig();
-		const dbConfig = config.databases.find((db: any) => db.notionDatabaseId === notionDatabaseId);
+		const dbConfig = await loadDatabaseConfig(notionDatabaseId);
 
 		if (!dbConfig) {
 			logger.warn({ 
@@ -46,12 +45,12 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		logger.info({ 
 			event: 'webhook_received', 
 			pageId, 
-			databaseId: dbConfig.short_db_ID 
+			databaseId: dbConfig.dbNickname 
 		});
 
-		// Check if post exists (efficient single query)
+		// Check if this post has already been ingested into the database (efficient single query)
 		const existingPostResult = await gqlAdminClient.request<ExistingPostResponse>(GET_EXISTING_POST_QUERY, {
-			source_id: dbConfig.short_db_ID,
+			source_id: dbConfig.dbNickname,
 			notion_page_id: pageId
 		});
 

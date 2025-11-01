@@ -105,7 +105,7 @@ export function createMockNotionPage(overrides: Partial<PageObjectResponse> = {}
  */
 export function createMockConfig(overrides: Partial<SymbiontConfig> = {}): SymbiontConfig {
 	const defaultDatabase: DatabaseBlueprint = {
-		short_db_ID: 'test-blog',
+		dbNickname: 'test-blog',
 		notionDatabaseId: 'test-database-id',
 		isPublicRule: (page: PageObjectResponse) => {
 			const status = page.properties.Status;

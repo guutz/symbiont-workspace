@@ -12,7 +12,6 @@
 	function toggleSearch() {
 		searchExpanded = !searchExpanded;
 		if (searchExpanded && browser) {
-			// Focus input after animation
 			setTimeout(() => searchInput?.focus(), 100);
 		}
 	}
@@ -26,53 +25,67 @@
 		}
 	}
 
-	// Popular tags (configure these based on your actual tags)
-	const popularTags = ['News', 'Sports', 'Opinion', 'Features'];
+	// Navigation sections - customize these!
+	const sections = [
+		{ name: 'News', href: '/?tag=News' },
+		{ name: 'Sports', href: '/?tag=Sports' },
+		{ name: 'Opinion', href: '/?tag=Opinion' },
+		{ name: 'Features', href: '/?tag=Features' },
+		{ name: 'All Categories', href: '/categories' },
+	];
 </script>
 
 <div class="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-8 h-full gap-4">
-
-	<!-- Popular Tags (Desktop only) -->
-	<div class="hidden lg:flex items-center gap-2">
-		{#each popularTags as tag}
+	<!-- Main navigation links -->
+	<nav class="hidden lg:flex items-center gap-1" aria-label="Primary">
+		{#each sections as section}
 			<a 
-				href="/?tag={tag}" 
-				class="text-sm px-2 py-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
-				class:font-bold={$page.url.searchParams.get('tag') === tag}
+				href={section.href}
+				class="px-3 py-2 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
+				class:font-bold={$page.url.searchParams.get('tag') === section.name || 
+				                  ($page.url.pathname === '/categories' && section.href === '/categories')}
 			>
-				{tag}
+				{section.name}
 			</a>
 		{/each}
-		<a 
-			href="/categories" 
-			class="text-sm px-2 py-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors border border-black/20 dark:border-white/20"
-		>
-			All Categories
-		</a>
-	</div>
+	</nav>
 
-	<!-- Right side controls -->
+	<!-- Mobile: Hamburger dropdown -->
+	<details class="lg:hidden relative" role="navigation">
+		<summary class="px-3 py-2 cursor-pointer list-none hover:bg-black/10 dark:hover:bg-white/10 rounded">
+			Menu
+		</summary>
+		<div class="absolute top-full left-0 mt-2 bg-white dark:bg-black border-2 border-black dark:border-white rounded-lg shadow-lg min-w-[200px] z-50">
+			{#each sections as section}
+				<a
+					href={section.href}
+					class="block px-4 py-2 hover:bg-black/10 dark:hover:bg-white/10 first:rounded-t-lg last:rounded-b-lg"
+					class:font-bold={$page.url.searchParams.get('tag') === section.name}
+				>
+					{section.name}
+				</a>
+			{/each}
+		</div>
+	</details>
+
+	<!-- Right side: Search + Theme -->
 	<div class="ml-auto flex items-center gap-2">
-		<!-- Search Bar (JS enabled only) -->
+		<!-- Search (with no-JS fallback) -->
 		<div class="flex items-center js-only-search">
 			{#if searchExpanded}
 				<form 
 					onsubmit={handleSearch}
-					class="flex items-center border-2 border-black dark:border-white rounded overflow-hidden transition-all duration-300"
+					class="flex items-center border-2 border-black dark:border-white rounded overflow-hidden"
 				>
 					<input
 						bind:this={searchInput}
 						bind:value={searchQuery}
 						type="search"
 						name="q"
-						placeholder="Search articles..."
+						placeholder="Search..."
 						class="px-3 py-1 bg-transparent focus:outline-none w-[200px] sm:w-[300px]"
 					/>
-					<button 
-						type="submit" 
-						class="px-3 py-1 hover:bg-black/10 dark:hover:bg-white/10"
-						aria-label="Submit search"
-					>
+					<button type="submit" class="px-3 py-1 hover:bg-black/10 dark:hover:bg-white/10" aria-label="Submit search">
 						<div class="i-carbon-search !w-5 !h-5"></div>
 					</button>
 					<button 
@@ -87,10 +100,10 @@
 			{:else}
 				<button 
 					onclick={toggleSearch}
-					class="btn active:translate-y-2 duration-600 ease-out group"
+					class="btn group"
 					aria-label="Open search"
 				>
-					<div class="!w-8 !h-8 i-carbon-search group-hover:(transition-transform duration-300 scale-120 ease-in-out)"></div>
+					<div class="!w-8 !h-8 i-carbon-search group-hover:scale-110 transition-transform"></div>
 				</button>
 			{/if}
 		</div>
@@ -99,7 +112,7 @@
 	</div>
 </div>
 
-<!-- No-JS Search Form (appears below header when JS disabled) -->
+<!-- No-JS Search Fallback -->
 <noscript>
 	<style>
 		.js-only-search { display: none !important; }
@@ -119,28 +132,13 @@
 	</div>
 </noscript>
 
-<!-- No-JS Search Form (replaces search icon when JS disabled) -->
-<!-- <noscript>
-	<style>
-		.js-only-search { display: none !important; }
-	</style>
-	<div class="flex items-center">
-		<form action="/" method="GET" class="flex items-center border-2 border-black dark:border-white rounded overflow-hidden">
-			<input
-				type="search"
-				name="q"
-				placeholder="Search..."
-				class="px-3 py-1 bg-transparent w-[150px] sm:w-[200px]"
-			/>
-			<button type="submit" class="px-3 py-1 hover:bg-black/10 dark:hover:bg-white/10" aria-label="Search">
-				<div class="i-carbon-search !w-5 !h-5"></div>
-			</button>
-		</form>
-	</div>
-</noscript> -->
-
 <style>
 	input::placeholder {
 		color: var(--qwer-input-placeholder-text-color);
+	}
+	
+	/* Hide default details marker */
+	summary::-webkit-details-marker {
+		display: none;
 	}
 </style>

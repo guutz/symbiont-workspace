@@ -21,8 +21,7 @@
 
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
-import type { MarkdownConfig, SymbiontConfig, ContentFeatures } from '../types.js';
-import { createLogger } from '../utils/logger.js';
+import type { MarkdownConfig, SymbiontConfig, FrontMatterLayout } from '../types.js';
 
 // @mdit plugins
 import { abbr } from '@mdit/plugin-abbr';
@@ -37,38 +36,12 @@ import { spoiler } from '@mdit/plugin-spoiler';
 import { katex, loadMhchem } from '@mdit/plugin-katex';
 
 // Prism.js for syntax highlighting
-import Prism from 'prismjs';
-import loadLanguages from 'prismjs/components/index.js';
 
 // Helper to use slugify - handle both default and named exports
 const slugify = (text: string, options?: any) => {
   const fn = typeof slugifyFn === 'function' ? slugifyFn : (slugifyFn as any).default;
   return fn(text, options);
 };
-
-// Track loaded Prism languages to avoid reloading
-const loadedLanguages = new Set<string>();
-
-/**
- * Load a Prism language if not already loaded
- */
-function loadPrismLanguage(lang: string): void {
-  if (loadedLanguages.has(lang)) {
-    return;
-  }
-  
-  const logger = createLogger({ operation: 'load_prism_language' });
-  try {
-    loadLanguages([lang]);
-    loadedLanguages.add(lang);
-  } catch (e: any) {
-    logger.warn({ 
-      event: 'prism_language_load_failed', 
-      language: lang,
-      error: e?.message
-    });
-  }
-}
 
 interface TOCItem {
   level: number;
@@ -82,36 +55,18 @@ export interface MarkdownResult {
   toc: TOCItem[];
 }
 
-export interface MarkdownOptions {
-  config: SymbiontConfig['markdown'];
-  features?: ContentFeatures;  // Optional: features detected during sync
-}
 
 /**
  * Configurable markdown processor using markdown-it
  * 
  * @param content - Markdown content to render
- * @param options - Configuration and optional features
- * @param options.config - Markdown configuration from symbiont.config
- * @param options.features - Pre-detected features from database (for optimization)
- * 
- * If `features.syntaxHighlighting` is provided, only those Prism languages will be preloaded.
- * Otherwise, languages are loaded on-demand during rendering (lazy loading).
+ * @param config - Markdown configuration from symbiont.config
  */
 export async function parseMarkdown(
   content: string, 
-  options: MarkdownOptions
+  config: MarkdownConfig | undefined
 ): Promise<MarkdownResult> {
-  const config: MarkdownConfig = options.config ?? {};
-  const features = options.features;
   const toc: TOCItem[] = [];
-  
-  // Preload Prism languages if we know which ones are needed
-  if (features?.syntaxHighlighting && config.syntaxHighlighting?.enabled) {
-    for (const lang of features.syntaxHighlighting) {
-      loadPrismLanguage(lang);
-    }
-  }
   
   // Initialize markdown-it with base options
   const md = new MarkdownIt({
@@ -133,7 +88,7 @@ export async function parseMarkdown(
   md.use(imgSize);  // Image size syntax: ![alt](url =WxH)
   
   // Add lazy loading for images if enabled
-  if (config.images?.lazy) {
+  if (config?.images?.lazy) {
     md.use(imgLazyload);
   }
 
@@ -158,8 +113,8 @@ export async function parseMarkdown(
     token.attrSet('id', slugUrl);
     
     // Only add to TOC if within configured range
-    if (level >= (config.toc?.minHeadingLevel || 2) && 
-        level <= (config.toc?.maxHeadingLevel || 4)) {
+    if (level >= (config?.toc?.minHeadingLevel || 2) && 
+        level <= (config?.toc?.maxHeadingLevel || 4)) {
       addToTOC(toc, level, content, slugUrl);
     }
     
@@ -180,24 +135,8 @@ export async function parseMarkdown(
     const code = token.content;
     const language = token.info.trim();
     
-    // Syntax highlighting if enabled
-    if (config.syntaxHighlighting?.enabled && language && Prism) {
-      // Lazy load the language if needed
-      loadPrismLanguage(language);
-      
-      const lang = Prism.languages[language];
-      if (lang) {
-        const highlighted = Prism.highlight(code, lang, language);
-        const showLineNumbers = config.syntaxHighlighting.showLineNumbers;
-        
-        return `<pre><code class="language-${language}">${
-          showLineNumbers ? addLineNumbers(highlighted) : highlighted
-        }</code></pre>\n`;
-      }
-    }
-    
     // Plain code block
-    return `<pre><code${language ? ` class="language-${language}"` : ''}>${escapeHtml(code)}</code></pre>\n`;
+    return `<pre><code>${escapeHtml(code)}</code></pre>\n`;
   };
   
   // Custom inline code renderer
@@ -218,7 +157,7 @@ export async function parseMarkdown(
     
     if (href) {
       // Detect Nhost Storage URLs and add optimization hints
-      if (config.images?.nhostStorage && isNhostStorageUrl(href)) {
+      if (config?.images?.nhostStorage && isNhostStorageUrl(href)) {
         token.attrSet('data-nhost-optimized', 'true');
       }
     }
@@ -266,7 +205,7 @@ export async function parseMarkdown(
     }
     
     // Handle custom text color syntax {color}(text)
-    if (config.extensions?.textColors && /\{[a-z]+\}\(/.test(content)) {
+    if (config?.extensions?.textColors && /\{[a-z]+\}\(/.test(content)) {
       content = parseTextColor(content);
     }
     
@@ -328,11 +267,4 @@ function mangleString(text: string): string {
     }
   }
   return result;
-}
-
-function addLineNumbers(html: string): string {
-  const lines = html.split('\n');
-  return lines.map((line, i) => 
-    `<span class="line-number">${i + 1}</span>${line}`
-  ).join('\n');
 }

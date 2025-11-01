@@ -23,10 +23,7 @@ export const GET = async ({ params, fetch, setHeaders }: {
 
 		// Load config and render markdown
 		const config = await loadConfig();
-		const { html, toc } = await parseMarkdown(post.content || '', {
-			config: config.markdown,
-			features: post.features,
-		});
+		const { html, toc } = await parseMarkdown(post.content || '', config.markdown);
 
 		// Convert to QWER format
 		const qwerPost = symbiontToQwerPost(post, html, toc);

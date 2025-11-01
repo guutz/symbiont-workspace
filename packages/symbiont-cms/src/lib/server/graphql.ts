@@ -43,7 +43,7 @@ export const UPSERT_POST_MUTATION = gql`
 			object: $post
 			on_conflict: {
 				constraint: posts_source_id_notion_page_id_key
-				update_columns: [title, content, slug, publish_at, tags, updated_at, notion_short_id, features, authors]
+				update_columns: [title, content, slug, publish_at, tags, updated_at, notion_short_id, layout_config, authors]
 			}
 		) {
 			id
@@ -52,8 +52,8 @@ export const UPSERT_POST_MUTATION = gql`
 `;
 
 export const CHECK_SLUG_QUERY = gql`
-	query CheckSlug($short_db_ID: String!, $slug: String!) {
-		posts(where: { source_id: { _eq: $short_db_ID }, slug: { _eq: $slug } }) {
+	query CheckSlug($dbNickname: String!, $slug: String!) {
+		posts(where: { source_id: { _eq: $dbNickname }, slug: { _eq: $slug } }) {
 			id
 			notion_page_id
 		}
@@ -61,8 +61,8 @@ export const CHECK_SLUG_QUERY = gql`
 `;
 
 export const GET_EXISTING_POST_QUERY = gql`
-	query GetExistingPost($short_db_ID: String!, $notion_page_id: String!) {
-		posts(where: { source_id: { _eq: $short_db_ID }, notion_page_id: { _eq: $notion_page_id } }) {
+	query GetExistingPost($dbNickname: String!, $notion_page_id: String!) {
+		posts(where: { source_id: { _eq: $dbNickname }, notion_page_id: { _eq: $notion_page_id } }) {
 			id
 			slug
 		}
@@ -70,8 +70,8 @@ export const GET_EXISTING_POST_QUERY = gql`
 `;
 
 export const GET_ALL_POSTS_FOR_DATABASE_QUERY = gql`
-	query GetAllPostsForDatabase($short_db_ID: String!) {
-		posts(where: { source_id: { _eq: $short_db_ID } }) {
+	query GetAllPostsForDatabase($dbNickname: String!) {
+		posts(where: { source_id: { _eq: $dbNickname } }) {
 			id
 			notion_page_id
 			slug
@@ -80,8 +80,8 @@ export const GET_ALL_POSTS_FOR_DATABASE_QUERY = gql`
 `;
 
 export const DELETE_POSTS_BY_SOURCE_MUTATION = gql`
-	mutation DeletePostsBySource($short_db_ID: String!) {
-		delete_posts(where: { source_id: { _eq: $short_db_ID } }) {
+	mutation DeletePostsBySource($dbNickname: String!) {
+		delete_posts(where: { source_id: { _eq: $dbNickname } }) {
 			affected_rows
 		}
 	}

@@ -12,8 +12,8 @@ const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
  * This creates a virtual module 'virtual:symbiont/config' that can be
  * imported anywhere (client or server) and contains only:
  * - graphqlEndpoint
- * - primaryShortDbId (explicit config value or first database's short_db_ID)
- * - shortDbIds[] (all databases' short_db_IDs)
+ * - primaryShortDbId (explicit config value or first database's dbNickname)
+ * - shortDbIds[] (all databases' dbNicknames)
  * 
  * All server-only data (functions, rules) stays in the original config
  * and is never exposed to the client bundle.
@@ -76,8 +76,8 @@ export function symbiontVitePlugin(): Plugin {
 					}
 					
 					// Extract ONLY public data (no functions, no secrets)
-					const primaryShortDbId = config.primaryShortDbId || config.databases?.[0]?.short_db_ID || '';
-					const shortDbIds = config.databases?.map((db: any) => db.short_db_ID) || [];
+					const primaryShortDbId = config.primaryShortDbId || config.databases?.[0]?.dbNickname || '';
+					const shortDbIds = config.databases?.map((db: any) => db.dbNickname) || [];
 
 					const publicConfig = {
 						graphqlEndpoint: config.graphqlEndpoint,

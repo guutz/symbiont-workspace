@@ -4,7 +4,6 @@
 	import { fade, fly } from 'svelte/transition';
 	
 	// Styles
-	import '$lib/styles/prism.scss';
 	import '$lib/styles/prose.scss';
 	import 'katex/dist/katex.min.css';
 	

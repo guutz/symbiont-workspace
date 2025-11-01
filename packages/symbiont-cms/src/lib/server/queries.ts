@@ -24,16 +24,16 @@ const GET_POST_BY_SLUG = gql`
 			publish_at
 			updated_at
 			tags
-			features
+			layout_config
 			authors
 		}
 	}
 `;
 
 const GET_ALL_POSTS = gql`
-	query GetAllPosts($limit: Int, $offset: Int, $short_db_ID: String!) {
+	query GetAllPosts($limit: Int, $offset: Int, $dbNickname: String!) {
 		posts(
-			where: { source_id: { _eq: $short_db_ID } }
+			where: { source_id: { _eq: $dbNickname } }
 			order_by: { publish_at: desc }
 			limit: $limit
 			offset: $offset
@@ -45,7 +45,7 @@ const GET_ALL_POSTS = gql`
 			publish_at
 			updated_at
 			tags
-			features
+			layout_config
 			authors
 		}
 	}
@@ -75,7 +75,7 @@ export interface GetAllPostsOptions {
 	limit?: number;
 	/** Number of posts to skip */
 	offset?: number;
-	/** Override the default short_db_ID from config */
+	/** Override the default dbNickname from config */
 	shortDbId?: string;
 }
 
@@ -145,7 +145,7 @@ export async function getAllPosts(
 	const result = await client.request<GetAllPostsResult>(GET_ALL_POSTS, {
 		limit: options.limit ?? 100,
 		offset: options.offset ?? 0,
-		short_db_ID: options.shortDbId ?? config.primaryShortDbId
+		dbNickname: options.shortDbId ?? config.primaryShortDbId
 	});
 	
 	return result.posts;

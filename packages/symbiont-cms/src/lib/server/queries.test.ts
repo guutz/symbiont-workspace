@@ -140,7 +140,7 @@ describe('getAllPosts', () => {
 			{
 				limit: 100,
 				offset: 0,
-				short_db_ID: 'test-db-id'
+				dbNickname: 'test-db-id'
 			}
 		);
 	});
@@ -155,7 +155,7 @@ describe('getAllPosts', () => {
 			{
 				limit: 10,
 				offset: 20,
-				short_db_ID: 'test-db-id'
+				dbNickname: 'test-db-id'
 			}
 		);
 	});
@@ -182,7 +182,7 @@ describe('getAllPosts', () => {
 			{
 				limit: 100,
 				offset: 0,
-				short_db_ID: 'custom-db-id'
+				dbNickname: 'custom-db-id'
 			}
 		);
 	});
