@@ -60,148 +60,103 @@ export interface TocItem {
  * Extended to be compatible with QWER post type for seamless integration.
  */
 export type Post = {
-    sql_id: string; // UUID from database (aliased from 'id' in GraphQL)
     title: string | null;
     slug: string;
     content: string | null; // The markdown content
     publish_at: string | null; // ISO 8601 date string
     updated_at?: string | null; // Last updated timestamp
     tags?: string[] | any[] | null;
-    author?: string | null;
-    
+    authors?: string[] | any[] | null;
+
     // Optional QWER-compatible fields
     summary?: string;
     description?: string;
     language?: string;
     cover?: string;
-    
+
     layout?: FrontMatterLayout;
-    
+
     // Allow any other properties from your schema
     [key: string]: any;
 };
 
-type SourceOfTruth = 'NOTION' | 'WEB_EDITOR';
-
 /**
  * Database configuration blueprint.
  * Contains both public data (dbNickname, notionDatabaseId) and private server-only rules.
- * 
- * Publishing Rules (work together, both optional with defaults):
- * 
- * - **isPublicRule**: Boolean gate - determines IF a page should be published
- *   - Default: `() => true` (all pages pass the gate)
- *   - Use for status checks, flags, or simple published/unpublished logic
- * 
- * - **publishDateRule**: Date extraction - determines WHEN a page should be published
- *   - Default: uses `page.last_edited_time` (always present in Notion)
- *   - Use for custom date properties or complex date logic
- * 
- * **Both rules must pass** for a page to be published:
- * 1. isPublicRule must return true
- * 2. publishDateRule must return a valid date (not null)
- * 
- * @example
- * // Simple: just gate by status (uses default last_edited_time)
- * {
- *   isPublicRule: (page) => page.properties.Status?.select?.name === 'Published'
- * }
- * 
- * @example
- * // Custom date property (allows all pages through gate)
- * {
- *   publishDateRule: (page) => page.properties['Go Live']?.date?.start || null
- * }
- * 
- * @example
- * // Complex: both rules working together
- * {
- *   isPublicRule: (page) => page.properties.Ready?.checkbox === true,
- *   publishDateRule: (page) => page.properties['Embargo Date']?.date?.start || null
- * }
+ * Used in symbiont.config.js.
  */
 export interface DatabaseBlueprint {
-    /** PUBLIC: A unique identifier/source_id for this database in the GraphQL schema, e.g., 'tech-blog'. */
-    dbNickname: string;
+    // ============================================
+    // REQUIRED
+    // ============================================
 
-    /** PUBLIC: The Notion database ID. This is NOT secret - it's just an identifier. */
-    notionDatabaseId: string;
+    /** Unique source_id for this data source in Postgres/GraphQL */
+    sourceId: string;
 
-    /** PRIVATE: Whether the Symbiont web editor should be exposed for this database. */
-    webEditorEnabled?: boolean;
+    /** Notion data source ID (from URL) */
+    notionDataSourceId: string;
 
-    /** 
-     * PRIVATE: Optional boolean gate that determines IF a page should be published.
-     * Works in combination with publishDateRule to determine final publish_at value.
-     * 
-     * Default: `() => true` (all pages pass the gate)
-     * 
-     * @example
-     * // Only publish pages marked as "Published"
-     * isPublicRule: (page) => page.properties.Status?.select?.name === 'Published'
-     * 
-     * @example
-     * // Only publish pages with a checked "Ready" checkbox
-     * isPublicRule: (page) => page.properties.Ready?.checkbox === true
-     */
+    // ============================================
+    // PUBLISHING RULES
+    // ============================================
+
+    /** Boolean gate: determines IF a page should be published */
     isPublicRule?: (page: PageObjectResponse) => boolean;
+    // Default: () => true
 
-    /**
-     * PRIVATE: Optional function that extracts the publish date from a page.
-     * Works in combination with isPublicRule to determine final publish_at value.
-     * 
-     * Default: Uses `page.last_edited_time` (always present in Notion)
-     * 
-     * Return an ISO date string to publish at that date, or null to mark as unpublished.
-     * 
-     * @example
-     * // Use a custom "Go Live" date property
-     * publishDateRule: (page) => page.properties['Go Live']?.date?.start || null
-     * 
-     * @example
-     * // Use 'Publish Date' property with fallback to last_edited_time
-     * publishDateRule: (page) => {
-     *   return page.properties['Publish Date']?.date?.start || page.last_edited_time;
-     * }
-     * 
-     * @example
-     * // Use scheduled date only if status is "Scheduled"
-     * publishDateRule: (page) => {
-     *   const status = page.properties.Status?.select?.name;
-     *   if (status === 'Scheduled') {
-     *     return page.properties['Scheduled Date']?.date?.start || null;
-     *   }
-     *   return page.last_edited_time;
-     * }
-     */
+    /** Date extraction: determines WHEN a page should be published */
     publishDateRule?: (page: PageObjectResponse) => string | null;
+    // Default: page.last_edited_time
 
-    /** PRIVATE: A function that determines the source of truth for a page's content. */
-    sourceOfTruthRule: (page: PageObjectResponse) => SourceOfTruth;
+    // ============================================
+    // SLUG CONFIGURATION
+    // ============================================
 
-    /** 
-     * PRIVATE: A function that determines the slug for a post. 
-     * Should return the slug from the page's Slug property if present,
-     * otherwise return null to trigger auto-generation.
-     * Default behavior: reads from page.properties.Slug.rich_text
-     */
+    /** Extract custom slug from Notion (return null for auto-generation) */
     slugRule?: (page: PageObjectResponse) => string | null;
+    // Default: null (auto-generate from title)
+
+    /** Notion property name to sync generated slugs back to */
+    slugSyncProperty?: string | null;
+    // Default: null (don't sync back)
+
+    // ============================================
+    // METADATA - Optional property mappings
+    // ============================================
+
+    /** Tags property name (must be multi_select) */
+    tagsProperty?: string | null;
+    // Default: null (no tags)
+
+    /** Authors property name (people or multi_select) */
+    authorsProperty?: string | null;
+    // Default: null (no authors)
+
+    // ============================================
+    // FLEXIBLE METADATA - Pass-through to JSONB
+    // ============================================
 
     /**
-     * PRIVATE: The name of the Notion property where the generated slug should be written back.
-     * Defaults to 'Slug' if not specified.
+     * Extract arbitrary metadata to store in JSONB field
+     * Use this for cover images, layout config, custom fields, etc.
+     * 
+     * @example
+     * metadataExtractor: (page) => ({
+     *   coverImage: page.properties['Cover']?.files?.[0]?.file?.url,
+     *   homepageWeight: page.properties['Weight']?.number,
+     *   featured: page.properties['Featured']?.checkbox
+     * })
      */
-    slugPropertyName?: string;
+    metadataExtractor?: (page: PageObjectResponse) => Record<string, any>;
+    // Default: null (no extra metadata)
 
-    /** PRIVATE: The name of the Notion property where authors are stored. Defaults to 'Authors'. */
-    authorsPropertyName?: string;
-
-    /** PRIVATE: The name of the Notion property where tags are stored. Defaults to 'Tags'. */
-    tagsPropertyName?: string;
-
-    titlePropertyName?: string;
-
-    coverImagePropertyName?: string;
+    /**
+     * Determines sync direction for content
+     * - 'NOTION': Notion → DB (current behavior)
+     * - 'WEB_EDITOR': DB → Notion (when Tiptap implemented)
+     * - Custom function for per-page logic
+     */
+    contentSourceRule?: 'NOTION' | 'WEB_EDITOR' | ((page: PageObjectResponse) => 'NOTION' | 'WEB_EDITOR');
 }
 
 /**
@@ -211,7 +166,7 @@ export interface DatabaseBlueprint {
 export interface SymbiontConfig {
     /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
     graphqlEndpoint: string;
-    
+
     /** PUBLIC: Optional explicit default database identifier. Falls back to first database when omitted. */
     primaryShortDbId?: string;
 
@@ -231,14 +186,14 @@ export interface SymbiontConfig {
  * Contains NO functions, NO secrets - only public identifiers.
  */
 export interface PublicSymbiontConfig {
-	/** GraphQL endpoint URL */
-	graphqlEndpoint: string;
-	
-	/** Primary database dbNickname (first configured database) */
-	primaryShortDbId: string;
-	
-	/** All configured database dbNicknames */
-	shortDbIds: string[];
+    /** GraphQL endpoint URL */
+    graphqlEndpoint: string;
+
+    /** Primary database dbNickname (first configured database) */
+    primaryShortDbId: string;
+
+    /** All configured database dbNicknames */
+    shortDbIds: string[];
 }
 
 /** Markdown configuration block from symbiont.config.js */
@@ -328,17 +283,17 @@ export type PrintTemplate = 'StandardFlow' | 'FullPageSpread' | 'Sidebar';
  * Defines the layout instructions for the 'web' (Svelte) engine.
  */
 export interface WebLayoutTarget {
-  card_template: CardTemplate;
-  cover_image: string | null;
-  show_summary: boolean;
+    card_template: CardTemplate;
+    cover_image: string | null;
+    show_summary: boolean;
 }
 
 /**
  * Defines the layout instructions for the 'print' (InDesign) engine.
  */
 export interface PrintLayoutTarget {
-  template: PrintTemplate;
-  emphasis: number; // e.g., 1-10 scale
+    template: PrintTemplate;
+    emphasis: number; // e.g., 1-10 scale
 }
 
 /**
@@ -347,11 +302,11 @@ export interface PrintLayoutTarget {
  * by merging the defaults with the partial front matter.
  */
 export interface LayoutConfig {
-  weight: number;
-  targets: {
-    web: WebLayoutTarget;
-    print: PrintLayoutTarget;
-  };
+    weight: number;
+    targets: {
+        web: WebLayoutTarget;
+        print: PrintLayoutTarget;
+    };
 }
 
 /**
@@ -359,7 +314,7 @@ export interface LayoutConfig {
  * and its nested objects, optional.
  */
 type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
 };
 
 /**

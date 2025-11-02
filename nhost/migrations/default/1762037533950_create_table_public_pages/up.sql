@@ -1,0 +1,1 @@
+CREATE TABLE public.pages (page_id text NOT NULL, title text NOT NULL, slug text NOT NULL, authors jsonb DEFAULT jsonb_build_array(), tags jsonb DEFAULT jsonb_build_array(), publish_at timestamptz, meta jsonb DEFAULT jsonb_build_object(), content text, updated_at timestamptz NOT NULL, datasource_id text NOT NULL, PRIMARY KEY (page_id));
