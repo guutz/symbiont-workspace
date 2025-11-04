@@ -46,39 +46,69 @@ export async function loadConfig(): Promise<SymbiontConfig> {
 			'symbiont.config.js must have at least one database configured in the databases array.'
 		);
 	}
-	
-	// Set primaryShortDbId to first database's dbNickname if not explicitly set
-	if (!config.primaryShortDbId) {
-		config.primaryShortDbId = config.databases[0].dbNickname;
-		logger.debug({ 
-			event: 'primary_db_defaulted',
-			primaryShortDbId: config.primaryShortDbId
-		});
-	}
-	
-	// No validation needed for rules - both are optional and work together
+
+	// Validate required fields
+	for (const db of config.databases) {
+		if (!db.alias) {
+			throw new Error('Each database must have an "alias" field (e.g., "blog", "docs")');
+		}
+		if (!db.dataSourceId) {
+			throw new Error(`Database "${db.alias}" missing required "dataSourceId" field`);
+		}
+		if (!db.notionToken) {
+			throw new Error(`Database "${db.alias}" missing required "notionToken" field`);
+		}
+	}	// No validation needed for rules - both are optional and work together
 	// isPublicRule defaults to () => true
 	// publishDateRule defaults to reading 'Publish Date' property
 	
 	return config;
 }
 
-export async function loadDatabaseConfig(shortDbId: string) : Promise<SymbiontConfig['databases'][0] | void> {
+/**
+ * Get a datasource configuration by its alias.
+ * 
+ * @param alias - The human-readable datasource alias (e.g., 'blog', 'docs')
+ * @returns The database configuration including dataSourceId and notionToken
+ */
+export async function getSourceByAlias(alias: string): Promise<SymbiontConfig['databases'][0]> {
+	const logger = createLogger({ 
+		operation: 'get_source_by_alias',
+		alias 
+	});
+	
+	const config = await loadConfig();
+	const source = config.databases.find(db => db.alias === alias);
+	
+	if (!source) {
+		logger.error({ 
+			event: 'datasource_not_found', 
+			alias,
+			available_aliases: config.databases.map(db => db.alias)
+		});
+		throw new Error(
+			`No datasource configured with alias "${alias}". ` +
+			`Available aliases: ${config.databases.map(db => db.alias).join(', ')}`
+		);
+	}
+	
+	logger.debug({ event: 'datasource_found', alias, dataSourceId: source.dataSourceId });
+	return source;
+}
+
+/**
+ * @deprecated Use getSourceByAlias() instead
+ */
+export async function loadDatabaseConfig(shortDbId: string): Promise<SymbiontConfig['databases'][0] | void> {
 	const logger = createLogger({ 
 		operation: 'load_database_config',
 		shortDbId 
 	});
 	
-	const config = await loadConfig();
-	const dbConfig = config.databases.find(db => db.dbNickname === shortDbId);
+	logger.warn({ 
+		event: 'deprecated_function_called',
+		message: 'loadDatabaseConfig() is deprecated, use getSourceByAlias() instead'
+	});
 	
-	if (!dbConfig) {
-		logger.error({ 
-			event: 'database_config_not_found', 
-			shortDbId 
-		});
-		return;
-	}
-	
-	return dbConfig;
+	return getSourceByAlias(shortDbId);
 }

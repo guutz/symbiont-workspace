@@ -12,11 +12,10 @@ const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
  * This creates a virtual module 'virtual:symbiont/config' that can be
  * imported anywhere (client or server) and contains only:
  * - graphqlEndpoint
- * - primaryShortDbId (explicit config value or first database's dbNickname)
- * - shortDbIds[] (all databases' dbNicknames)
+ * - aliases[] (all configured datasource aliases like 'blog', 'docs')
  * 
- * All server-only data (functions, rules) stays in the original config
- * and is never exposed to the client bundle.
+ * All server-only data (dataSourceId, notionToken, functions, rules) stays 
+ * in the original config and is never exposed to the client bundle.
  * 
  * **Note**: Only .js config files are supported. Use `defineConfig()` from
  * 'symbiont-cms/config' for full TypeScript autocomplete in .js files.
@@ -75,17 +74,13 @@ export function symbiontVitePlugin(): Plugin {
 						throw new Error(`Config file ${configEntry.path} must export a default object`);
 					}
 					
-					// Extract ONLY public data (no functions, no secrets)
-					const primaryShortDbId = config.primaryShortDbId || config.databases?.[0]?.dbNickname || '';
-					const shortDbIds = config.databases?.map((db: any) => db.dbNickname) || [];
+				// Extract ONLY public data (no functions, no secrets, no UUIDs)
+				const aliases = config.databases?.map((db: any) => db.alias) || [];
 
-					const publicConfig = {
-						graphqlEndpoint: config.graphqlEndpoint,
-						primaryShortDbId,
-						shortDbIds
-					};
-					
-					// Return as a static module with only JSON data
+				const publicConfig = {
+					graphqlEndpoint: config.graphqlEndpoint,
+					aliases
+				};					// Return as a static module with only JSON data
 					return `export default ${JSON.stringify(publicConfig, null, 2)};`;
 				} catch (error) {
 					// Provide helpful error message
@@ -115,6 +110,5 @@ export function symbiontVitePlugin(): Plugin {
 // Export type for virtual module (for TypeScript autocomplete)
 export interface VirtualSymbiontConfig {
 	graphqlEndpoint: string;
-	primaryShortDbId: string;
-	shortDbIds: string[];
+	aliases: string[];
 }

@@ -54,19 +54,22 @@ export interface TocItem {
 
 /**
  * Represents the structure of a single post or article.
- * This type should mirror the data fetched from your Nhost/Supabase backend,
- * ensuring that component props are strongly typed.
+ * This type mirrors the `pages` table in the database.
  * 
  * Extended to be compatible with QWER post type for seamless integration.
  */
 export type Post = {
+    // Database fields (from pages table)
+    page_id?: string;           // Notion page UUID (primary key)
+    datasource_id?: string;     // Notion database ID
     title: string | null;
     slug: string;
-    content: string | null; // The markdown content
-    publish_at: string | null; // ISO 8601 date string
+    content: string | null;     // Markdown content
+    publish_at: string | null;  // ISO 8601 date string
     updated_at?: string | null; // Last updated timestamp
-    tags?: string[] | any[] | null;
-    authors?: string[] | any[] | null;
+    tags?: any[] | null;        // JSONB array
+    authors?: any[] | null;     // JSONB array
+    meta?: Record<string, any> | null; // JSONB object (flexible metadata)
 
     // Optional QWER-compatible fields
     summary?: string;
@@ -74,15 +77,13 @@ export type Post = {
     language?: string;
     cover?: string;
 
-    layout?: FrontMatterLayout;
-
     // Allow any other properties from your schema
     [key: string]: any;
 };
 
 /**
  * Database configuration blueprint.
- * Contains both public data (dbNickname, notionDatabaseId) and private server-only rules.
+ * Contains both public data (alias) and private server-only data (dataSourceId, notionToken, rules).
  * Used in symbiont.config.js.
  */
 export interface DatabaseBlueprint {
@@ -90,11 +91,14 @@ export interface DatabaseBlueprint {
     // REQUIRED
     // ============================================
 
-    /** Unique source_id for this data source in Postgres/GraphQL */
-    sourceId: string;
+    /** Human-readable identifier (used in routes, queries). Example: 'blog', 'docs' */
+    alias: string;
 
-    /** Notion data source ID (from URL) */
-    notionDataSourceId: string;
+    /** Notion database UUID (stored in DB as datasource_id). Can use env vars. */
+    dataSourceId: string;
+
+    /** Notion API integration token for this specific datasource. Can use env vars. */
+    notionToken: string;
 
     // ============================================
     // PUBLISHING RULES
@@ -167,9 +171,6 @@ export interface SymbiontConfig {
     /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
     graphqlEndpoint: string;
 
-    /** PUBLIC: Optional explicit default database identifier. Falls back to first database when omitted. */
-    primaryShortDbId?: string;
-
     /** PRIVATE: Database configurations with server-only sync rules. */
     databases: DatabaseBlueprint[];
 
@@ -189,11 +190,8 @@ export interface PublicSymbiontConfig {
     /** GraphQL endpoint URL */
     graphqlEndpoint: string;
 
-    /** Primary database dbNickname (first configured database) */
-    primaryShortDbId: string;
-
-    /** All configured database dbNicknames */
-    shortDbIds: string[];
+    /** All configured datasource aliases (for client-side queries) */
+    aliases: string[];
 }
 
 /** Markdown configuration block from symbiont.config.js */
@@ -241,7 +239,6 @@ export type HydratedDatabaseConfig = DatabaseBlueprint;
 
 export interface HydratedSymbiontConfig {
     graphqlEndpoint: string;
-    primaryShortDbId: string;
     databases: HydratedDatabaseConfig[];
     markdown?: MarkdownConfig;
     caching?: CachingConfig;
@@ -249,18 +246,21 @@ export interface HydratedSymbiontConfig {
 
 /**
  * Represents the result of a sync operation for a single database
+ * 
+ * Note: This type is being phased out. Use SyncSummary from sync/orchestrator.ts instead.
+ * @deprecated Use orchestrator SyncResult instead
  */
 export type SyncSummary = {
-    /** The configured source_id for this database in GraphQL */
-    dbNickname: string;
-    /** The actual Notion database ID */
-    notionDatabaseId: string;
+    /** The configured alias for this datasource */
+    alias: string;
+    /** The Notion database UUID */
+    dataSourceId: string;
     /** Number of pages processed */
     processed: number;
     /** Number of pages skipped */
     skipped: number;
     /** Status of the sync operation */
-    status: 'ok' | 'error' | 'no-changes';
+    status: 'ok' | 'error' | 'no-changes' | 'success';
     /** Additional details, especially for errors */
     details?: string;
 };

@@ -13,11 +13,14 @@ const config = defineConfig({
 	
 	databases: [
 		{
-			// PUBLIC: Unique identifier for GraphQL queries
-			dbNickname: 'tech-article-staging',
+			// PUBLIC: Human-readable identifier (used in routes/queries)
+			alias: 'tech-article-staging',
 			
-			// PUBLIC: Notion database ID (not secret, just an identifier)
-			notionDatabaseId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
+			// PRIVATE: Notion database UUID (server-only, can use env var)
+			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
+			
+			// PRIVATE: Notion API integration token (server-only, MUST use env var)
+			notionToken: process.env.NOTION_TECH_TOKEN || '',
 			
 			// PRIVATE: Server-only function to determine if a page is published
 			isPublicRule: (page) => {
@@ -54,11 +57,8 @@ const config = defineConfig({
 				}
 			},			
 		
-			// PRIVATE: Server-only function to determine content source
-			sourceOfTruthRule: () => 'NOTION',
-			
-			// PRIVATE: Server-only property name configuration
-			slugPropertyName: "Website Slug",
+			// PRIVATE: Server-only property name to sync generated slugs back to Notion
+			slugSyncProperty: "Website Slug",
 			
 			// PRIVATE: Server-only custom slug extraction logic
 			slugRule: (page) => {

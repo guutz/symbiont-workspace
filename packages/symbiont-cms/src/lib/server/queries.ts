@@ -142,10 +142,13 @@ export async function getAllPosts(
 	const config = await loadConfig();
 	const client = await createClient(options.fetch);
 	
+	// Use alias if provided, otherwise use first database's alias
+	const sourceAlias = options.shortDbId ?? config.databases[0]?.alias;
+	
 	const result = await client.request<GetAllPostsResult>(GET_ALL_POSTS, {
 		limit: options.limit ?? 100,
 		offset: options.offset ?? 0,
-		dbNickname: options.shortDbId ?? config.primaryShortDbId
+		dbNickname: sourceAlias  // TODO: Update GraphQL query to use datasource_id instead
 	});
 	
 	return result.posts;

@@ -101,17 +101,17 @@ export function createMockNotionPage(overrides: Partial<PageObjectResponse> = {}
 }
 
 /**
- * Create a mock Symbiont config
+ * Create a mock Symbiont configuration for testing
  */
 export function createMockConfig(overrides: Partial<SymbiontConfig> = {}): SymbiontConfig {
 	const defaultDatabase: DatabaseBlueprint = {
-		dbNickname: 'test-blog',
-		notionDatabaseId: 'test-database-id',
+		alias: 'test-blog',
+		dataSourceId: 'test-database-id',
+		notionToken: 'test-notion-token',
 		isPublicRule: (page: PageObjectResponse) => {
 			const status = page.properties.Status;
 			return status?.type === 'select' && status.select?.name === 'Published';
 		},
-		sourceOfTruthRule: () => 'NOTION' as const,
 		slugRule: (page: PageObjectResponse) => {
 			const prop = page.properties['Website Slug'];
 			if (prop?.type === 'rich_text') {
@@ -123,14 +123,12 @@ export function createMockConfig(overrides: Partial<SymbiontConfig> = {}): Symbi
 
 	const defaultConfig: SymbiontConfig = {
 		graphqlEndpoint: 'http://localhost:8080/v1/graphql',
-		primaryShortDbId: 'test-blog',
 		databases: [defaultDatabase]
 	};
 
 	return {
 		...defaultConfig,
-		...overrides,
-		databases: overrides.databases || defaultConfig.databases
+		...overrides
 	};
 }
 

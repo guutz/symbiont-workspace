@@ -7,7 +7,8 @@ import { defineConfig } from 'symbiont-cms/config';
  * 
  * Environment variables:
  * - GRAPHQL_ENDPOINT: Your Nhost GraphQL endpoint
- * - NOTION_BLOG_DATABASE_ID: Your Notion database ID
+ * - NOTION_BLOG_DB_ID: Your Notion database UUID
+ * - NOTION_BLOG_TOKEN: Your Notion integration token
  * 
  * @type {import('symbiont-cms').SymbiontConfig}
  */
@@ -18,28 +19,25 @@ const config = defineConfig({
 	
 	databases: [
 		{
-			// PUBLIC: Unique identifier for GraphQL queries
-			dbNickname: 'guutz-blog',
+			// PUBLIC: Human-readable identifier (used in routes/queries)
+			alias: 'guutz-blog',
 			
-			// PUBLIC: Notion database ID (not secret, just an identifier)
-			// Replace with your actual Notion database ID
-			notionDatabaseId: '24a96d70-9f22-8066-897b-000b3b946090',
+			// PRIVATE: Notion database UUID (server-only, can use env var)
+			dataSourceId: '24a96d70-9f22-8066-897b-000b3b946090',
 			
-			// PRIVATE: Server-only function to determine if a page is published
-			isPublicRule: (page) => {
-				// @ts-ignore - Notion types are complex, this is safe at runtime
-				const tags = page.properties.Tags;
-				// @ts-ignore - multi_select exists on Tags property
-				return tags?.multi_select?.some((/** @type {any} */ tag) => tag.name === 'LIVE') ?? false;
-			},
+			// PRIVATE: Notion API integration token (server-only, MUST use env var)
+			notionToken: process.env.NOTION_BLOG_TOKEN || '',
 			
-			// PRIVATE: Server-only function to determine content source
-			sourceOfTruthRule: () => 'NOTION',
-			
-			// PRIVATE: Server-only property name configuration
-			slugPropertyName: 'Slug',
-			
-			// PRIVATE: Server-only custom slug extraction logic
+		// PRIVATE: Server-only function to determine if a page is published
+		isPublicRule: (page) => {
+			// @ts-ignore - Notion types are complex, this is safe at runtime
+			const tags = page.properties.Tags;
+			// @ts-ignore - multi_select exists on Tags property
+			return tags?.multi_select?.some((/** @type {any} */ tag) => tag.name === 'LIVE') ?? false;
+		},
+		
+		// PRIVATE: Server-only property name to sync generated slugs back to Notion
+		slugSyncProperty: 'Slug',			// PRIVATE: Server-only custom slug extraction logic
 			slugRule: (page) => {
 				// @ts-ignore - Notion types are complex, this is safe at runtime
 				const slugProperty = page.properties.Slug?.rich_text;
