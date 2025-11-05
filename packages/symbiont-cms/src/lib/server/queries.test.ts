@@ -14,9 +14,15 @@ vi.mock('graphql-request', () => ({
 }));
 
 vi.mock('./load-config.js', () => ({
-	loadConfig: vi.fn().mockResolvedValue({
+	loadConfig: vi.fn().mockReturnValue({
 		graphqlEndpoint: 'https://test.nhost.io/v1/graphql',
-		primaryShortDbId: 'test-db-id'
+		databases: [
+			{
+				alias: 'test-blog',
+				dataSourceId: 'test-db-id',
+				notionToken: 'secret_test'
+			}
+		]
 	})
 }));
 
@@ -47,7 +53,7 @@ describe('getPostBySlug', () => {
 			features: {}
 		};
 
-		mockRequest.mockResolvedValue({ posts: [mockPost] });
+		mockRequest.mockResolvedValue({ pages: [mockPost] });
 
 		const result = await getPostBySlug('test-post');
 
@@ -64,7 +70,7 @@ describe('getPostBySlug', () => {
 	});
 
 	it('should return null if post not found', async () => {
-		mockRequest.mockResolvedValue({ posts: [] });
+		mockRequest.mockResolvedValue({ pages: [] });
 
 		const result = await getPostBySlug('non-existent');
 
@@ -73,7 +79,7 @@ describe('getPostBySlug', () => {
 
 	it('should use custom fetch function when provided', async () => {
 		const customFetch = vi.fn();
-		mockRequest.mockResolvedValue({ posts: [] });
+		mockRequest.mockResolvedValue({ pages: [] });
 
 		await getPostBySlug('test', { fetch: customFetch });
 
@@ -92,9 +98,9 @@ describe('getPostBySlug', () => {
 			publish_at: '2025-01-01T00:00:00Z'
 		};
 
-		mockRequest.mockResolvedValue({ posts: [minimalPost] });
+		mockRequest.mockResolvedValue({ pages: [minimalPost] });
 
-		const result = await getPostBySlug('minimal');
+		const result = await getPostBySlug('minimal-post');
 
 		expect(result).toEqual(minimalPost);
 	});
@@ -129,7 +135,7 @@ describe('getAllPosts', () => {
 			}
 		];
 
-		mockRequest.mockResolvedValue({ posts: mockPosts });
+		mockRequest.mockResolvedValue({ pages: mockPosts });
 
 		const result = await getAllPosts();
 
@@ -140,29 +146,29 @@ describe('getAllPosts', () => {
 			{
 				limit: 100,
 				offset: 0,
-				dbNickname: 'test-db-id'
+				alias: 'test-blog'
 			}
 		);
 	});
 
 	it('should respect custom limit and offset', async () => {
-		mockRequest.mockResolvedValue({ posts: [] });
+		mockRequest.mockResolvedValue({ pages: [] });
 
-		await getAllPosts({ limit: 10, offset: 20 });
+		await getAllPosts({ limit: 5, offset: 10 });
 
 		expect(mockRequest).toHaveBeenCalledWith(
 			expect.any(String),
 			{
-				limit: 10,
-				offset: 20,
-				dbNickname: 'test-db-id'
+				limit: 5,
+				offset: 10,
+				alias: 'test-blog'
 			}
 		);
 	});
 
 	it('should use custom fetch function', async () => {
 		const customFetch = vi.fn();
-		mockRequest.mockResolvedValue({ posts: [] });
+		mockRequest.mockResolvedValue({ pages: [] });
 
 		await getAllPosts({ fetch: customFetch });
 
@@ -172,23 +178,23 @@ describe('getAllPosts', () => {
 		);
 	});
 
-	it('should allow overriding shortDbId', async () => {
-		mockRequest.mockResolvedValue({ posts: [] });
+	it('should allow overriding alias', async () => {
+		mockRequest.mockResolvedValue({ pages: [] });
 
-		await getAllPosts({ shortDbId: 'custom-db-id' });
+		await getAllPosts({ alias: 'custom-alias' });
 
 		expect(mockRequest).toHaveBeenCalledWith(
 			expect.any(String),
 			{
 				limit: 100,
 				offset: 0,
-				dbNickname: 'custom-db-id'
+				alias: 'custom-alias'
 			}
 		);
 	});
 
 	it('should return empty array when no posts found', async () => {
-		mockRequest.mockResolvedValue({ posts: [] });
+		mockRequest.mockResolvedValue({ pages: [] });
 
 		const result = await getAllPosts();
 
@@ -215,7 +221,7 @@ describe('getAllPosts', () => {
 			language: 'en'
 		};
 
-		mockRequest.mockResolvedValue({ posts: [fullPost] });
+		mockRequest.mockResolvedValue({ pages: [fullPost] });
 
 		const result = await getAllPosts();
 

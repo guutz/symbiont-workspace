@@ -16,37 +16,39 @@ import type { Post } from '../types.js';
 
 const GET_POST_BY_SLUG = gql`
 	query GetPostBySlug($slug: String!) {
-		posts(where: { slug: { _eq: $slug } }) {
-			sql_id: id
+		pages(where: { slug: { _eq: $slug } }) {
+			page_id
+			datasource_id
 			title
 			slug
 			content
 			publish_at
 			updated_at
 			tags
-			layout_config
 			authors
+			meta
 		}
 	}
 `;
 
 const GET_ALL_POSTS = gql`
-	query GetAllPosts($limit: Int, $offset: Int, $dbNickname: String!) {
-		posts(
-			where: { source_id: { _eq: $dbNickname } }
+	query GetAllPosts($limit: Int, $offset: Int, $alias: String!) {
+		pages(
+			where: { datasource_id: { _eq: $alias } }
 			order_by: { publish_at: desc }
 			limit: $limit
 			offset: $offset
 		) {
-			sql_id: id
+			page_id
+			datasource_id
 			title
 			slug
 			content
 			publish_at
 			updated_at
 			tags
-			layout_config
 			authors
+			meta
 		}
 	}
 `;
@@ -54,11 +56,11 @@ const GET_ALL_POSTS = gql`
 // --- Response Types ---
 
 interface GetPostBySlugResult {
-	posts: Post[];
+	pages: Post[];
 }
 
 interface GetAllPostsResult {
-	posts: Post[];
+	pages: Post[];
 }
 
 // --- Query Options ---
@@ -75,8 +77,8 @@ export interface GetAllPostsOptions {
 	limit?: number;
 	/** Number of posts to skip */
 	offset?: number;
-	/** Override the default dbNickname from config */
-	shortDbId?: string;
+	/** Override the default alias from config */
+	alias?: string;
 }
 
 // --- Helper: Create Client ---
@@ -117,7 +119,7 @@ export async function getPostBySlug(
 ): Promise<Post | null> {
 	const client = await createClient(options.fetch);
 	const result = await client.request<GetPostBySlugResult>(GET_POST_BY_SLUG, { slug });
-	return result.posts[0] ?? null;
+	return result.pages[0] ?? null;
 }
 
 /**
@@ -143,13 +145,13 @@ export async function getAllPosts(
 	const client = await createClient(options.fetch);
 	
 	// Use alias if provided, otherwise use first database's alias
-	const sourceAlias = options.shortDbId ?? config.databases[0]?.alias;
+	const sourceAlias = options.alias ?? config.databases[0]?.alias;
 	
 	const result = await client.request<GetAllPostsResult>(GET_ALL_POSTS, {
 		limit: options.limit ?? 100,
 		offset: options.offset ?? 0,
-		dbNickname: sourceAlias  // TODO: Update GraphQL query to use datasource_id instead
+		alias: sourceAlias
 	});
 	
-	return result.posts;
+	return result.pages;
 }
