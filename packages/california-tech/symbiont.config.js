@@ -19,8 +19,9 @@ const config = defineConfig({
 			// PRIVATE: Notion database UUID (server-only, can use env var)
 			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
 			
-			// PRIVATE: Notion API integration token (server-only, MUST use env var)
-			notionToken: process.env.NOTION_TECH_TOKEN || '',
+			// PRIVATE: Notion API token - can be env var name or actual token
+			// Omit to use default NOTION_TOKEN env var
+			notionToken: 'NOTION_TOKEN',
 			
 			// PRIVATE: Server-only function to determine if a page is published
 			isPublicRule: (page) => {

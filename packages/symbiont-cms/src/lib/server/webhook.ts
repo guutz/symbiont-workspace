@@ -1,16 +1,13 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { requireEnvVar } from '../utils/env.js';
+import { requireEnvVar, resolveNotionToken } from '../utils/env.js';
 import { loadConfig } from './load-config.js';
 import { syncFromNotion } from './sync.js';
 import { createLogger } from '../utils/logger.js';
 import { createSyncOrchestrator } from './sync/factory.js';
 import { Client } from '@notionhq/client';
 
-const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
-const NOTION_API_KEY = requireEnvVar('NOTION_API_KEY', 'Set NOTION_API_KEY in your environment.');
-
-const notion = new Client({ auth: NOTION_API_KEY });
+const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.'); 
 
 /**
  * Handle Notion webhook requests for page updates
@@ -53,8 +50,11 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 			dataSourceId: dbConfig.dataSourceId 
 		});
 
-		// Fetch page from Notion using the datasource-specific token
-		const notion = new Client({ auth: dbConfig.notionToken });
+		// Resolve Notion token (supports env var name, actual token, or default)
+		const notionToken = resolveNotionToken(dbConfig.notionToken, dbConfig.alias);
+		
+		// Fetch page from Notion using the resolved token
+		const notion = new Client({ auth: notionToken });
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 
 		// Create orchestrator and process page

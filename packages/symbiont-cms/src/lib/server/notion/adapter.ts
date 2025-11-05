@@ -23,13 +23,24 @@ export class NotionAdapter {
 	async getPage(pageId: string): Promise<PageObjectResponse> {
 		this.logger.debug({ event: 'fetch_page', pageId });
 		
-		const response = await this.notion.pages.retrieve({ page_id: pageId });
-		
-		if (!('properties' in response)) {
-			throw new Error(`Page ${pageId} is not a database page`);
+		try {
+			const response = await this.notion.pages.retrieve({ page_id: pageId });
+			
+			if (!('properties' in response)) {
+				throw new Error(`Page ${pageId} is not a database page`);
+			}
+			
+			return response as PageObjectResponse;
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
 		}
-		
-		return response as PageObjectResponse;
 	}
 
 	/**
@@ -47,21 +58,32 @@ export class NotionAdapter {
 			cursor 
 		});
 
-		// @ts-expect-error - Notion SDK types are incomplete for databases.query
-		const response = await this.notion.databases.query({
-			database_id: dataSourceId,
-			filter,
-			start_cursor: cursor
-		});
+		try {
+			// @ts-expect-error - Notion SDK types are incomplete for databases.query
+			const response = await this.notion.databases.query({
+				database_id: dataSourceId,
+				filter,
+				start_cursor: cursor
+			});
 
-		const pages = response.results.filter((page: any): page is PageObjectResponse => 
-			'properties' in page
-		);
+			const pages = response.results.filter((page: any): page is PageObjectResponse => 
+				'properties' in page
+			);
 
-		return {
-			pages,
-			nextCursor: response.has_more ? response.next_cursor : null
-		};
+			return {
+				pages,
+				nextCursor: response.has_more ? response.next_cursor : null
+			};
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
 	}
 
 	/**
@@ -94,13 +116,21 @@ export class NotionAdapter {
 				}
 			});
 		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			
 			this.logger.warn({ 
 				event: 'update_property_failed', 
 				pageId,
 				propertyName,
 				error: error?.message 
 			});
-			// Don't throw - property updates should be non-blocking
+			// Don't throw for other errors - property updates should be non-blocking
 		}
 	}
 
@@ -110,9 +140,20 @@ export class NotionAdapter {
 	async pageToMarkdown(pageId: string): Promise<string> {
 		this.logger.debug({ event: 'convert_to_markdown', pageId });
 
-		const mdblocks = await this.n2m.pageToMarkdown(pageId);
-		const mdResult = this.n2m.toMarkdownString(mdblocks);
-		return typeof mdResult === 'string' ? mdResult : mdResult?.parent ?? '';
+		try {
+			const mdblocks = await this.n2m.pageToMarkdown(pageId);
+			const mdResult = this.n2m.toMarkdownString(mdblocks);
+			return typeof mdResult === 'string' ? mdResult : mdResult?.parent ?? '';
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
 	}
 
 	/**

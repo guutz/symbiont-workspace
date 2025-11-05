@@ -1,7 +1,7 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import type { DatabaseBlueprint } from '../../types.js';
-import { requireEnvVar } from '../../utils/env.js';
+import { resolveNotionToken } from '../../utils/env.js';
 import { gqlAdminClient } from '../graphql.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
@@ -12,7 +12,7 @@ import { SyncOrchestrator } from './orchestrator.js';
  * Factory function to create a fully-wired SyncOrchestrator
  * 
  * This handles all the dependency injection:
- * - Notion client initialization
+ * - Notion client initialization (with token resolution)
  * - GraphQL client setup
  * - Class instantiation in the correct order
  * 
@@ -21,8 +21,11 @@ import { SyncOrchestrator } from './orchestrator.js';
  * await orchestrator.syncDataSource({ syncAll: true });
  */
 export function createSyncOrchestrator(config: DatabaseBlueprint): SyncOrchestrator {
-	// Initialize Notion client with datasource-specific token
-	const notion = new Client({ auth: config.notionToken });
+	// Resolve Notion token (supports env var name, actual token, or default)
+	const notionToken = resolveNotionToken(config.notionToken, config.alias);
+	
+	// Initialize Notion client with resolved token
+	const notion = new Client({ auth: notionToken });
 	const n2m = new NotionToMarkdown({ notionClient: notion });
 
 	// Create adapter layer (Notion API)
