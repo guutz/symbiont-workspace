@@ -1,3 +1,24 @@
 table:
   name: pages
   schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - authors
+        - meta
+        - tags
+        - content
+        - datasource_id
+        - page_id
+        - slug
+        - title
+        - publish_at
+        - updated_at
+      filter:
+        _and:
+          - publish_at:
+              _is_null: false
+          - publish_at:
+              _lte: NOW()
+    comment: ""
