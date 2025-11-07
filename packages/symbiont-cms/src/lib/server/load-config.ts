@@ -97,11 +97,6 @@ export async function getSourceByAlias(alias: string): Promise<SymbiontConfig['d
 }
 
 /**
- * @deprecated Use loadServerConfig() instead
- */
-export const loadConfig = loadServerConfig;
-
-/**
  * @deprecated Use getSourceByAlias() instead
  */
 export async function loadDatabaseConfig(shortDbId: string): Promise<SymbiontConfig['databases'][0] | void> {

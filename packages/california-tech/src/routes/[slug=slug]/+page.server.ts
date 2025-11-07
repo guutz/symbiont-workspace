@@ -25,6 +25,11 @@ export const load = async (event: any) => {
 	// Convert Symbiont post to QWER format
 	const qwerPost = symbiontToQwerPost(data.post, data.html, data.toc);
 	
+	// Set cache headers for client-side navigation
+	event.setHeaders({
+		'cache-control': 'public, max-age=60, s-maxage=60',
+	});
+	
 	return {
 		post: qwerPost,
 		html: data.html,

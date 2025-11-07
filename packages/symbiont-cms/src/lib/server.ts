@@ -32,4 +32,4 @@ export { createLogger } from './server/utils/logger.js';
 export { createSlug } from './server/utils/slug-helpers.js';
 
 // Server-side config loader (full config with secrets)
-export { loadServerConfig, loadConfig, getSourceByAlias } from './server/load-config.js';
+export { loadServerConfig, getSourceByAlias } from './server/load-config.js';

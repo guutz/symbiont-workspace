@@ -61,4 +61,4 @@ export { syncFromNotion } from './sync.js';
 export { handleNotionWebhookRequest, handlePollBlogRequest } from './webhook.js';
 
 // Configuration helpers
-export { loadConfig, getSourceByAlias } from './load-config.js';
+export { getSourceByAlias } from './load-config.js';
