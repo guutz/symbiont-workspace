@@ -1,6 +1,13 @@
-import { GraphQLClient, gql } from 'graphql-request';
+import { GraphQLClient } from 'graphql-request';
 import type { Post } from '../../types.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
+import {
+	getPostByPageIdQuery,
+	getPostBySlugQuery,
+	getAllPostsForSourceQuery,
+	getUpsertPostMutation,
+	getDeletePostsForSourceMutation
+} from '../queries.js';
 
 /**
  * Data transfer object for inserting/updating posts
@@ -43,26 +50,7 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = gql`
-			query GetByPageId($datasourceId: String!, $pageId: String!) {
-				pages(where: { 
-					datasource_id: { _eq: $datasourceId }, 
-					page_id: { _eq: $pageId } 
-				}) {
-					page_id
-					datasource_id
-					title
-					slug
-					content
-					publish_at
-					tags
-					authors
-					meta
-					updated_at
-				}
-			}
-		`;
-
+		const query = getPostByPageIdQuery();
 		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
 			datasourceId,
 			pageId
@@ -81,18 +69,7 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = gql`
-			query GetBySlug($datasourceId: String!, $slug: String!) {
-				pages(where: { 
-					datasource_id: { _eq: $datasourceId }, 
-					slug: { _eq: $slug } 
-				}) {
-					page_id
-					slug
-				}
-			}
-		`;
-
+		const query = getPostBySlugQuery();
 		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
 			datasourceId,
 			slug
@@ -110,16 +87,7 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = gql`
-			query GetAllForSource($datasourceId: String!) {
-				pages(where: { datasource_id: { _eq: $datasourceId } }) {
-					page_id
-					slug
-					title
-				}
-			}
-		`;
-
+		const query = getAllPostsForSourceQuery();
 		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
 			datasourceId
 		});
@@ -138,29 +106,7 @@ export class PostRepository {
 			pageId: post.page_id
 		});
 
-		const mutation = gql`
-			mutation UpsertPage($page: pages_insert_input!) {
-				insert_pages_one(
-					object: $page
-					on_conflict: {
-						constraint: pages_datasource_id_slug_key
-						update_columns: [
-							title, 
-							content, 
-							publish_at, 
-							tags, 
-							authors,
-							meta,
-							updated_at
-						]
-					}
-				) {
-					page_id
-					slug
-				}
-			}
-		`;
-
+		const mutation = getUpsertPostMutation();
 		await this.gqlClient.request(mutation, { page: post });
 		
 		this.logger.info({ 
@@ -179,25 +125,20 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const mutation = gql`
-			mutation DeleteForSource($datasourceId: String!) {
-				delete_pages(where: { datasource_id: { _eq: $datasourceId } }) {
-					affected_rows
-				}
-			}
-		`;
-
+		const mutation = getDeletePostsForSourceMutation();
 		const result = await this.gqlClient.request<{ delete_pages: { affected_rows: number } }>(
 			mutation, 
 			{ datasourceId }
 		);
 
+		const affectedRows = result.delete_pages.affected_rows;
+
 		this.logger.info({ 
 			event: 'deleted_posts', 
 			datasourceId,
-			count: result.delete_pages.affected_rows 
+			count: affectedRows 
 		});
 
-		return result.delete_pages.affected_rows;
+		return affectedRows;
 	}
 }

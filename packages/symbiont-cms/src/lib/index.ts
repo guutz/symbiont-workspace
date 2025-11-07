@@ -25,6 +25,13 @@ export type {
 // Config loading (client-safe, returns PublicSymbiontConfig)
 export { loadConfig } from './client/load-config.js';
 
+// Public GraphQL queries (client-safe)
+export { getPostBySlug, getAllPosts } from './client/queries.js';
+export type { GetPostOptions, GetAllPostsOptions } from './client/queries.js';
+
+// Public environment utilities (client-safe)
+export { requirePublicEnvVar } from './client/utils/env.public.js';
+
 // Image zoom utilities (optional, requires medium-zoom to be installed separately)
 export { initializeImageZoom, imageZoom } from './client/image-zoom.js';
 export type { ImageZoomOptions } from './client/image-zoom.js';

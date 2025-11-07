@@ -1,11 +1,9 @@
 /**
- * Tests for server-side GraphQL queries
+ * Tests for public GraphQL queries
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { getAllPosts, getPostBySlug } from './queries.js';
-import type { Post } from '../types.js';
 
-// Mock the dependencies
+// Mock the dependencies BEFORE importing queries
 vi.mock('graphql-request', () => ({
 	GraphQLClient: vi.fn().mockImplementation(() => ({
 		request: vi.fn()
@@ -16,17 +14,13 @@ vi.mock('graphql-request', () => ({
 vi.mock('./load-config.js', () => ({
 	loadConfig: vi.fn().mockReturnValue({
 		graphqlEndpoint: 'https://test.nhost.io/v1/graphql',
-		databases: [
-			{
-				alias: 'test-blog',
-				dataSourceId: 'test-db-id',
-				notionToken: 'secret_test'
-			}
-		]
+		aliases: ['test-blog', 'test-docs']
 	})
 }));
 
 // Import after mocking
+import { getAllPosts, getPostBySlug } from './queries.js';
+import type { Post } from '../types.js';
 import { GraphQLClient } from 'graphql-request';
 import { loadConfig } from './load-config.js';
 

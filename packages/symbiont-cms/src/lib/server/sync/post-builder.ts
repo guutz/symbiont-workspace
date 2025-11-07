@@ -1,10 +1,10 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { PostData } from './post-repository.js';
-import { createSlug } from '../../utils/slug-helpers.js';
+import { createSlug } from '../utils/slug-helpers.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * PostBuilder - Business logic for transforming Notion pages into Post data

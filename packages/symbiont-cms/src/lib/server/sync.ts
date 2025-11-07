@@ -1,6 +1,6 @@
 import type { DatabaseBlueprint } from '../types.js';
-import { loadConfig } from './load-config.js';
-import { createLogger } from '../utils/logger.js';
+import { loadServerConfig } from './load-config.js';
+import { createLogger } from './utils/logger.js';
 import { createSyncOrchestrator } from './sync/factory.js';
 import type { SyncSummary, SyncOptions } from './sync/orchestrator.js';
 
@@ -21,7 +21,7 @@ export async function syncFromNotion(
 	const logger = createLogger({ operation: 'sync' });
 	logger.info({ event: 'sync_started', options });
 	
-	const config = await loadConfig();
+	const config = await loadServerConfig();
 
 	const sinceIso = options.syncAll ? null : options.since || new Date(Date.now() - 5 * 60 * 1000).toISOString();
 	const targetDatabases = getTargetDatabases(config.databases, options.databaseId);

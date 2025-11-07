@@ -1,8 +1,8 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import type { DatabaseBlueprint } from '../../types.js';
-import { resolveNotionToken } from '../../utils/env.js';
-import { gqlAdminClient } from '../graphql.js';
+import { resolveNotionToken } from '../utils/env.server.js';
+import { gqlAdminClient } from '../queries.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { PostBuilder } from './post-builder.js';

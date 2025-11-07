@@ -1,9 +1,9 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { requireEnvVar, resolveNotionToken } from '../utils/env.js';
-import { loadConfig } from './load-config.js';
+import { requireEnvVar, resolveNotionToken } from './utils/env.server.js';
+import { loadServerConfig } from './load-config.js';
 import { syncFromNotion } from './sync.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from './utils/logger.js';
 import { createSyncOrchestrator } from './sync/factory.js';
 import { Client } from '@notionhq/client';
 
@@ -32,8 +32,8 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const notionDataSourceId = payload.page.parent.data_source_id;
 
 		// Find database config by dataSourceId (Notion database UUID)
-		const config = await loadConfig();
-		const dbConfig = config.databases.find((db) => db.dataSourceId === notionDataSourceId);
+		const config = await loadServerConfig();
+		const dbConfig = config.databases.find((db: any) => db.dataSourceId === notionDataSourceId);
 
 		if (!dbConfig) {
 			logger.warn({ 

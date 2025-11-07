@@ -3,7 +3,7 @@ import type { DatabaseBlueprint } from '../../types.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { PostBuilder } from './post-builder.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 export interface SyncOptions {
 	/** Only sync pages modified since this timestamp */

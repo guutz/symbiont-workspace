@@ -1,6 +1,6 @@
 import { Client, type PageObjectResponse } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * NotionAdapter - Pure Notion API interactions

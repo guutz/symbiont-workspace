@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { SymbiontConfig } from '../types.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from './utils/logger.js';
 
 /**
  * Loads the full symbiont.config.js (including server-only rules and functions).
@@ -10,7 +10,7 @@ import { createLogger } from '../utils/logger.js';
  * 
  * @returns Full configuration including database rules and functions
  */
-export async function loadConfig(): Promise<SymbiontConfig> {
+export async function loadServerConfig(): Promise<SymbiontConfig> {
 	const logger = createLogger({ operation: 'load_config' });
 	const cwd = process.cwd();
 	const configPaths = [
@@ -77,24 +77,29 @@ export async function getSourceByAlias(alias: string): Promise<SymbiontConfig['d
 		alias 
 	});
 	
-	const config = await loadConfig();
-	const source = config.databases.find(db => db.alias === alias);
+	const config = await loadServerConfig();
+	const source = config.databases.find((db: any) => db.alias === alias);
 	
 	if (!source) {
 		logger.error({ 
 			event: 'datasource_not_found', 
 			alias,
-			available_aliases: config.databases.map(db => db.alias)
+			available_aliases: config.databases.map((db: any) => db.alias)
 		});
 		throw new Error(
 			`No datasource configured with alias "${alias}". ` +
-			`Available aliases: ${config.databases.map(db => db.alias).join(', ')}`
+			`Available aliases: ${config.databases.map((db: any) => db.alias).join(', ')}`
 		);
 	}
 	
 	logger.debug({ event: 'datasource_found', alias, dataSourceId: source.dataSourceId });
 	return source;
 }
+
+/**
+ * @deprecated Use loadServerConfig() instead
+ */
+export const loadConfig = loadServerConfig;
 
 /**
  * @deprecated Use getSourceByAlias() instead

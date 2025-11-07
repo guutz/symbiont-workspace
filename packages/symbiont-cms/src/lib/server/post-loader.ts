@@ -6,16 +6,16 @@
  * 2. Renders markdown to HTML with TOC
  * 3. Returns everything needed for the page
  * 
- * For custom behavior, import the lower-level functions from './queries.ts'
+ * For custom behavior, import the lower-level functions from '../client/queries.ts'
  * and './markdown-processor.ts' directly.
  */
 
 import { error } from '@sveltejs/kit';
-import { loadConfig } from './load-config.js';
+import { loadServerConfig } from './load-config.js';
 import { parseMarkdown, type MarkdownResult } from './markdown-processor.js';
-import { getPostBySlug } from './queries.js';
+import { getPostBySlug } from '../client/queries.js';
 import type { Post } from '../types.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from './utils/logger.js';
 
 type PostLoadEvent = {
 	params: { slug: string };
@@ -66,7 +66,7 @@ export function createPostLoad<Event extends PostLoadEvent = PostLoadEvent>(): P
 			}
 
 			// Load config for markdown rendering
-			const config = await loadConfig();
+			const config = await loadServerConfig();
 
 			// Render markdown to HTML with TOC
 			const markdownContent = post.content || '';
@@ -106,7 +106,7 @@ export const load = createPostLoad();
  * incremental static regeneration.
  */
 export const config = (async () => {
-	const symbiontConfig = await loadConfig();
+	const symbiontConfig = await loadServerConfig();
   
 	if (symbiontConfig.caching?.isr?.enabled) {
 		return {

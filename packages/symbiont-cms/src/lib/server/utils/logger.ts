@@ -11,7 +11,7 @@
  */
 
 import pino from 'pino';
-import { readEnvVar } from './env.js';
+import { readEnvVar } from './env.server.js';
 
 // Default log level (can be overridden by LOG_LEVEL env var)
 const LOG_LEVEL = readEnvVar('LOG_LEVEL') || 'info';
