@@ -59,9 +59,8 @@ export class NotionAdapter {
 		});
 
 		try {
-			// @ts-expect-error - Notion SDK types are incomplete for databases.query
-			const response = await this.notion.databases.query({
-				database_id: dataSourceId,
+			const response = await this.notion.dataSources.query({
+				data_source_id: dataSourceId,
 				filter,
 				start_cursor: cursor
 			});
