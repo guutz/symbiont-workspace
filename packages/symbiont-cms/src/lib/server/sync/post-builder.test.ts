@@ -52,26 +52,27 @@ describe('PostBuilder', () => {
 	});
 
 	describe('buildPost', () => {
-		it('should return null if page is not published', async () => {
-			const mockPage = {
-				id: 'page-123',
-				properties: {
-					Tags: {
-						type: 'multi_select',
-						multi_select: [] // No LIVE tag
-					}
-				},
-				last_edited_time: '2025-01-01T00:00:00Z'
-			} as any;
+	it('should sync unpublished posts with null publish_at', async () => {
+		const mockPage = {
+			id: 'page-123',
+			properties: {
+				Tags: {
+					type: 'multi_select',
+					multi_select: [] // No LIVE tag
+				}
+			},
+			last_edited_time: '2025-01-01T00:00:00Z'
+		} as any;
 
-			mockNotionAdapter.getTitleProperty.mockReturnValue('Test Post');
+		mockNotionAdapter.getTitleProperty.mockReturnValue('Test Post');
 
-			const result = await builder.buildPost(mockPage);
+		const result = await builder.buildPost(mockPage);
 
-			expect(result).toBeNull();
-		});
-
-		it('should build post with auto-generated slug', async () => {
+		// Should still sync the post, but with null publish_at
+		expect(result).not.toBeNull();
+		expect(result?.publish_at).toBeNull();
+		expect(result?.title).toBe('Test Post');
+	});		it('should build post with auto-generated slug', async () => {
 			const mockPage = {
 				id: 'page-123',
 				properties: {

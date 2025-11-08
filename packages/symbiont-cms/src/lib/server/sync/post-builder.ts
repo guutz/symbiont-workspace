@@ -32,7 +32,10 @@ export class PostBuilder {
 	});
 }	/**
 	 * Build a complete PostData object from a Notion page
-	 * Returns null if the page should not be published
+	 * 
+	 * Always syncs the post to the database, but sets publish_at to null
+	 * if the post doesn't pass the isPublicRule. This allows the database
+	 * to handle filtering of non-public posts.
 	 */
 	async buildPost(page: PageObjectResponse): Promise<PostData | null> {
 		this.logger.debug({ 
@@ -40,23 +43,26 @@ export class PostBuilder {
 			pageId: page.id 
 		});
 
-		// 1. Check publishing rules
-		if (!this.shouldPublish(page)) {
-			this.logger.debug({ 
-				event: 'post_skipped_not_public', 
-				pageId: page.id 
-			});
-			return null;
-		}
-
-		// 2. Extract metadata
+		// 1. Extract metadata
 		const meta = this.extractMetadata(page);
 
-		// 3. Resolve slug (handles conflicts, sync-back)
+		// 2. Resolve slug (handles conflicts, sync-back)
 		const slug = await this.resolveSlug(page, meta.title);
 
-		// 4. Get content
+		// 3. Get content
 		const content = await this.notionAdapter.pageToMarkdown(page.id);
+
+		// 4. Check publishing rules - if not public, set publish_at to null
+		const isPublic = this.shouldPublish(page);
+		const publishDate = isPublic ? this.getPublishDate(page) : null;
+
+		if (!isPublic) {
+			this.logger.debug({ 
+				event: 'post_marked_unpublished', 
+				pageId: page.id,
+				title: meta.title 
+			});
+		}
 
 		// 5. Build post data
 		const postData: PostData = {
@@ -65,7 +71,7 @@ export class PostBuilder {
 			title: meta.title,
 			slug,
 			content,
-			publish_at: this.getPublishDate(page),
+			publish_at: publishDate,
 			updated_at: page.last_edited_time, // Use Notion's last edited time
 			tags: meta.tags.length > 0 ? meta.tags : null,
 			authors: meta.authors.length > 0 ? meta.authors : null,
@@ -76,7 +82,8 @@ export class PostBuilder {
 			event: 'post_built', 
 			pageId: page.id,
 			slug,
-			title: meta.title 
+			title: meta.title,
+			isPublic 
 		});
 
 		return postData;
