@@ -63,7 +63,7 @@ export type Post = {
     page_id?: string;           // Notion page UUID (primary key)
     datasource_id?: string;     // Notion database ID
     title: string | null;
-    slug: string;
+    slug: string | null;        // Nullable - only generated for public posts
     content: string | null;     // Markdown content
     publish_at: string | null;  // ISO 8601 date string
     updated_at?: string | null; // Last updated timestamp

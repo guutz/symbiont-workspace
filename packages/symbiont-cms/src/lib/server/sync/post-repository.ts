@@ -16,7 +16,7 @@ export interface PostData {
 	page_id: string;           // Notion page UUID (primary key)
 	datasource_id: string;      // Notion database ID
 	title: string;
-	slug: string;
+	slug: string | null;        // Nullable - only generated for public posts
 	content: string;
 	publish_at: string | null;
 	updated_at: string;         // ISO 8601 timestamp (from Notion or manual)

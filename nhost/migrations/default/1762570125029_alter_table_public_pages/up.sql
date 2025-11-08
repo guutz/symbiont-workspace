@@ -1,0 +1,1 @@
+ALTER TABLE public.pages ALTER COLUMN slug DROP NOT NULL;

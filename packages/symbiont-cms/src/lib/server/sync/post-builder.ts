@@ -22,45 +22,48 @@ export class PostBuilder {
 
 	constructor(
 		private config: DatabaseBlueprint,
-	private notionAdapter: NotionAdapter,
-	private postRepository: PostRepository
-) {
-	this.logger = createLogger({ 
-		operation: 'post_builder',
-		alias: this.config.alias,
-		dataSourceId: this.config.dataSourceId 
-	});
-}	/**
+		private notionAdapter: NotionAdapter,
+		private postRepository: PostRepository
+	) {
+		this.logger = createLogger({
+			operation: 'post_builder',
+			alias: this.config.alias,
+			dataSourceId: this.config.dataSourceId
+		});
+	}	/**
 	 * Build a complete PostData object from a Notion page
 	 * 
 	 * Always syncs the post to the database, but sets publish_at to null
 	 * if the post doesn't pass the isPublicRule. This allows the database
 	 * to handle filtering of non-public posts.
+	 * 
+	 * For non-public posts, slug generation is skipped (slug set to null)
+	 * since the post may not be finished yet (including title).
 	 */
 	async buildPost(page: PageObjectResponse): Promise<PostData | null> {
-		this.logger.debug({ 
-			event: 'build_post_started', 
-			pageId: page.id 
+		this.logger.debug({
+			event: 'build_post_started',
+			pageId: page.id
 		});
 
 		// 1. Extract metadata
 		const meta = this.extractMetadata(page);
 
-		// 2. Resolve slug (handles conflicts, sync-back)
-		const slug = await this.resolveSlug(page, meta.title);
-
-		// 3. Get content
-		const content = await this.notionAdapter.pageToMarkdown(page.id);
-
-		// 4. Check publishing rules - if not public, set publish_at to null
+		// 2. Check publishing rules first
 		const isPublic = this.shouldPublish(page);
 		const publishDate = isPublic ? this.getPublishDate(page) : null;
 
+		// 3. Resolve slug only for public posts (non-public posts may not be finished)
+		const slug = isPublic ? await this.resolveSlug(page, meta.title) : null;
+
+		// 4. Get content
+		const content = await this.notionAdapter.pageToMarkdown(page.id);
+
 		if (!isPublic) {
-			this.logger.debug({ 
-				event: 'post_marked_unpublished', 
+			this.logger.debug({
+				event: 'post_marked_unpublished',
 				pageId: page.id,
-				title: meta.title 
+				title: meta.title
 			});
 		}
 
@@ -78,12 +81,12 @@ export class PostBuilder {
 			meta: this.extractCustomMetadata(page)
 		};
 
-		this.logger.info({ 
-			event: 'post_built', 
+		this.logger.info({
+			event: 'post_built',
 			pageId: page.id,
 			slug,
 			title: meta.title,
-			isPublic 
+			isPublic
 		});
 
 		return postData;
@@ -99,21 +102,21 @@ export class PostBuilder {
 	/**
 	 * Extract standard metadata (title, tags, authors)
 	 */
-	private extractMetadata(page: PageObjectResponse): { 
-		title: string; 
-		tags: string[]; 
+	private extractMetadata(page: PageObjectResponse): {
+		title: string;
+		tags: string[];
 		authors: string[];
 	} {
 		// Auto-detect title (type: 'title')
 		const title = this.notionAdapter.getTitleProperty(page);
-		
+
 		// Extract tags (if configured)
-		const tags = this.config.tagsProperty 
+		const tags = this.config.tagsProperty
 			? this.notionAdapter.getPropertyValues(page, this.config.tagsProperty)
 			: [];
-		
+
 		// Extract authors (if configured)
-		const authors = this.config.authorsProperty 
+		const authors = this.config.authorsProperty
 			? this.notionAdapter.getPropertyValues(page, this.config.authorsProperty)
 			: [];
 
@@ -124,39 +127,41 @@ export class PostBuilder {
 	 * Resolve slug with conflict handling and sync-back
 	 */
 	private async resolveSlug(page: PageObjectResponse, title: string): Promise<string> {
-	// 1. Check for custom slug from Notion
-	const customSlug = this.config.slugRule?.(page) ?? null;
+		// 1. Check for custom slug from Notion
+		const customSlug = this.config.slugRule?.(page) ?? null;
 
-	// 2. Check if page already exists in DB
-	const existingPost = await this.postRepository.getByNotionPageId(
-		page.id,
-		this.config.dataSourceId
-	);		// 3. Determine final slug
+		// 2. Check if page already exists in DB
+		const existingPost = await this.postRepository.getByNotionPageId(
+			page.id,
+			this.config.dataSourceId
+		);
+
+		// 3. Determine final slug
 		let slug: string;
 
-		if (existingPost) {
-			// Existing post - handle slug changes
+		if (existingPost && existingPost.slug) {
+			// Existing post with slug - handle slug changes
 			if (customSlug && customSlug !== existingPost.slug) {
 				// User changed slug in Notion - validate uniqueness
 				slug = await this.ensureUniqueSlug(customSlug, page.id);
-				this.logger.info({ 
-					event: 'slug_updated', 
+				this.logger.info({
+					event: 'slug_updated',
 					pageId: page.id,
 					oldSlug: existingPost.slug,
-					newSlug: slug 
+					newSlug: slug
 				});
 			} else {
 				// No change - keep existing slug
 				slug = existingPost.slug;
 			}
 		} else {
-			// New post - generate or use custom
+			// New post or existing post without slug - generate or use custom
 			const baseSlug = customSlug || createSlug(title);
 			slug = await this.ensureUniqueSlug(baseSlug);
-			this.logger.info({ 
-				event: 'slug_generated', 
+			this.logger.info({
+				event: 'slug_generated',
 				pageId: page.id,
-				slug 
+				slug
 			});
 		}
 
@@ -183,12 +188,12 @@ export class PostBuilder {
 		for (let i = 2; i <= 100; i++) {
 			const numberedSlug = `${baseSlug}-${i}`;
 			const conflict = await this.postRepository.getBySlug(numberedSlug, this.config.dataSourceId);
-			
+
 			if (!conflict || conflict.page_id === excludePageId) {
-				this.logger.warn({ 
+				this.logger.warn({
 					event: 'slug_conflict_resolved',
 					requestedSlug: baseSlug,
-					finalSlug: numberedSlug 
+					finalSlug: numberedSlug
 				});
 				return numberedSlug;
 			}
@@ -196,10 +201,10 @@ export class PostBuilder {
 
 		// Fallback: use random string
 		const randomSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
-		this.logger.warn({ 
+		this.logger.warn({
 			event: 'slug_conflict_random_fallback',
 			requestedSlug: baseSlug,
-			finalSlug: randomSlug 
+			finalSlug: randomSlug
 		});
 		return randomSlug;
 	}
@@ -226,10 +231,10 @@ export class PostBuilder {
 		try {
 			return this.config.metadataExtractor(page);
 		} catch (error: any) {
-			this.logger.warn({ 
+			this.logger.warn({
 				event: 'metadata_extractor_failed',
 				pageId: page.id,
-				error: error?.message 
+				error: error?.message
 			});
 			return null;
 		}
