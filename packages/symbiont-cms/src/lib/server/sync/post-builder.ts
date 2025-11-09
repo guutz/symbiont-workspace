@@ -138,12 +138,14 @@ export class PostBuilder {
 
 		// 3. Determine final slug
 		let slug: string;
+		let slugChanged = false;
 
 		if (existingPost && existingPost.slug) {
 			// Existing post with slug - handle slug changes
 			if (customSlug && customSlug !== existingPost.slug) {
 				// User changed slug in Notion - validate uniqueness
 				slug = await this.ensureUniqueSlug(customSlug, page.id);
+				slugChanged = true;
 				this.logger.info({
 					event: 'slug_updated',
 					pageId: page.id,
@@ -153,11 +155,13 @@ export class PostBuilder {
 			} else {
 				// No change - keep existing slug
 				slug = existingPost.slug;
+				slugChanged = false;
 			}
 		} else {
 			// New post or existing post without slug - generate or use custom
 			const baseSlug = customSlug || createSlug(title);
 			slug = await this.ensureUniqueSlug(baseSlug);
+			slugChanged = true;
 			this.logger.info({
 				event: 'slug_generated',
 				pageId: page.id,
@@ -165,9 +169,17 @@ export class PostBuilder {
 			});
 		}
 
-		// 4. Sync back to Notion if configured
-		if (this.config.slugSyncProperty) {
-			await this.notionAdapter.updateProperty(page.id, this.config.slugSyncProperty, slug);
+		// 4. Sync back to Notion ONLY if slug is new or changed
+		if (this.config.slugSyncProperty && slugChanged) {
+			// Also check if Notion already has the correct slug to avoid unnecessary updates
+			if (customSlug !== slug) {
+				await this.notionAdapter.updateProperty(page.id, this.config.slugSyncProperty, slug);
+				this.logger.debug({
+					event: 'slug_synced_to_notion',
+					pageId: page.id,
+					slug
+				});
+			}
 		}
 
 		return slug;

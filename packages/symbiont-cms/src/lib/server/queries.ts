@@ -107,6 +107,10 @@ export function getAllPostsForSourceQuery(): string {
 
 /**
  * Generate mutation to upsert a post
+ * 
+ * Uses page_id (primary key) for conflict resolution since:
+ * - Every page always has a unique page_id from Notion
+ * - The datasource_id+slug constraint doesn't work when slug is null (unpublished posts)
  */
 export function getUpsertPostMutation(): string {
 	return `
@@ -114,9 +118,10 @@ export function getUpsertPostMutation(): string {
 			insert_pages_one(
 				object: $page
 				on_conflict: {
-					constraint: pages_datasource_id_slug_key
+					constraint: pages_pkey
 					update_columns: [
 						title, 
+						slug,
 						content, 
 						publish_at, 
 						tags, 

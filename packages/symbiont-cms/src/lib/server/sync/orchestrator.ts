@@ -181,10 +181,44 @@ export class SyncOrchestrator {
 			pageId: page.id 
 		});
 
-		// 1. Build post data (applies all business logic)
+		// 1. Check if page needs updating (compare timestamps)
+		const existingPost = await this.postRepository.getByNotionPageId(
+			page.id,
+			this.config.dataSourceId
+		);
+
+		if (existingPost && existingPost.updated_at) {
+			const notionTime = new Date(page.last_edited_time).getTime();
+			const dbTime = new Date(existingPost.updated_at).getTime();
+			const diff = notionTime - dbTime;
+
+			this.logger.debug({ 
+				event: 'timestamp_comparison',
+				pageId: page.id,
+				notionTime: page.last_edited_time,
+				dbTime: existingPost.updated_at,
+				notionTimeMs: notionTime,
+				dbTimeMs: dbTime,
+				diffMs: diff,
+				willSkip: dbTime >= notionTime - 1000
+			});
+
+			// Skip if DB is up to date (allowing 1 second tolerance for clock drift)
+			if (dbTime >= notionTime - 1000) {
+				this.logger.info({ 
+					event: 'page_already_up_to_date',
+					pageId: page.id,
+					notionTime: page.last_edited_time,
+					dbTime: existingPost.updated_at
+				});
+				return false; // Skipped
+			}
+		}
+
+		// 2. Build post data (applies all business logic - expensive)
 		const postData = await this.postBuilder.buildPost(page);
 
-		// 2. Skip if not publishable
+		// 3. Skip if not publishable
 		if (!postData) {
 			this.logger.debug({ 
 				event: 'page_skipped',
@@ -193,7 +227,7 @@ export class SyncOrchestrator {
 			return false;
 		}
 
-		// 3. Upsert to database
+		// 4. Upsert to database
 		await this.postRepository.upsert(postData);
 
 		this.logger.info({ 

@@ -60,6 +60,10 @@ const config = defineConfig({
 		
 			// PRIVATE: Server-only property name to sync generated slugs back to Notion
 			slugSyncProperty: "Website Slug",
+
+			tagsProperty: "Tags",
+
+			authorsProperty: "Authors",
 			
 			// PRIVATE: Server-only custom slug extraction logic
 			slugRule: (page) => {
