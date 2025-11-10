@@ -21,7 +21,7 @@ PUBLIC_NHOST_GRAPHQL_URL=https://YOUR-PROJECT.nhost.run/v1/graphql
 PUBLIC_SITE_URL=http://localhost:5173            # optional but handy for feeds
 ```
 
-Keep secrets (`NHOST_ADMIN_SECRET`, `NOTION_API_KEY`) in the workspace root `.env` so server routes can access them.
+Keep secrets (`NHOST_ADMIN_SECRET`, `NOTION_TOKEN`) in the workspace root `.env` so server routes can access them.
 
 ---
 
@@ -68,7 +68,7 @@ Within a second or two the homepage should reflect your latest Notion changes. U
 | Empty homepage | Verify `PUBLIC_NHOST_GRAPHQL_URL`, ensure posts have `publish_at`, and rebuild `symbiont-cms`. |
 | `Cannot find module 'symbiont-cms/…'` | Run `pnpm -F symbiont-cms build` again – the QWER app reads the compiled output. |
 | Type errors in the editor | Restart the TS server or run `pnpm -F qwer-test check` after the first successful dev build. |
-| Sync endpoint 500s | Confirm `NHOST_ADMIN_SECRET` and `NOTION_API_KEY` exist in the root `.env`. |
+| Sync endpoint 500s | Confirm `NHOST_ADMIN_SECRET` and `NOTION_TOKEN` exist in the root `.env`. |
 
 ---
 

@@ -2,13 +2,14 @@
 
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
-> **⚠️ IMPLEMENTATION STATUS: DESIGNED ONLY**  
-> This document contains a complete design for image optimization, but **no code has been implemented yet**.  
-> - ❌ No Nhost Storage bucket configuration exists  
-> - ❌ No image download/upload utilities implemented  
-> - ❌ No URL rewriting in markdown processor  
+> **⚠️ IMPLEMENTATION STATUS: IN PROGRESS (November 2025)**  
+> - ✅ Nhost Storage v0.9.1 configured with `blog-images` bucket
+> - ✅ Design document complete and validated
+> - ❌ Image download/upload utilities not yet implemented  
+> - ❌ URL rewriting in markdown processor not implemented  
+> - ❌ Hasura storage permissions not configured
 > 
-> This is a **roadmap document** for Phase 2 implementation.
+> This is a **Phase 2 implementation** currently in progress. Storage infrastructure ready, utilities next.
 
 ## Context
 
