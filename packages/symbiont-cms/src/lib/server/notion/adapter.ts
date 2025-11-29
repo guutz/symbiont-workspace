@@ -134,6 +134,118 @@ export class NotionAdapter {
 	}
 
 	/**
+	 * Replace all blocks in a Notion page
+	 * 
+	 * Note: Notion doesn't have a "replace all" operation, so this:
+	 * 1. Deletes all existing blocks
+	 * 2. Appends new blocks in chunks of 100 (Notion API limit)
+	 */
+	async updatePageBlocks(
+		pageId: string,
+		blocks: any[]
+	): Promise<void> {
+		this.logger.debug({ 
+			event: 'update_page_blocks', 
+			pageId, 
+			blockCount: blocks.length 
+		});
+
+		try {
+			// Delete existing blocks
+			const existingBlocks = await this.notion.blocks.children.list({ block_id: pageId });
+			
+			for (const block of existingBlocks.results) {
+				if ('type' in block) {
+					await this.notion.blocks.delete({ block_id: block.id });
+				}
+			}
+
+			// Add new blocks (100 blocks per request max)
+			const chunkSize = 100;
+			for (let i = 0; i < blocks.length; i += chunkSize) {
+				const chunk = blocks.slice(i, i + chunkSize);
+				await this.notion.blocks.children.append({
+					block_id: pageId,
+					children: chunk,
+				});
+			}
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Find a page by a specific property value
+	 * Generic version of finding by any property type
+	 */
+	async findPageByProperty(
+		dataSourceId: string,
+		propertyName: string,
+		propertyType: 'number' | 'rich_text' | 'select',
+		value: number | string
+	): Promise<string | null> {
+		this.logger.debug({ 
+			event: 'find_page_by_property', 
+			dataSourceId,
+			propertyName,
+			propertyType,
+			value 
+		});
+
+		try {
+			let filter: any;
+			
+			switch (propertyType) {
+				case 'number':
+					filter = {
+						property: propertyName,
+						number: { equals: value }
+					};
+					break;
+				case 'rich_text':
+					filter = {
+						property: propertyName,
+						rich_text: { equals: value }
+					};
+					break;
+				case 'select':
+					filter = {
+						property: propertyName,
+						select: { equals: value }
+					};
+					break;
+			}
+
+			const response = await this.notion.dataSources.query({
+				data_source_id: dataSourceId,
+				filter
+			});
+
+			if (response.results.length === 0) {
+				return null;
+			}
+
+			return response.results[0].id;
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
+	}
+
+	/**
 	 * Convert Notion page content to markdown
 	 */
 	async pageToMarkdown(pageId: string): Promise<string> {

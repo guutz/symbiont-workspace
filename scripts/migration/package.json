@@ -1,0 +1,22 @@
+{
+  "name": "migration-scripts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "tsx migrate-to-notion.ts",
+    "test-reverse": "tsx test-reverse-sync.ts"
+  },
+  "dependencies": {
+    "@nhost/nhost-js": "^4.1.0",
+    "@notionhq/client": "^5.4.0",
+    "@tryfabric/martian": "^1.2.4",
+    "dotenv": "^17.2.3",
+    "gray-matter": "^4.0.3",
+    "symbiont-cms": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6"
+  }
+}

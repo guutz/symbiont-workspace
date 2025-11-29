@@ -33,3 +33,21 @@ export { createSlug } from './server/utils/slug-helpers.js';
 
 // Server-side config loader (full config with secrets)
 export { loadServerConfig, getSourceByAlias } from './server/load-config.js';
+
+// Image processing utilities
+export { extractImageUrlsFromMarkdown, extractImageUrlsFromNotionPage } from './image-utils.js';
+export { uploadImage, uploadImages, rewriteImageUrls } from './image-upload.js';
+export type { ImageUploadOptions, ImageUploadResult, ImageUploadError } from './image-upload.js';
+export { processMarkdownImages, processNotionPageImages, isExternalUrl } from './image-processor.js';
+export type { ImageProcessorOptions, ProcessMarkdownResult } from './image-processor.js';
+
+// Markdown to Notion conversion
+export { markdownToNotionBlocks } from './server/notion/markdown-to-notion.js';
+
+// Reverse sync (DB → Notion)
+export { publishPostToNotion } from './server/sync/publish-to-notion.js';
+export type { PublishToNotionOptions } from './server/sync/publish-to-notion.js';
+
+// Markdown migration utilities
+export { extractImages, replaceImageUrls } from './server/utils/markdown-migration.js';
+export type { ImageReference } from './server/utils/markdown-migration.js';
