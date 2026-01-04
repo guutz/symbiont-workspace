@@ -11,14 +11,25 @@ import { GraphQLClient } from 'graphql-request';
 import { loadConfig } from './load-config.js';
 import type { Post } from '../types.js';
 
-// --- GraphQL Query Generators (hardcoded 'pages' table) ---
+// Table name is centralized here; change only after aligning Hasura metadata/migrations
+const PAGES_TABLE = 'pages';
 
-function getPostBySlugQuery(): string {
+// --- GraphQL Query Builders (pure) ---
+
+function buildGetPostBySlug(): string {
 	return `
-		query GetPostBySlug($slug: String!) {
-			pages(where: { slug: { _eq: $slug } }) {
+		query GetPostBySlug($slug: String!, $alias: String!) {
+			${PAGES_TABLE}(
+				where: {
+					_and: [
+						{ slug: { _eq: $slug } },
+						{ datasource_alias: { _eq: $alias } }
+					]
+				}
+				limit: 1
+			) {
 				page_id
-				datasource_id
+				datasource_alias
 				title
 				slug
 				content
@@ -32,17 +43,17 @@ function getPostBySlugQuery(): string {
 	`;
 }
 
-function getAllPostsQuery(): string {
+function buildGetAllPosts(): string {
 	return `
 		query GetAllPosts($limit: Int, $offset: Int, $alias: String!) {
-			pages(
-				where: { datasource_id: { _eq: $alias } }
+			${PAGES_TABLE}(
+				where: { datasource_alias: { _eq: $alias } }
 				order_by: { publish_at: desc }
 				limit: $limit
 				offset: $offset
 			) {
 				page_id
-				datasource_id
+				datasource_alias
 				title
 				slug
 				content
@@ -54,16 +65,6 @@ function getAllPostsQuery(): string {
 			}
 		}
 	`;
-}
-
-// --- Response Types ---
-
-interface GetPostBySlugResult {
-	[key: string]: Post[];
-}
-
-interface GetAllPostsResult {
-	[key: string]: Post[];
 }
 
 // --- Query Options ---
@@ -71,6 +72,8 @@ interface GetAllPostsResult {
 export interface GetPostOptions {
 	/** Custom fetch function for SSR context */
 	fetch?: typeof globalThis.fetch;
+	/** Database alias to query */
+	alias?: string;
 }
 
 export interface GetAllPostsOptions {
@@ -89,11 +92,39 @@ export interface GetAllPostsOptions {
 /**
  * Internal helper to create a GraphQL client with public config
  */
-async function createClient(customFetch?: typeof globalThis.fetch): Promise<GraphQLClient> {
+async function createClient(customFetch?: typeof globalThis.fetch): Promise<{
+	client: GraphQLClient;
+	config: Awaited<ReturnType<typeof loadConfig>>;
+}> {
 	const config = await loadConfig();
-	return new GraphQLClient(config.graphqlEndpoint, {
+	const client = new GraphQLClient(config.graphqlEndpoint, {
 		fetch: customFetch
 	});
+
+	return { client, config };
+}
+
+/** Execute a public GraphQL query against the pages table */
+async function runPublicPagesQuery<T>(
+	queryBuilder: () => string,
+	variables: Record<string, any>,
+	options: { fetch?: typeof globalThis.fetch; alias?: string } = {}
+): Promise<T> {
+	const { client, config } = await createClient(options.fetch);
+	const sourceAlias = resolveAlias(config, options.alias);
+
+	const query = queryBuilder();
+	return client.request<T>(query, { ...variables, alias: sourceAlias });
+}
+
+function resolveAlias(config: Awaited<ReturnType<typeof loadConfig>>, alias?: string): string {
+	const sourceAlias = alias ?? config.aliases[0];
+
+	if (!sourceAlias) {
+		throw new Error('No database alias configured or provided');
+	}
+
+	return sourceAlias;
 }
 
 // --- Public Query Functions ---
@@ -122,9 +153,11 @@ export async function getPostBySlug(
 	slug: string,
 	options: GetPostOptions = {}
 ): Promise<Post | null> {
-	const client = await createClient(options.fetch);
-	const query = getPostBySlugQuery();
-	const result = await client.request<{ pages: Post[] }>(query, { slug });
+	const result = await runPublicPagesQuery<{ pages: Post[] }>(
+		buildGetPostBySlug,
+		{ slug },
+		{ fetch: options.fetch, alias: options.alias }
+	);
 	return result.pages[0] ?? null;
 }
 
@@ -149,22 +182,14 @@ export async function getPostBySlug(
 export async function getAllPosts(
 	options: GetAllPostsOptions = {}
 ): Promise<Post[]> {
-	const config = await loadConfig();
-	const client = await createClient(options.fetch);
-	
-	// Use alias if provided, otherwise use first configured alias
-	const sourceAlias = options.alias ?? config.aliases[0];
-	
-	if (!sourceAlias) {
-		throw new Error('No database alias configured or provided');
-	}
-	
-	const query = getAllPostsQuery();
-	const result = await client.request<{ pages: Post[] }>(query, {
-		limit: options.limit ?? 100,
-		offset: options.offset ?? 0,
-		alias: sourceAlias
-	});
+	const result = await runPublicPagesQuery<{ pages: Post[] }>(
+		buildGetAllPosts,
+		{
+			limit: options.limit ?? 100,
+			offset: options.offset ?? 0
+		},
+		{ fetch: options.fetch, alias: options.alias }
+	);
 	
 	return result.pages;
 }

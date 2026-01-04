@@ -9,7 +9,7 @@ select_permissions:
         - meta
         - tags
         - content
-        - datasource_id
+        - datasource_alias
         - page_id
         - slug
         - title
@@ -29,7 +29,7 @@ select_permissions:
         - meta
         - tags
         - content
-        - datasource_id
+        - datasource_alias
         - page_id
         - slug
         - title

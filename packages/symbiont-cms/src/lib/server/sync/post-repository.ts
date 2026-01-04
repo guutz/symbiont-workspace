@@ -15,6 +15,7 @@ import {
 export interface PostData {
 	page_id: string;           // Notion page UUID (primary key)
 	datasource_id: string;      // Notion database ID
+	datasource_alias: string; // Non-secret datasource alias for public queries
 	title: string;
 	slug: string | null;        // Nullable - only generated for public posts
 	content: string;

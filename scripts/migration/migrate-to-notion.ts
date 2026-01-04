@@ -28,7 +28,7 @@ import type { NhostClient } from '@nhost/nhost-js';
 import { markdownToBlocks } from '@tryfabric/martian';
 import type { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints.js';
 
-const { createClient } = NhostDefault as any;
+const { createClient, withAdminSession } = NhostDefault as any;
 
 const isDryRun = process.argv.includes('--dry-run');
 
@@ -69,6 +69,12 @@ function extractImages(markdown: string): ImageReference[] {
   }
 
   return images;
+}
+
+// Strip image styling attributes like {.post__image} from markdown
+function stripImageStyling(markdown: string): string {
+  // Remove {.class-name} or {#id} or other attributes after markdown images
+  return markdown.replace(/(!\\[[^\\]]*\\]\\([^)]+\\))\\{[^}]+\\}/g, '$1');
 }
 
 // Read markdown file with frontmatter
@@ -169,16 +175,22 @@ async function main() {
   const notionDatabaseId = process.env.NOTION_DATABASE_ID;
   const nhostSubdomain = process.env.NHOST_SUBDOMAIN;
   const nhostRegion = process.env.NHOST_REGION;
+  const nhostAdminSecret = process.env.NHOST_ADMIN_SECRET;
 
-  if (!contentDir || !staticDir || !notionApiKey || !notionDatabaseId || !nhostSubdomain || !nhostRegion) {
+  if (!contentDir || !staticDir || !notionApiKey || !notionDatabaseId || !nhostSubdomain || !nhostRegion || !nhostAdminSecret) {
     console.error('❌ Missing required environment variables!');
-    console.error('Required: CONTENT_DIR, STATIC_DIR, NOTION_API_KEY, NOTION_DATABASE_ID, NHOST_SUBDOMAIN, NHOST_REGION');
+    console.error('Required: CONTENT_DIR, STATIC_DIR, NOTION_API_KEY, NOTION_DATABASE_ID, NHOST_SUBDOMAIN, NHOST_REGION, NHOST_ADMIN_SECRET');
     process.exit(1);
   }
 
   const nhostClient = createClient({
     subdomain: nhostSubdomain!,
     region: nhostRegion!,
+    configure: [
+      withAdminSession({
+        adminSecret: nhostAdminSecret!
+      })
+    ]
   });
 
   const notionClient = new Client({ auth: notionApiKey });
@@ -230,8 +242,59 @@ async function main() {
     };
 
     try {
-      let updatedMarkdown = file.content;
+      let markdownForNotion = stripImageStyling(file.content);
       let uploadedCount = 0;
+      const uploadedImages = new Map<string, string>(); // Track uploaded images: localPath -> nhostUrl
+
+      // Handle thumbnail from frontmatter
+      let thumbnailUrl: string | null = null;
+      if (file.frontmatter.thumbnail) {
+        const thumbnail = file.frontmatter.thumbnail;
+        // Check if thumbnail is already an Nhost URL
+        if (thumbnail.includes('.storage.') && thumbnail.includes('.nhost.run')) {
+          thumbnailUrl = thumbnail;
+          console.log(`\n  🖼️  Thumbnail already uploaded: ${path.basename(thumbnail)}`);
+        } else if (!thumbnail.startsWith('http://') && !thumbnail.startsWith('https://')) {
+          // Local thumbnail needs uploading
+          try {
+            const localPath = path.join(staticDir, thumbnail);
+            const buffer = await readFile(localPath);
+            const filename = path.basename(thumbnail);
+            const sizeKB = (buffer.length / 1024).toFixed(1);
+            
+            if (isDryRun) {
+              console.log(`\n  🖼️  Thumbnail: ${filename} (${sizeKB} KB)`);
+            } else {
+              console.log(`\n  🖼️  Uploading thumbnail: ${filename} (${sizeKB} KB)`);
+              const ext = path.extname(localPath).toLowerCase();
+              const mimeTypes: Record<string, string> = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp',
+              };
+              const mimeType = mimeTypes[ext] || 'image/jpeg';
+              const base64 = buffer.toString('base64');
+              const dataUrl = `data:${mimeType};base64,${base64}`;
+
+              thumbnailUrl = await uploadImageToNhost(
+                nhostClient,
+                dataUrl,
+                filename,
+                'default',
+                `${notionId}/`
+              );
+              
+              // Track this upload for deduplication
+              uploadedImages.set(thumbnail, thumbnailUrl);
+              console.log(`    ✓ Uploaded to Nhost`);
+            }
+          } catch (error: any) {
+            console.error(`    ✗ Failed to upload thumbnail: ${error.message}`);
+          }
+        }
+      }
 
       // Process images: convert local paths to data URLs, upload, rewrite markdown
       if (file.images.length > 0) {
@@ -241,49 +304,68 @@ async function main() {
         const imageErrors: string[] = [];
 
         for (const img of file.images) {
+          // Skip images that are already Nhost URLs
+          if (img.url.includes('.storage.') && img.url.includes('.nhost.run')) {
+            continue;
+          }
+          
           if (img.isLocal) {
             try {
-              // Read local file to get size
-              const localPath = path.join(staticDir, img.url);
-              const buffer = await readFile(localPath);
-              const filename = path.basename(img.url);
-              const sizeKB = (buffer.length / 1024).toFixed(1);
+              let publicUrl: string;
               
-              if (isDryRun) {
-                console.log(`    • ${filename} (${sizeKB} KB)`);
+              // Check if we already uploaded this image (deduplication)
+              if (uploadedImages.has(img.url)) {
+                // Already uploaded, reuse the URL
+                publicUrl = uploadedImages.get(img.url)!;
               } else {
-                const ext = path.extname(localPath).toLowerCase();
+                // Need to upload this image
+                const localPath = path.join(staticDir, img.url);
+                const buffer = await readFile(localPath);
+                const filename = path.basename(img.url);
+                const sizeKB = (buffer.length / 1024).toFixed(1);
                 
-                const mimeTypes: Record<string, string> = {
-                  '.jpg': 'image/jpeg',
-                  '.jpeg': 'image/jpeg',
-                  '.png': 'image/png',
-                  '.gif': 'image/gif',
-                  '.webp': 'image/webp',
-                  '.svg': 'image/svg+xml',
-                };
-                
-                const mimeType = mimeTypes[ext] || 'image/jpeg';
-                const base64 = buffer.toString('base64');
-                const dataUrl = `data:${mimeType};base64,${base64}`;
+                if (isDryRun) {
+                  console.log(`    • ${filename} (${sizeKB} KB)`);
+                  continue;
+                } else {
+                  const ext = path.extname(localPath).toLowerCase();
+                  
+                  const mimeTypes: Record<string, string> = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png',
+                    '.gif': 'image/gif',
+                    '.webp': 'image/webp',
+                    '.svg': 'image/svg+xml',
+                  };
+                  
+                  const mimeType = mimeTypes[ext] || 'image/jpeg';
+                  const base64 = buffer.toString('base64');
+                  const dataUrl = `data:${mimeType};base64,${base64}`;
 
-                // Upload to Nhost
-                const publicUrl = await uploadImageToNhost(
-                  nhostClient,
-                  dataUrl,
-                  filename,
-                  'blog-images',
-                  `${notionId}/`
-                );
+                  // Upload to Nhost
+                  publicUrl = await uploadImageToNhost(
+                    nhostClient,
+                    dataUrl,
+                    filename,
+                    'default',
+                    `${notionId}/`
+                  );
 
-                // Replace in markdown
-                updatedMarkdown = updatedMarkdown.replace(
+                  // Track this upload for deduplication and logging
+                  uploadedImages.set(img.url, publicUrl);
+
+                  uploadedCount++;
+                  console.log(`    ✓ ${filename} (${sizeKB} KB)`);
+                }
+              }
+
+              // Replace in markdown for Notion (not saved to file)
+              if (!isDryRun && publicUrl) {
+                markdownForNotion = markdownForNotion.replace(
                   new RegExp(`!\\[([^\\]]*)\\]\\(${img.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g'),
                   `![$1](${publicUrl})`
                 );
-
-                uploadedCount++;
-                console.log(`    ✓ ${filename} (${sizeKB} KB)`);
               }
             } catch (error: any) {
               const errorMsg = `${img.url}: ${error.message}`;
@@ -300,10 +382,16 @@ async function main() {
 
         result.imagesUploaded = isDryRun ? localImages.length : uploadedCount;
 
-        if (!isDryRun) {
-          // Update markdown file with new URLs
-          await writeMarkdownFile(file, updatedMarkdown);
-          console.log(`  ✅ Updated markdown file`);
+        // Save image URL mappings to a log file instead of updating markdown
+        if (!isDryRun && uploadedImages.size > 0) {
+          const logPath = path.join(process.cwd(), 'image-migrations.log');
+          const logEntry = `\n## ${relativePath} (TECH-${notionId})\n` +
+            Array.from(uploadedImages.entries())
+              .map(([localPath, nhostUrl]) => `- ${localPath} → ${nhostUrl}`)
+              .join('\n') + '\n';
+          
+          await writeFile(logPath, logEntry, { flag: 'a' });
+          console.log(`  ✅ Logged ${uploadedImages.size} image URL(s) to image-migrations.log`);
         }
       }
 
@@ -337,7 +425,38 @@ async function main() {
       console.log(`  ✓ Found: "${notionTitle}" (TECH-${notionId})`);
       
       if (!isDryRun) {
-        const blocks = markdownToBlocks(updatedMarkdown, {
+        // Update page properties
+        try {
+          const updatePayload: any = {
+            page_id: pageId,
+            properties: {
+              'Where is it': {
+                select: { name: 'This Notion Page' }
+              }
+            }
+          };
+
+          // Add cover photo if we have a thumbnail
+          if (thumbnailUrl) {
+            updatePayload.properties['Cover Photo'] = {
+              files: [{
+                type: 'external',
+                name: 'Click to view',
+                external: { url: thumbnailUrl }
+              }]
+            };
+          }
+
+          await notionClient.pages.update(updatePayload);
+          console.log(`  ✓ Updated "Where is it" to "This Notion Page"`);
+          if (thumbnailUrl) {
+            console.log(`  ✓ Updated cover photo`);
+          }
+        } catch (error: any) {
+          console.warn(`  ⚠️  Failed to update page properties: ${error.message}`);
+        }
+
+        const blocks = markdownToBlocks(markdownForNotion, {
           strictImageUrls: false,
           notionLimits: { truncate: true }
         }) as unknown as BlockObjectRequest[];
@@ -360,7 +479,11 @@ async function main() {
           });
         }
       } else {
-        console.log(`  [DRY RUN] Would sync ${updatedMarkdown.split('\n').length} lines of markdown`);
+        console.log(`  [DRY RUN] Would sync ${markdownForNotion.split('\n').length} lines of markdown`);
+        console.log(`  [DRY RUN] Would set "Where is it" to "This Notion Page"`);
+        if (thumbnailUrl) {
+          console.log(`  [DRY RUN] Would set cover photo`);
+        }
       }
       
       result.notionUpdated = true;

@@ -1,5 +1,7 @@
 # Sync Architecture Refactor - Implementation Summary
 
+> **Historical Reference:** This refactor shipped in Nov 2025. Keep for context; no active work tracked here.
+
 **Date:** November 2, 2025  
 **Status:** ✅ **COMPLETED**
 

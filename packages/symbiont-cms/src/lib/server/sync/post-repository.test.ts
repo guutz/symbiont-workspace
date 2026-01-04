@@ -147,6 +147,7 @@ describe('PostRepository', () => {
 			const postData: PostData = {
 				page_id: 'notion-page-123',
 				datasource_id: 'datasource-abc',
+				datasource_alias: 'blog',
 				title: 'New Post',
 				slug: 'new-post',
 				content: 'Content here',
@@ -169,6 +170,7 @@ describe('PostRepository', () => {
 					page: expect.objectContaining({
 						page_id: 'notion-page-123',
 						datasource_id: 'datasource-abc',
+						datasource_alias: 'blog',
 						title: 'New Post',
 						slug: 'new-post'
 					})
@@ -180,6 +182,7 @@ describe('PostRepository', () => {
 			const postData: PostData = {
 				page_id: 'notion-page-123',
 				datasource_id: 'datasource-abc',
+				datasource_alias: 'blog',
 				title: 'Updated Post',
 				slug: 'updated-post',
 				content: 'Updated content',
@@ -202,6 +205,7 @@ describe('PostRepository', () => {
 					page: expect.objectContaining({
 						page_id: 'notion-page-123',
 						datasource_id: 'datasource-abc',
+						datasource_alias: 'blog',
 						title: 'Updated Post',
 						slug: 'updated-post',
 						meta: { custom: 'data' }
@@ -214,6 +218,7 @@ describe('PostRepository', () => {
 			const postData: PostData = {
 				page_id: 'notion-page-123',
 				datasource_id: 'datasource-abc',
+				datasource_alias: 'blog',
 				title: 'Test',
 				slug: 'test',
 				content: 'test',

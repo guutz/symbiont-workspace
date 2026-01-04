@@ -120,6 +120,7 @@ export function getUpsertPostMutation(): string {
 				on_conflict: {
 					constraint: pages_pkey
 					update_columns: [
+						datasource_alias,
 						title, 
 						slug,
 						content, 

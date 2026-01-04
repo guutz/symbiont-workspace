@@ -2,16 +2,13 @@
 
 > **📖 Part of Phase 1.5 Enhancement** - Design is complete, partial implementation exists
 
-> **⚠️ IMPLEMENTATION STATUS: PARTIALLY IMPLEMENTED (October 2025)**  
-> - ✅ TypeScript interface exists (`ContentFeatures` in `markdown-processor.ts`)
-> - ✅ Markdown processor accepts optional `features` parameter for optimization
-> - ✅ Server-side Prism language loading works (lazy or preloaded via features)
-> - ❌ Database schema doesn't have `features JSONB` column yet
-> - ❌ No feature detection code during sync process
-> - ❌ No backfill for existing content
-> - 🟡 Client-side uses static CSS imports (~25KB total) - works fine, just not optimal
+> **⚠️ IMPLEMENTATION STATUS: DEFERRED / SIMPLIFIED (December 2025)**  
+> - ✅ Markdown processor supports Prism + KaTeX and can accept a `features` payload, but callers don't supply one
+> - ✅ Server-side Prism language loading is lazy; assets are acceptable in size (KaTeX/mhchem left as-is)
+> - ❌ No `features` column in the database; no ingestion-time detection; no backfill
+> - ❌ No client-side conditional asset loader; CSS/JS are loaded unconditionally via the bundle
 > 
-> **Current Reality:** Static imports work well enough. This optimization is deferred to Phase 1.5.
+> **Current Reality:** We chose to keep things simple (no feature flags, no column) because asset weight is acceptable. This design stays on the shelf unless we need to slim client payloads later.
 > 
 > This document describes the **recommended architecture** for feature detection when you're ready to implement it. See `.docs/IMPLEMENTATION_STATUS.md` for current status.
 

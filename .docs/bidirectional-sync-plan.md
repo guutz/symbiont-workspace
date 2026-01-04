@@ -1,12 +1,24 @@
 # Bidirectional Metadata Sync & Collaborative Editor Plan
 
-> **Status**: Planning Phase  
-> **Target**: Phase 2 Implementation (after current Phase 1 stabilization)  
+> **Status**: High Priority (Phase 2)  
+> **Current scope**: Notion → Postgres only; DB → Notion will follow media wiring  
+> **Target**: Notion/Postgres metadata unity after media wiring  
 > **Last Updated**: November 7, 2025
+
+**Use Case (reminder):** Allow teams to edit metadata in either Notion or a web editor while keeping content one-way (Notion → DB). External contributors use the web editor; metadata syncs back to Notion for the editorial dashboard.
+
+## Quick checklist (for DB → Notion phase)
+- Fields to sync back: decide (title, status, publish date, tags, authors, cover?).
+- DB columns: add `content_source`, `last_synced_to_notion`, optional `managed_by`.
+- Conflict policy: who wins when both changed? (e.g., if `content_source = 'database'`, DB wins; otherwise Notion wins.)
+- Trigger rules: sync back only when `content_source = 'database'` or an explicit flag is set.
+- Notion mapping: property names for each field; ensure cover property is used.
+- Backfill plan: seed `content_source` defaults and `last_synced_to_notion` to avoid noisy first run.
 
 ## Table of Contents
 
 - [Vision](#vision)
+- [Quick checklist (for DB → Notion phase)](#quick-checklist-for-db--notion-phase)
 - [Use Case](#use-case)
 - [Architecture Overview](#architecture-overview)
 - [Implementation Phases](#implementation-phases)

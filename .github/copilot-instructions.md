@@ -29,26 +29,9 @@
 5. **If documentation seems outdated**, point it out and suggest updates
 6. **When creating new features**, reference relevant strategy docs (e.g., image-optimization-strategy.md)
 
-## Current Implementation Status (Oct 2025)
+## Current Implementation Status
 
-### ✅ What's Working (Phase 1 - 80% Complete)
-- Dynamic post sync from Notion → Nhost → SvelteKit
-- GraphQL client/server utilities
-- Markdown rendering with feature detection
-- Multi-tenant database schema
-- Feed generation (Atom, JSON, Sitemap)
-- Type-safe configuration system
-
-### ⚠️ What's Missing from Phase 1
-- Testing infrastructure (zero tests)
-- Structured logging/observability
-- Retry logic for sync failures
-- Webhook support (only polling)
-
-### 📋 What's Designed But Not Implemented
-- **Phase 2 (Media)**: File uploads, Nhost Storage config, image URL rewriting
-- **Phase 3 (Redirects)**: Database table, middleware, admin UI
-- See `.docs/IMPLEMENTATION_STATUS.md` for complete breakdown
+See `.docs/IMPLEMENTATION_STATUS.md` for the source of truth. It is updated regularly and reflects current regressions and priorities (media wiring, bidirectional metadata, redirects).
 
 ## Project Structure
 
@@ -77,7 +60,7 @@
 - **Sync content from Notion**: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:5173/api/sync/poll-blog`
   - Or with query param: `curl "http://localhost:5173/api/sync/poll-blog?secret=$CRON_SECRET"`
 - **Build symbiont-cms**: `pnpm build:package`
-- **Run qwer-test**: `pnpm dev:qwer`
+- **Run california-tech app **: `pnpm dev:tech`
 - **Run guutz-blog**: `pnpm dev:guutz`
 
 ## Development Priorities
@@ -89,4 +72,4 @@
 
 ---
 
-**Last Updated**: October 8, 2025
+**Last Updated**: December 9, 2025

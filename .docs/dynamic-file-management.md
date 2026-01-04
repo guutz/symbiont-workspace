@@ -2,13 +2,12 @@
 
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
-> **⚠️ IMPLEMENTATION STATUS: DESIGNED ONLY**  
-> This document contains a complete design for dynamic file management, but **no code has been implemented yet**.  
-> - ❌ No Nhost Storage bucket configuration exists in `nhost.toml`  
-> - ❌ No file upload utilities exist in `packages/symbiont-cms/src/lib/server/`  
-> - ❌ No image URL rewriting implemented in sync process  
+> **⚠️ IMPLEMENTATION STATUS: PARTIAL (December 2025)**  
+> - 🟡 Nhost Storage is working via the default/console bucket, but bucket declarations and permissions are not committed to `nhost/nhost.toml`  
+> - ✅ File download/upload + URL rewrite helpers exist in `packages/symbiont-cms/src/lib/image-upload.ts` and `image-processor.ts`  
+> - ❌ Not wired into the sync process yet; no file metadata table or admin UI  
 > 
-> This is a **roadmap document** for Phase 2 implementation.
+> This is still a **roadmap document**—use the existing helpers, but the orchestration pieces remain to be built.
 
 ## Vision
 

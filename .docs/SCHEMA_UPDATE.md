@@ -1,5 +1,7 @@
 # Database Schema Update - `pages` Table
 
+> **Historical Reference:** Schema migration completed in Nov 2025; kept for background only.
+
 **Date:** November 2, 2025  
 **Status:** ✅ **COMPLETE**
 

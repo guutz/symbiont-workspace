@@ -1,0 +1,2107 @@
+
+> migration-scripts@0.0.1 migrate /Users/guutz/Desktop/shenanigans/symbiont-workspace/scripts/migration
+> tsx migrate-to-notion.ts
+
+
+🚀 Markdown → Notion + Nhost Migration
+
+Content: /Users/guutz/Desktop/tech/california-tech/content/2025/
+Static: /Users/guutz/Desktop/tech/california-tech/static/
+Nhost: ygsdnfrbruuhtxczekur.us-west-2
+
+📂 Scanning for markdown files with notionId...
+✅ Found 132 files
+
+
+[1/132] 01/14/a-study-of-caltech-lunch-hour-chaos.md
+  Notion ID: 315
+  Images: 1
+
+  🖼️  Uploading thumbnail: browne.jpg (120.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Brownian Motion: A Study of Caltech's Lunch Hour Chaos" (TECH-315)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[2/132] 01/14/behind-foreign-glasses.md
+  Notion ID: 321
+  Images: 2
+
+  🖼️  Uploading thumbnail: student-life.jpg (330.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ student-life-2.jpeg (67.3 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Behind “Foreign” Glasses" (TECH-321)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[3/132] 01/14/caltech-and-la-wildfires.md
+  Notion ID: 318
+  Images: 3
+
+  🖼️  Uploading thumbnail: image1.jpg (629.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image7.jpg (324.6 KB)
+    ✓ caltech-trees.jpg (1247.3 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech and LA Wildfires " (TECH-318)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[4/132] 01/14/circumnavigating-tacit-earth-data.md
+  Notion ID: 298
+  Images: 1
+
+  🖼️  Uploading thumbnail: earth-data.jpg (145.6 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Circumnavigating TACIT's Earth Data: The Musical — A Retrospective" (TECH-298)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[5/132] 01/14/colonizing-the-best-in-ourselves.md
+  Notion ID: 319
+  Images: 0
+
+  🖼️  Uploading thumbnail: campus.jpg (6781.0 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "As Below, So Above: Colonizing the Best in Ourselves" (TECH-319)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[6/132] 01/14/eaton-fire-scorches-the-caltech-and-pasadena-community.md
+  Notion ID: 322
+  Images: 11
+
+  🖼️  Uploading thumbnail: image9.jpg (387.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.jpg (167.9 KB)
+    ✓ image8.jpg (581.9 KB)
+    ✓ image7.jpg (324.6 KB)
+    ✓ image5.jpg (526.8 KB)
+    ✓ image3.jpg (216.0 KB)
+    ✓ image1.jpg (629.8 KB)
+    ✓ image11.jpg (422.6 KB)
+    ✓ image4.jpg (217.2 KB)
+    ✓ image10.jpg (601.5 KB)
+    ✓ image6.jpg (233.8 KB)
+  ✅ Logged 11 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Eaton Fire Scorches the Caltech and Pasadena Community" (TECH-322)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[7/132] 01/14/let-it-snow.md
+  Notion ID: 324
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Let it Snow, Let it Shine, Let it Rain" (TECH-324)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[8/132] 01/14/the-metaphysical-ideas-of-plato.md
+  Notion ID: 313
+  Images: 2
+
+  🖼️  Uploading thumbnail: philo.jpg (77.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ philo-2.jpg (190.4 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Metaphysical Ideas of Plato: Reality or Imagination" (TECH-313)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[9/132] 01/14/what-up-with-switch-up-2.md
+  Notion ID: 317
+  Images: 1
+
+  🖼️  Uploading thumbnail: nintendo.jpeg (4.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What's Up With the Switch 2?" (TECH-317)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[10/132] 01/28/aristotle.md
+  Notion ID: 325
+  Images: 2
+
+  🖼️  Uploading thumbnail: school_of_athens.png (2840.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ philosopher.png (3726.5 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Aristotle: The Philosopher of Reason, Reality, and the Tangible World" (TECH-325)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[11/132] 01/28/athletics-director-stepping-down.md
+  Notion ID: 328
+  Images: 0
+
+  🖼️  Uploading thumbnail: default4.jpg (3848.8 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Betsy Mitchell to Step Down as Athletic Director" (TECH-328)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[12/132] 01/28/cgpu-bargaining-statement.md
+  Notion ID: 335
+  Images: 0
+
+  🖼️  Uploading thumbnail: cgpu_logo.png (95.5 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "CGPU Bargaining Team Statement in Support of Our Groundbreaking Tentative Agreement" (TECH-335)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[13/132] 01/28/cgpu-misleads-compensation.md
+  Notion ID: 332
+  Images: 1
+
+  🖼️  Uploading thumbnail: ratification.png (155.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "CGPU Misleads in Compensation Gains of Proposed Tentative Agreement" (TECH-332)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[14/132] 01/28/huntington-exhibit.md
+  Notion ID: 333
+  Images: 1
+
+  🖼️  Uploading thumbnail: queen_mariana.png (1598.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Rare 17th-Century Portrait Comes to Pasadena" (TECH-333)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[15/132] 01/28/switch-2.md
+  Notion ID: 330
+  Images: 1
+
+  🖼️  Uploading thumbnail: switch_2.png (1470.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What Games Will Be on the Switch 2?" (TECH-330)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[16/132] 01/28/the-bubble.md
+  Notion ID: 334
+  Images: 1
+
+  🖼️  Uploading thumbnail: bubble.png (2151.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "THE BUBBLE" (TECH-334)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[17/132] 01/28/wasted-time-at-bechtel.md
+  Notion ID: 329
+  Images: 1
+
+  🖼️  Uploading thumbnail: bechtel_floor_plan.png (479.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Case for More Card Readers: How Bechtel’s Single Entrance Costs Students 1,454 Hours Yearly" (TECH-329)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[18/132] 01/28/wicked-caltech-off-campus.md
+  Notion ID: 327
+  Images: 1
+
+  🖼️  Uploading thumbnail: off_campus_thumb.png (2833.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ off_campus.png (3334.3 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "From Wicked to Wickedly Fun: Caltech's Off-Campus Adventures" (TECH-327)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[19/132] 02/18/ the-british-schindler.md
+  Notion ID: 346
+  Images: 1
+
+  🖼️  Uploading thumbnail: one-life.jpg (209.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The British Schindler" (TECH-346)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[20/132] 02/18/an-interview-with-sandy-krasner-fighting-climate-change.md
+  Notion ID: 347
+  Images: 0
+
+  🖼️  Uploading thumbnail: krasner.png (842.8 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "An interview with Sandy Krasner: Fighting Climate Change" (TECH-347)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[21/132] 02/18/deepseek.md
+  Notion ID: 350
+  Images: 1
+
+  🖼️  Uploading thumbnail: deepseek.jpg (64.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "DeepSeek" (TECH-350)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[22/132] 02/18/department-of-education-warning.md
+  Notion ID: 351
+  Images: 0
+
+  🖼️  Uploading thumbnail: radical-warning.png (267.6 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "U.S. Department of Education Warns Universities Over Equity Programs, Threatens Federal Funding" (TECH-351)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[23/132] 02/18/diy-punk-metal-emo-shows-and-where-to-find-them.md
+  Notion ID: 344
+  Images: 4
+
+  🖼️  Uploading thumbnail: diy1.png (1076.2 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ diy2.jpg (136.7 KB)
+    ✓ diy3.jpg (131.8 KB)
+    ✓ diy4.jpg (3457.6 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "DIY/Punk/Metal/Emo shows and where to find them!" (TECH-344)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[24/132] 02/18/everything-flows.md
+  Notion ID: 336
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Everything Flows, Everything Moves, and Nothing Ever Stops: Heraclitus and Panta rei" (TECH-336)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[25/132] 02/18/jenijoy-la-belle-a-trailblazer-in-academia-a-champion-of-literature-and-a-legacy-that-lives-on.md
+  Notion ID: 339
+  Images: 5
+
+  🖼️  Uploading thumbnail: trailblazer1.png (1366.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ trailblazer2.png (1361.4 KB)
+    ✓ trailblazer3.jpg (283.5 KB)
+    ✓ trailblazer4.png (1220.4 KB)
+    ✓ trailblazer5.png (1065.0 KB)
+  ✅ Logged 5 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Jenijoy La Belle: A Trailblazer in Academia and a Champion of Literature" (TECH-339)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[26/132] 02/18/new-honor-code-approved-updates.md
+  Notion ID: 345
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "New, Approved Honor Code Updates" (TECH-345)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[27/132] 02/18/practicing-resilience-at-a-downsized-jpl.md
+  Notion ID: 337
+  Images: 0
+
+  🖼️  Uploading thumbnail: jpl.jpg (499.1 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Practicing Resilience at a Downsized JPL" (TECH-337)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[28/132] 02/18/the-history-of-underrepresented-students-at-caltech-a-journey-of-struggle-and-progress.md
+  Notion ID: 342
+  Images: 5
+
+  🖼️  Uploading thumbnail: bhm5.png (551.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ bhm1.png (1452.5 KB)
+    ✓ bhm2.png (521.5 KB)
+    ✓ bhm3.jpg (826.8 KB)
+    ✓ bhm4.png (2747.0 KB)
+  ✅ Logged 5 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The History of Underrepresented Students at Caltech: A Journey of Struggle and Progress" (TECH-342)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[29/132] 02/18/the-layoff-of-dr-tim-parker-a-message-from-an-ex-jpler.md
+  Notion ID: 352
+  Images: 0
+
+  🖼️  Uploading thumbnail: jpl.jpg (499.1 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Layoff of Dr. Tim Parker: An Open Letter to JPL" (TECH-352)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[30/132] 03/04/caltech-federal-funding-cuts.md
+  Notion ID: 359
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Faces Uncertainty Pending Federal Funding Cuts" (TECH-359)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[31/132] 03/04/caltech-nih-lawsuit.md
+  Notion ID: 360
+  Images: 0
+
+  🖼️  Uploading thumbnail: default2.jpg (2385.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Joins Lawsuit Suing NIH Over Funding Cuts" (TECH-360)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[32/132] 03/04/democritus-the-atomic-visionary.md
+  Notion ID: 355
+  Images: 4
+
+  🖼️  Uploading thumbnail: demo1.png (2256.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ demo2.png (250.1 KB)
+    ✓ demo3.png (82.0 KB)
+    ✓ demo4.png (2473.6 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Democritus: The Atomic Visionary Whispering Through Caltech’s Labs" (TECH-355)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[33/132] 03/04/frank-capra-caltech-oscars-filmmaker.md
+  Notion ID: 354
+  Images: 3
+
+  🖼️  Uploading thumbnail: capra1.png (412.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ capra2.png (1065.2 KB)
+    ✓ capra3.png (2695.1 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Frank Capra: Caltech’s Six-time Oscar-Winning Filmmaker.
+" (TECH-354)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[34/132] 03/04/jack-parsons-revolutionized-rocketry.md
+  Notion ID: 338
+  Images: 2
+
+  🖼️  Uploading thumbnail: parsons1.png (896.6 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ parsons2.png (1355.7 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Jack Parsons: The Paradoxical Figure Who Revolutionized Rocketry" (TECH-338)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[35/132] 03/04/parallel-lives.md
+  Notion ID: 356
+  Images: 1
+
+  🖼️  Uploading thumbnail: parallel_lives.png (1191.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Parallel Lives" (TECH-356)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[36/132] 03/04/research-emfs-wildfires.md
+  Notion ID: 361
+  Images: 0
+
+  🖼️  Uploading thumbnail: default7.jpg (1452.5 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Recent Research Sheds Light on the Relationship Between EMFs and Wildfires" (TECH-361)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[37/132] 04/08/a-retrospective-of-a-hollywood-portrait-legend.md
+  Notion ID: 389
+  Images: 1
+
+  🖼️  Uploading thumbnail: marilyn.png (435.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Retrospective of a Hollywood Portrait Legend" (TECH-389)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[38/132] 04/08/accessing-buildings-after-hours.md
+  Notion ID: 380
+  Images: 0
+
+  🖼️  Uploading thumbnail: default5.jpg (5345.3 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Accessing Buildings After Hours" (TECH-380)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[39/132] 04/08/applications-open-for-2025-wolfram-summer-school.md
+  Notion ID: 368
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Applications Open for 2025 Wolfram Summer School" (TECH-368)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[40/132] 04/08/caltech-must-protect-its-students.md
+  Notion ID: 379
+  Images: 0
+
+  🖼️  Uploading thumbnail: default4.jpg (3848.8 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Must Protect Its Students" (TECH-379)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[41/132] 04/08/caltech-rugby-club-saves-graduate-formal.md
+  Notion ID: 387
+  Images: 1
+
+  🖼️  Uploading thumbnail: caltech_rugby.png (505.2 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Rugby Club SAVES Graduate Formal" (TECH-387)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[42/132] 04/08/caltech-students-eligible-for-2025-student-academy-awards.md
+  Notion ID: 367
+  Images: 0
+
+  🖼️  Uploading thumbnail: default2.jpg (2385.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech students eligible for 2025 Student Academy Awards®" (TECH-367)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[43/132] 04/08/epicurus-at-caltech-the-garden-of-serenity-and-science.md
+  Notion ID: 390
+  Images: 2
+
+  🖼️  Uploading thumbnail: epicurus1.png (1109.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ epicurus2.png (41.2 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Epicurus at Caltech: The Garden of Serenity and Science" (TECH-390)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[44/132] 04/08/off-campus-report.md
+  Notion ID: 392
+  Images: 5
+
+  🖼️  Uploading thumbnail: studyabroad1.png (2562.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ studyabroad2.png (1303.8 KB)
+    ✓ studyabroad4.png (1710.3 KB)
+    ✓ studyabroad5.png (1474.5 KB)
+    ✓ studyabroad3.png (991.3 KB)
+  ✅ Logged 5 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Edinburgh Study Abroad" (TECH-392)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[45/132] 04/08/on-timeless-wisdom-ninthcentury-japanese-culture-embedded-in-dabney-garden.md
+  Notion ID: 371
+  Images: 1
+
+  🖼️  Uploading thumbnail: japanese.png (817.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "On Timeless Wisdom: Ninth-Century Japanese Culture Embedded in Dabney Garden" (TECH-371)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[46/132] 04/08/the-underrated-and-underexplored-world-of-south-indian-cuisine.md
+  Notion ID: 382
+  Images: 3
+
+  🖼️  Uploading thumbnail: south-india-map-slide1.png (56.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ foodstall.png (2208.9 KB)
+    ✓ indian_cuisine.jpg (121.4 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Underrated and Underexplored World of South Indian Cuisine" (TECH-382)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[47/132] 04/08/tuberculosis-is-the-world-deadliest-disease.md
+  Notion ID: 370
+  Images: 0
+
+  🖼️  Uploading thumbnail: tuberculosis.jpg (28.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Tuberculosis Is the World’s Deadliest Disease" (TECH-370)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[48/132] 04/08/wolf-prize-2025.md
+  Notion ID: 384
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Faculty Named Laureates of the Wolf Prize" (TECH-384)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[49/132] 04/22/caltech-doe-lawsuit.md
+  Notion ID: 404
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Joins Federal Lawsuit Over DOE Grant Funding Cuts" (TECH-404)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[50/132] 04/22/caltech-president-retirement.md
+  Notion ID: 400
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech President Thomas Rosenbaum Announces Retirement" (TECH-400)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[51/132] 04/22/courses-that-dont-suck.md
+  Notion ID: 395
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Courses That Don't Suck" (TECH-395)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[52/132] 04/22/dream-lab.md
+  Notion ID: 383
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "My Dream Lab: How AI Transformed My Self-Analysis" (TECH-383)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[53/132] 04/22/dropbox.md
+  Notion ID: 402
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Dropbox" (TECH-402)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[54/132] 04/22/im-still-here.md
+  Notion ID: 369
+  Images: 1
+
+  🖼️  Uploading thumbnail: im_still_here.png (3232.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "I'm Still Here" (TECH-369)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[55/132] 04/22/iyq-2025.md
+  Notion ID: 362
+  Images: 2
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image1.png (397.6 KB)
+    ✓ image2.png (831.5 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "IYQ 2025: Caltech’s Role in 100 Years of Quantum Mechanics" (TECH-362)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[56/132] 04/22/letter-to-coach.md
+  Notion ID: 401
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Letter to my coach" (TECH-401)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[57/132] 04/22/nintendo-direct-rankings.md
+  Notion ID: 393
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Every Game Shown in the March Nintendo Direct and How Excited I Am" (TECH-393)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[58/132] 04/22/philosophy-eleatic-school.md
+  Notion ID: 399
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Three Pillars of the Eleatic School " (TECH-399)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[59/132] 04/22/the-day-i-died.md
+  Notion ID: 381
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Day I Died" (TECH-381)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[60/132] 04/22/ts-pmo-places-you-shouldnt-be.md
+  Notion ID: 394
+  Images: 1
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image1.png (144.6 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "TS PMO: Places You Shouldn't Be" (TECH-394)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[61/132] 05/13/caltech-and-usc-rally-downtown-kill-the-cuts.md
+  Notion ID: 410
+  Images: 4
+
+  🖼️  Uploading thumbnail: cuts3.png (3459.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ cuts1.png (2032.6 KB)
+    ✓ cuts2.png (852.5 KB)
+    ✓ cuts4.png (3255.7 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech and USC Rally Downtown to "Kill the Cuts”" (TECH-410)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[62/132] 05/13/caltech-athletics-bloom-in-spring-season.md
+  Notion ID: 427
+  Images: 0
+
+  🖼️  Uploading thumbnail: default2.jpg (2385.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Athletics Bloom in Spring Season" (TECH-427)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[63/132] 05/13/cinco-de-mayo-at-browne-dining-hall.md
+  Notion ID: 426
+  Images: 3
+
+  🖼️  Uploading thumbnail: cinco2.jpg (1300.6 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ cinco1.jpg (976.3 KB)
+    ✓ cinco3.jpg (1091.0 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Cinco de Mayo Fiesta Lights Up Browne Dining Hall" (TECH-426)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[64/132] 05/13/make-a-difference-at-yaanna-lila-rodriguez-aceves-brings-land-based-learning-to-caltech.md
+  Notion ID: 409
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (181.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Make-A-Difference at Ya’anna: Lila Rodriguez-Aceves Brings Land-Based Learning to Caltech" (TECH-409)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[65/132] 05/13/more-funding-cuts-and-uncertainty-at-nsf.md
+  Notion ID: 418
+  Images: 0
+
+  🖼️  Uploading thumbnail: default2.jpg (2385.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "More Funding Cuts and Uncertainty at NSF" (TECH-418)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[66/132] 05/13/nasa-faces-budget-cut-heres-how-you-can-fight-back.md
+  Notion ID: 413
+  Images: 3
+
+  🖼️  Uploading thumbnail: mcclintock_June.png (121.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ mcclintock_qrcode.png (36.5 KB)
+    ✓ mcclintock.png (36.5 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "NASA Faces 47% Budget Cut—Here’s How You Can Fight Back" (TECH-413)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[67/132] 05/13/the-magical-campus-of-caltech.md
+  Notion ID: 417
+  Images: 2
+
+  🖼️  Uploading thumbnail: Olive_Walk_Hyp.png (670.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ magical.png (1543.3 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Magical Campus of Caltech" (TECH-417)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[68/132] 05/13/the-obligation-to-worklife-balance.md
+  Notion ID: 407
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Obligation to Work-Life Balance" (TECH-407)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[69/132] 05/13/vive-la-fete-a-revolutionary-blacker-interhouse.md
+  Notion ID: 431
+  Images: 6
+
+  🖼️  Uploading thumbnail: blacker1.png (2903.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ blacker2.png (1812.5 KB)
+    ✓ blacker3.png (1553.3 KB)
+    ✓ blacker4.png (2279.6 KB)
+    ✓ blacker5.png (1694.5 KB)
+    ✓ blacker6.png (1161.6 KB)
+  ✅ Logged 6 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Vive la Fête: A Revolutionary Blacker Interhouse" (TECH-431)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[70/132] 05/13/what-cuts-kill-on-wonder-and-revolution.md
+  Notion ID: 411
+  Images: 1
+
+  🖼️  Uploading thumbnail: kill_cuts_speech.png (2742.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What Cuts Kill: On Wonder and Revolution" (TECH-411)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[71/132] 05/13/what-if--the-disney-influence.md
+  Notion ID: 415
+  Images: 2
+
+  🖼️  Uploading thumbnail: DisneyPrincessMain.jpg (68.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ disney1.png (2048.2 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What If? The Disney Influence in My (and Probably Everyone’s) Life" (TECH-415)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[72/132] 05/13/what-is-love.md
+  Notion ID: 425
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (287.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What is Love?" (TECH-425)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[73/132] 05/13/what-you-will-and-what-a-delight-explicts-twelfth-night.md
+  Notion ID: 421
+  Images: 1
+
+  🖼️  Uploading thumbnail: twelfthnight.png (2458.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What You Will: And What a Delight! EXPLiCIT's Twelfth Night" (TECH-421)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[74/132] 06/03/a-senior-prank-of-cosmic-proportions-kip-thorne-s-85th-birthday-bash.md
+  Notion ID: 447
+  Images: 2
+
+  🖼️  Uploading thumbnail: prank1.png (1289.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ prank2.png (807.5 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Senior Prank of Cosmic Proportions: Kip Thorne’s 85th Birthday Bash" (TECH-447)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[75/132] 06/03/artificial-intelligence-our-modern-promethean-fire.md
+  Notion ID: 443
+  Images: 1
+
+  🖼️  Uploading thumbnail: prometheus.jpg (317.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Artificial Intelligence: Our Modern Promethean Fire" (TECH-443)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[76/132] 06/03/ascit-bod-meeting-minutes-may-25th-2025.md
+  Notion ID: 440
+  Images: 0
+
+  🖼️  Uploading thumbnail: default2.jpg (2385.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "ASCIT BoD Meeting Minutes May 25th 2025" (TECH-440)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[77/132] 06/03/caltech-wildlife-juveniles.md
+  Notion ID: 448
+  Images: 5
+
+  🖼️  Uploading thumbnail: squirrel.jpeg (3574.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ wildlife1.jpg (373.3 KB)
+    ✓ wildlife2.jpg (379.3 KB)
+    ✓ wildlife3.jpg (268.3 KB)
+    ✓ wildlife4.jpg (184.6 KB)
+  ✅ Logged 5 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Wildlife: Juvenile Panel Interviews" (TECH-448)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[78/132] 06/03/finding-faith-and-family-far-from-home-my-journey-with-ask-ministries.md
+  Notion ID: 434
+  Images: 1
+
+  🖼️  Uploading thumbnail: ministries.png (355.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Finding Faith and Family Far From Home: My Journey with ASK Ministries" (TECH-434)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[79/132] 06/03/giving-the-planet-a-break-with-dr-daniel-lewis.md
+  Notion ID: 433
+  Images: 1
+
+  🖼️  Uploading thumbnail: daniellewis.png (736.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Giving the Planet a Break with Dr. Daniel Lewis" (TECH-433)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[80/132] 06/03/hic-et-nunc-presence-under-pressure-at-caltech.md
+  Notion ID: 439
+  Images: 1
+
+  🖼️  Uploading thumbnail: philo.png (915.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Hic et Nunc: Presence Under Pressure at Caltech" (TECH-439)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[81/132] 06/03/how-benson-boone-saved-my-college-life.md
+  Notion ID: 446
+  Images: 1
+
+  🖼️  Uploading thumbnail: benson_boone.jpg (49.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "How Benson Boone Saved My College Life" (TECH-446)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[82/132] 06/03/i-have-failed.md
+  Notion ID: 436
+  Images: 1
+
+  🖼️  Uploading thumbnail: fail.jpg (72.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "I Have Failed" (TECH-436)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[83/132] 06/03/is-that-all-there-is-a-letter-from-the-editor.md
+  Notion ID: 437
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Is That All There Is? — A Letter From the Editor" (TECH-437)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[84/132] 06/03/music-in-a-temple-of-science.md
+  Notion ID: 445
+  Images: 2
+
+  🖼️  Uploading thumbnail: temple.png (2837.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ temple2.png (1796.9 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Music in a Temple of Science" (TECH-445)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[85/132] 06/03/path-optimization-on-campus.md
+  Notion ID: 432
+  Images: 4
+
+  🖼️  Uploading thumbnail: optimize1.png (663.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ optimize2.png (330.7 KB)
+    ✓ optimize3.png (186.8 KB)
+    ✓ optimize4.png (269.0 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Path Optimization on Campus" (TECH-432)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[86/132] 06/03/reminiscences-of-caltech-rugby.md
+  Notion ID: 441
+  Images: 1
+
+  🖼️  Uploading thumbnail: rugby.png (2070.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Reminiscences of Caltech Rugby" (TECH-441)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[87/132] 06/03/robots-and-remembrance-transcending-memory-with-dementia-doula.md
+  Notion ID: 412
+  Images: 1
+
+  🖼️  Uploading thumbnail: dementia_doula_cast.png (907.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Robots and Remembrance: Transcending Memory With Dementia Doula" (TECH-412)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[88/132] 06/03/science-in-the-vatican.md
+  Notion ID: 450
+  Images: 0
+
+  🖼️  Uploading thumbnail: default5.jpg (5345.3 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Science in the Vatican" (TECH-450)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[89/132] 06/03/silk-installation-at-the-huntington-reflects-on-a-world-without-us.md
+  Notion ID: 438
+  Images: 1
+
+  🖼️  Uploading thumbnail: huntington.png (3675.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Silk Installation at the Huntington Reflects on a World ‘Without Us’" (TECH-438)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[90/132] 06/03/stars-solutions-and-service-a-sass-lunch-with-dr-lorraine-lundquist.md
+  Notion ID: 435
+  Images: 2
+
+  🖼️  Uploading thumbnail: lorraine.jpg (1338.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ lorraine2.webp (63.3 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Stars, Solutions, and Service: A SASS Lunch with Dr. Lorraine Lundquist" (TECH-435)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[91/132] 06/03/symphony.md
+  Notion ID: 444
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: " Symphony" (TECH-444)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[92/132] 10/07/a-concert-filled-socal-summer.md
+  Notion ID: 471
+  Images: 3
+
+  🖼️  Uploading thumbnail: image1.png (140.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (114.4 KB)
+    ✓ image3.png (139.5 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Concert-Filled SoCal Summer" (TECH-471)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[93/132] 10/07/an-ode-to-the-red-door-quesadilla.md
+  Notion ID: 470
+  Images: 0
+
+  🖼️  Uploading thumbnail: default8.jpg (3507.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "An Ode to the RD Quesadilla" (TECH-470)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[94/132] 10/07/caltech-welcomes-international-students-amid-immigration-uncertainties.md
+  Notion ID: 458
+  Images: 2
+
+  🖼️  Uploading thumbnail: image1.png (487.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (322.9 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Welcomes International Students Amid Immigration Uncertainties" (TECH-458)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[95/132] 10/07/caltech-wildlife-a-welcome-guide.md
+  Notion ID: 461
+  Images: 4
+
+  🖼️  Uploading thumbnail: image1.png (372.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (277.4 KB)
+    ✓ image3.png (314.4 KB)
+    ✓ image4.png (2.4 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Wildlife: A Welcome Guide" (TECH-461)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[96/132] 10/07/david-baltimore-former-caltech-president-dies-at-87.md
+  Notion ID: 481
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (63.5 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "David Baltimore, former Caltech President, Dies at 87" (TECH-481)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[97/132] 10/07/documentary-review-the-rose-come-back-to-me.md
+  Notion ID: 478
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (202.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Documentary Review - The Rose: Come Back To Me" (TECH-478)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[98/132] 10/07/every-game-shown-at-day-of-the-devs.md
+  Notion ID: 463
+  Images: 0
+
+  🖼️  Uploading thumbnail: default5.jpg (5345.3 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Every Game Shown at Day of the Devs" (TECH-463)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[99/132] 10/07/feeding-the-frosh-orientation-with-cds.md
+  Notion ID: 464
+  Images: 0
+
+  🖼️  Uploading thumbnail: default.jpg (185.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Feeding the Frosh: Orientation with C.D.S." (TECH-464)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[100/132] 10/07/insomnia.md
+  Notion ID: 457
+  Images: 0
+
+  🖼️  Uploading thumbnail: default4.jpg (3848.8 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Insomnia" (TECH-457)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[101/132] 10/07/integrated-core-launches-with-energy-at-the-center.md
+  Notion ID: 483
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (476.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Integrated Core Launches with Energy at the Center [Blurb]" (TECH-483)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[102/132] 10/07/italian-heritage-month-between-memory-identity-and-the-legacy-of-renato-dulbecco.md
+  Notion ID: 468
+  Images: 4
+
+  🖼️  Uploading thumbnail: image1.png (132.2 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (90.7 KB)
+    ✓ image3.png (389.9 KB)
+    ✓ image4.png (89.4 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Italian Heritage Month: Between Memory, Identity, and the Legacy of Renato Dulbecco" (TECH-468)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[103/132] 10/07/opposition.md
+  Notion ID: 456
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (369.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Opposition" (TECH-456)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[104/132] 10/07/sudden-changes-to-nsf-s-graduate-fellowship-program.md
+  Notion ID: 475
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Sudden Changes to NSF’s Graduate Fellowship Program" (TECH-475)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[105/132] 10/07/tasting-the-golden-state-at-foodfest.md
+  Notion ID: 472
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (265.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Tasting the Golden State at FoodFest" (TECH-472)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[106/132] 10/07/the-inner-crack-of-women-in-science.md
+  Notion ID: 467
+  Images: 2
+
+  🖼️  Uploading thumbnail: image1.png (88.2 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (340.2 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The Inner Crack of Women in Science" (TECH-467)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[107/132] 10/07/we-are-so-back-fall-25-athletics-at-caltech.md
+  Notion ID: 469
+  Images: 3
+
+  🖼️  Uploading thumbnail: image1.png (437.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (608.8 KB)
+    ✓ image3.png (368.3 KB)
+  ✅ Logged 3 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "We Are SO Back: Fall ‘25 Athletics at Caltech" (TECH-469)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[108/132] 10/07/where-science-meets-the-sacred-reflections-from-a-journey-to-houston.md
+  Notion ID: 473
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (298.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Where Science Meets the Sacred: Reflections from a Journey to Houston" (TECH-473)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[109/132] 10/07/young-journalists-speak-on-l-a-wildfires-impact-at-usc-initiative.md
+  Notion ID: 452
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (329.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Young Journalists Speak on the impact of the Wildfires at U.S.C. Initiative" (TECH-452)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[110/132] 10/21/2025-nobel-prizes-announced.md
+  Notion ID: 499
+  Images: 2
+
+  🖼️  Uploading thumbnail: image1.png (92.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (247.6 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "2025 Nobel Prizes Announced" (TECH-499)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[111/132] 10/21/a-conversation-with-jocelyn-vargas-and-chris-barragan-caltech-accessibility-specialists.md
+  Notion ID: 494
+  Images: 0
+
+  🖼️  Uploading thumbnail: image1.png (295.4 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Conversation with Jocelyn Vargas and Chris Barragan, Caltech Accessibility Specialists" (TECH-494)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[112/132] 10/21/an-appeal-to-the-seniors-leave-the-frosh-alone.md
+  Notion ID: 498
+  Images: 0
+
+  🖼️  Uploading thumbnail: default5.jpg (5345.3 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "An Appeal to the Seniors: Leave the Frosh Alone" (TECH-498)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[113/132] 10/21/ascit-board-of-directors-meeting-minutes-october-19-2025.md
+  Notion ID: 490
+  Images: 0
+
+  🖼️  Uploading thumbnail: default3.jpg (272.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "ASCIT Board of Directors Meeting Minutes: October 19, 2025" (TECH-490)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[114/132] 10/21/beavers-battle-strong-across-fall-sports-as-season-heads-into-home-stretch.md
+  Notion ID: 509
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (441.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Beavers Battle Strong Across Fall Sports as Season Heads Into Home Stretch" (TECH-509)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[115/132] 10/21/caltech-wildlife-crows-and-ravens.md
+  Notion ID: 493
+  Images: 4
+
+  🖼️  Uploading thumbnail: image1.png (620.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (346.3 KB)
+    ✓ image3.png (409.9 KB)
+    ✓ image4.png (558.4 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Caltech Wildlife: Crows and Ravens" (TECH-493)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+@notionhq/client warn: request fail {
+  code: 'validation_error',
+  message: 'Content creation Failed. Fix the following: \nInvalid URL for link.',
+  requestId: '74bfebf9-a0f7-41c4-b006-c229576e7638'
+}
+  ❌ Error: Content creation Failed. Fix the following: 
+Invalid URL for link.
+
+[116/132] 10/21/every-game-shown-at-summer-games-fest.md
+  Notion ID: 462
+  Images: 0
+
+  🖼️  Uploading thumbnail: default4.jpg (3848.8 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Every Game Shown at Summer Games Fest" (TECH-462)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[117/132] 10/21/further-jpl-layoffs-amid-continued-nasa-uncertainty.md
+  Notion ID: 505
+  Images: 0
+
+  🖼️  Uploading thumbnail: default5.jpg (5345.3 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "Further JPL Layoffs Amid Continued NASA Uncertainty" (TECH-505)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[118/132] 10/21/how-do-we-as-scientists-respond-to-data-erasure.md
+  Notion ID: 496
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (4.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "How do we as scientists respond to data erasure?" (TECH-496)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[119/132] 10/21/meet-joseph-greenwell-caltechs-new-avp-for-student-life.md
+  Notion ID: 503
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (87.8 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Meet Joseph Greenwell, Caltech’s New AVP for Student Life" (TECH-503)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[120/132] 10/21/scientific-discovery-as-sacred-encounter-reflections-on-quantum-fields-and-faith.md
+  Notion ID: 507
+  Images: 3
+
+  🖼️  Uploading thumbnail: image1.png (343.7 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (125.8 KB)
+    ✓ image3.png (405.6 KB)
+    ✓ image4.png (311.3 KB)
+  ✅ Logged 4 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Scientific Discovery as Sacred Encounter: Reflections on Quantum Fields and Faith" (TECH-507)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[121/132] 10/21/the-eight-directions-of-the-wind-at-the-huntington.md
+  Notion ID: 500
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (47.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "“the eight directions of the wind” at The Huntington" (TECH-500)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[122/132] 10/21/the-wild-west-of-the-internet-returns.md
+  Notion ID: 487
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (158.1 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "The “Wild West of the Internet” Returns" (TECH-487)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[123/132] 10/21/un-fortunately-we-now-have-an-h-index.md
+  Notion ID: 506
+  Images: 0
+
+  🖼️  Uploading thumbnail: default6.jpg (2092.7 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "(Un)Fortunately, We Now Have an H-Index" (TECH-506)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[124/132] 11/18/a-letter-to-future-generations-on-the-philosophy-of-happiness-part-i-unhappiness.md
+  Notion ID: 534
+  Images: 1
+
+  🖼️  Uploading thumbnail: happiness.png (853.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Letter to Future Generations: On the Philosophy of Happiness — Part I" (TECH-534)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[125/132] 11/18/a-pinterhouse-fit-for-the-end-of-the-world.md
+  Notion ID: 533
+  Images: 2
+
+  🖼️  Uploading thumbnail: image1.png (147.0 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (144.9 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "A Pinterhouse Fit for the End of the World" (TECH-533)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[126/132] 11/18/an-overdue-conversation-with-tom-mannion-caltech-s-cornerstone-of-student-life.md
+  Notion ID: 529
+  Images: 10
+
+  🖼️  Uploading thumbnail: image1.png (307.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (150.2 KB)
+    ✓ image3.png (250.3 KB)
+    ✓ image4.png (157.0 KB)
+    ✓ image5.png (161.2 KB)
+    ✓ image6.png (291.4 KB)
+    ✓ image7.png (135.4 KB)
+    ✓ image8.png (163.5 KB)
+    ✓ image9.png (284.0 KB)
+    ✓ image10.png (128.8 KB)
+  ✅ Logged 10 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "An Overdue Conversation with Tom Mannion, Caltech’s Cornerstone of Student Life" (TECH-529)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[127/132] 11/18/ascit-board-of-directors-meeting-minutes-november-16-2025.md
+  Notion ID: 537
+  Images: 0
+
+  🖼️  Uploading thumbnail: default8.jpg (3507.2 KB)
+    ✓ Uploaded to Nhost
+
+  📤 Syncing to Notion...
+  ✓ Found: "ASCIT Board of Directors Meeting Minutes: November 16, 2025" (TECH-537)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[128/132] 11/18/behind-integrated-core-caltech-s-grand-experiment-in-first-year-teaching.md
+  Notion ID: 528
+  Images: 6
+
+  🖼️  Uploading thumbnail: image1.png (110.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (131.8 KB)
+    ✓ image3.png (464.4 KB)
+    ✓ image4.png (421.3 KB)
+    ✓ image5.png (370.9 KB)
+    ✓ image6.png (163.8 KB)
+  ✅ Logged 6 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Behind Integrated Core, Caltech’s Grand Experiment in First-Year Teaching" (TECH-528)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[129/132] 11/18/gut-feelings-how-microbes-might-be-shaping-the-mind-and-more.md
+  Notion ID: 519
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (44.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Gut Feelings: How Microbes Might Be Shaping the Mind—and More" (TECH-519)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[130/132] 11/18/nostalgia.md
+  Notion ID: 524
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (354.9 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Nostalgia" (TECH-524)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[131/132] 11/18/richard-kipling-l-a-times-veteran-and-longtime-tech-advisor-dies-at-81.md
+  Notion ID: 527
+  Images: 1
+
+  🖼️  Uploading thumbnail: image1.png (280.3 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+  ✅ Logged 1 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "Richard Kipling," (TECH-527)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+[132/132] 11/18/what-makes-caltech-special-a-letter-to-caltech-s-incoming-president.md
+  Notion ID: 517
+  Images: 2
+
+  🖼️  Uploading thumbnail: image1.png (210.4 KB)
+    ✓ Uploaded to Nhost
+
+  📸 Processing images:
+    ✓ image2.png (189.9 KB)
+  ✅ Logged 2 image URL(s) to image-migrations.log
+
+  📤 Syncing to Notion...
+  ✓ Found: "What Makes Caltech Special? A Letter to Caltech’s Incoming President" (TECH-517)
+  ✓ Updated "Where is it" to "This Notion Page"
+  ✓ Updated cover photo
+  ✅ Success!
+
+
+📊 Summary
+
+✅ Successful: 131
+❌ Failed: 1
+📸 Images: 102
+
+❌ Failed:
+  • 10/21/caltech-wildlife-crows-and-ravens.md: Content creation Failed. Fix the following: 
+Invalid URL for link.
+
+

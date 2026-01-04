@@ -2,14 +2,15 @@
 
 > **📖 Part of the Zero-Rebuild CMS Vision** - See `.docs/zero-rebuild-cms-vision.md` for the complete architecture
 
-> **⚠️ IMPLEMENTATION STATUS: IN PROGRESS (November 2025)**  
-> - ✅ Nhost Storage v0.9.1 configured with `blog-images` bucket
-> - ✅ Design document complete and validated
-> - ❌ Image download/upload utilities not yet implemented  
-> - ❌ URL rewriting in markdown processor not implemented  
-> - ❌ Hasura storage permissions not configured
+> **⚠️ IMPLEMENTATION STATUS: PARTIAL (December 2025)**  
+> - ✅ Image extraction/upload/rewrite helpers implemented (`image-processor.ts`, `image-upload.ts`, `image-utils.ts`)
+> - 🟡 Nhost Storage is working via the default/console bucket; bucket declarations + Hasura permissions are not committed to `nhost/nhost.toml`
+> - ❌ Sync integration (automatic markdown rewrite + cover extraction) still pending  
+> - ❌ URL rewriting in the sync pipeline not wired; currently manual via helpers
+> - ℹ️ Cover: prefer the dedicated Notion cover property when present; fall back to first image only if needed
+> - ℹ️ Size hints: optional `![alt](url =800x600)` (or `=800x`/`=x600`) to reduce layout shift; can be appended when dimensions are known
 > 
-> This is a **Phase 2 implementation** currently in progress. Storage infrastructure ready, utilities next.
+> This remains a **Phase 2 implementation**: helpers are ready, but wiring + permissions are outstanding.
 
 ## Context
 

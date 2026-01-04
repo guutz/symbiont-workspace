@@ -1,7 +1,7 @@
 # Implementation Status Tracker
 
 > **Purpose:** Quick reference for what's actually implemented vs. designed vs. conceptual  
-> **Last Updated:** November 9, 2025
+> **Last Updated:** December 9, 2025
 
 This document provides an honest assessment of the Symbiont CMS implementation status, helping contributors understand what works, what's ready to build, and what's still in the idea phase.
 
@@ -9,38 +9,38 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ## 🚀 Quick Summary (TL;DR)
 
-**What's Production-Ready Right Now (November 2025):**
-- ✅ Complete Notion → Database sync with polling
-- ✅ GraphQL-backed content queries
-- ✅ Server-side markdown rendering
-- ✅ Multi-tenant support (multiple Notion databases)
-- ✅ Customizable publishing rules
-- ✅ Tags & authors extraction
-- ✅ Slug generation with conflict resolution
-- ✅ Performance optimizations (timestamp comparison, 5-10x faster)
-- ✅ Comprehensive testing (105 tests)
-- ✅ Structured logging throughout
-- ✅ Complete QWER integration example
+**What's Working (December 2025):**
+- ✅ Notion → Postgres sync pipeline (orchestrator/builder/repo) with slug resolution and `pages` table migrations
+- ✅ Server-side markdown rendering pipeline and structured logging
+- ✅ Basic unit tests (6 test files, Vitest configured) for sync utilities and helpers
+- ✅ Image upload/rewrite helpers to Nhost Storage (`processMarkdownImages` / `processNotionPageImages` + `uploadImages`) validated against the default bucket
 
-**What's Actively Being Built (November 2025):**
-- 🔄 Image upload to Nhost Storage (bucket configured, utilities next)
-- 🔄 URL rewriting for Notion images (design complete)
+**What's Risky/Broken Right Now:**
+- ⚠️ Local dev (SvelteKit apps) currently renders zero posts — likely a too-strict `isPublicRule`/publishing rule or query shape change; needs verification
+- ⚠️ Image pipeline is not wired into the sync flow yet; markdown/cover URLs stay unchanged unless the helpers are called manually
+- ⚠️ Storage bucket/permission config is not checked into `nhost/nhost.toml` (using console/default bucket only)
 
-**What's Coming Next:**
-- 📋 Redirect management (fully designed, ready to implement)
-- 💭 Site configuration system (concept phase)
-- 💭 Collaborative rich-text editor (concept phase)
+**What's Next:**
+- 🟡 Wire image pipeline into sync (markdown rewrite + cover extraction)
+- 🟡 Add explicit Nhost bucket declarations and Hasura storage permissions to the repo
+- 🟡 Fix the local dev regression (posts not loading) and add a regression test
+- 📋 Redirect management (designed, not started)
 
 ---
 
-## � Recent Changes
+## 🆕 Recent Changes
+
+### December 9, 2025
+- **Media**: Shipped image upload/rewrite helpers (`src/lib/image-processor.ts`, `image-upload.ts`, `image-utils.ts`) using Nhost `uploadFiles`; tested against default bucket
+- **Infra**: Nhost Storage working via console/default bucket, but no bucket entries or permissions are committed to `nhost/nhost.toml`
+- **Regression**: Local dev apps show zero posts after the media work; needs root-cause analysis
 
 ### November 9, 2025
 - **Performance**: Added timestamp comparison - syncs now 5-10x faster for unchanged content
 - **Bug Fix**: Changed upsert constraint to `pages_pkey` to properly handle null slugs
 - **Bug Fix**: Only sync slug back to Notion when actually changed (prevents infinite loops)
 - **Feature**: Tags & authors now properly sync from configured Notion properties
-- **Infrastructure**: Nhost Storage v0.9.1 configured with blog-images bucket
+- **Infrastructure**: Nhost Storage v0.9.1 configured with blog-images bucket (superseded; config not committed)
 
 ### November 2, 2025
 - **Refactor**: Complete architecture overhaul with class-based separation
@@ -60,16 +60,16 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ---
 
-## �📊 Overall Status
+## 📊 Overall Status
 
 | Phase | Status | Complete | Ready For |
 |-------|--------|----------|-----------|
-| **Phase 1: Core CMS** | 🟢 **~98% Complete** | Nov 2025 | Production use with optimized polling sync |
-| **Phase 2: Media** | � **In Progress** | Nov 2025 | Nhost Storage configured, utilities next |
+| **Phase 1: Core CMS** | 🟡 Mostly complete, but local dev regression (no posts) needs fixing | Nov 2025 baseline | Sync + markdown + logging in place; investigate dev regression |
+| **Phase 2: Media** | 🟡 Partial | Dec 2025 | Nhost storage works; upload/rewrite helpers shipped; sync integration/permissions pending |
 | **Phase 3: Redirects** | 📋 Designed | TBD | Dynamic URL management |
 | **Phase 4+: Future** | 💭 Concept | TBD | CLI tools, advanced features |
 
-**Current Milestone:** Phase 1 essentially complete with Nov 2025 optimizations (tags/authors sync, timestamp comparison, slug sync prevention). Phase 2 (images) actively in progress - Storage bucket configured, next step is upload utilities.
+**Current Milestone:** Fix the local dev regression, then wire the new image pipeline into sync with committed storage config/permissions.
 
 ---
 
@@ -137,25 +137,15 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 | Environment helpers | ✅ | `src/lib/server/utils/env.server.ts` | Required env var validation |
 | Slug helpers | ✅ | `src/lib/server/utils/slug-helpers.ts` | Slug generation and validation |
 
-### ✅ Testing Infrastructure (Shipped - October 2025)
+### 🟡 Testing Infrastructure (Partial)
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
-| Vitest setup | ✅ | `vitest.config.ts` | Configured with coverage |
-| Query tests | ✅ | `src/lib/server/queries.test.ts` | 12 tests passing |
-| Markdown processor tests | ✅ | `src/lib/server/markdown-processor.test.ts` | 31 tests passing |
-| Page processor tests | ✅ | `src/lib/server/sync/post-builder.test.ts` | Tests for business logic |
-| Slug helper tests | ✅ | `src/lib/server/utils/slug-helpers.test.ts` | 23 tests passing |
-| Notion helper tests | ✅ | Tests for property extraction | 27 tests passing |
-| GraphQL mocking | ✅ | Test utilities | Mock client for isolated testing |
-| Config mocking | ✅ | Test utilities | Mock loadConfig for controlled tests |
+| Vitest setup | ✅ | `vitest.config.ts` | Node environment with `vitest.setup.ts` |
+| Unit tests | 🟡 | `src/lib/**/*.test.ts` | 6 small suites (queries, slug helpers, notion adapter, post repository, post builder, orchestrator); coverage is thin |
+| Coverage reporting | 🟡 | `vitest.config.ts` | Configured but not run regularly; no artifacts checked in |
 
-**Test Coverage:** 105/105 tests passing across 5 test suites
-- ✅ Query functions - pagination, error handling, GraphQL failures
-- ✅ Markdown rendering - plugins, TOC, syntax highlighting
-- ✅ Post building - rules, metadata extraction, slug resolution
-- ✅ Slug generation - creation, conflict resolution, validation
-- ✅ Property extraction - Notion types, edge cases
+**Gaps:** Integration tests are missing and there's no regression test for the current "no posts rendering" bug.
 
 ### ✅ QWER Integration Example (Shipped - NEW!)
 
@@ -186,17 +176,16 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 | PostHead | ✅ | `src/lib/components/PostHead.svelte` | SEO meta tags (Open Graph, Twitter cards) |
 | PostMeta | ✅ | `src/lib/components/PostMeta.svelte` | Date/tags display with customizable styling |
 | TOC | ✅ | `src/lib/components/TOC.svelte` | Table of contents with active section highlighting |
-| FeatureLoader | ✅ | `src/lib/components/FeatureLoader.svelte` | Conditional CSS loading (Prism, KaTeX) |
+| Editor (placeholder) | 🟡 | `src/lib/components/Editor.svelte` | Stub file; no implementation yet |
 
 **Usage Pattern:**
 ```svelte
 <script>
-  import { PostHead, PostMeta, TOC, FeatureLoader } from 'symbiont-cms';
+   import { PostHead, PostMeta, TOC } from 'symbiont-cms';
   export let data;
 </script>
 
 <PostHead {post} siteName="My Blog" baseUrl="https://example.com" />
-<FeatureLoader features={data.features} />
 
 <article>
   <PostMeta {post} showReadingTime={true} />
@@ -205,26 +194,22 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 </article>
 ```
 
-### ✅ Markdown & Feature Detection (Shipped)
+### ✅ Markdown & Feature Detection (Rendering shipped, detection pending)
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
-| Markdown processor | ✅ | `src/lib/server/markdown-processor.ts` | Full markdown-it with plugins |
+| Markdown processor | ✅ | `src/lib/server/markdown-processor.ts` | markdown-it with TOC, Prism, KaTeX, footnotes, etc. |
 | Prism language loading | ✅ | Same file | Server-side lazy loading |
 | TOC generation | ✅ | Same file | Configurable heading levels |
-| Feature detection interface | ✅ | `src/lib/types.ts` | `ContentFeatures` + `TocItem` types exported |
-| Features parameter | ✅ | `src/lib/server/markdown-processor.ts` | `parseMarkdown` accepts features |
-| **Database features column** | ✅ | `nhost/migrations/*/up.sql` | `features JSONB` added to posts table |
-| **Client asset loading** | ✅ | `FeatureLoader.svelte` | Conditional CSS loading based on features |
+| Feature types | ✅ | `src/lib/types.ts` | `ContentFeatures` + `TocItem` exported |
+| Feature detection | ❌ | n/a | Not computed; callers would need to supply features manually |
+| Database features column | ❌ | n/a | `pages` migrations do not include a `features` column |
+| Client asset loading | ❌ | n/a | No `FeatureLoader` component; assets load unconditionally today |
 
 **Current State:**
-- ✅ Server-side Prism languages load on-demand
-- ✅ Client-side CSS conditionally loaded via `<FeatureLoader>`
-- ✅ Features column in database ready for sync-time detection
-- 🟡 Feature detection during sync not yet implemented (can be added later)
-
-**Optional Enhancement:**
-- Detect features during Notion sync and store in `features` column
+- Server-side rendering + TOC/Prism are working
+- No automated feature detection or persistence yet
+- Add detection + client asset toggling once features are stored
 
 ### ⚠️ Phase 1 Recent Improvements (November 2025)
 
@@ -249,9 +234,9 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 | Component | Status | Impact | Notes |
 |-----------|--------|--------|-------|
 | Structured logging | ✅ | High | Pino logger with structured JSON throughout |
-| Unit tests | ✅ | High | 105/105 tests passing across 5 test suites |
-| 4-file hybrid pattern | ✅ | Medium | Complete SSR + client navigation example in QWER |
-| Documentation | ✅ | Medium | Complete architectural docs and guides |
+| Unit tests | 🟡 | Medium | Small Vitest suite (6 files); coverage is thin |
+| 4-file hybrid pattern | ✅ | Medium | SSR + client navigation example (qwer-test) |
+| Documentation | ✅ | Medium | Architectural docs and guides |
 
 **What's Left for Phase 1 (~2% remaining):**
 - Retry logic with exponential backoff for Notion API failures
@@ -262,26 +247,23 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ## Phase 2: Media & Files
 
-### � Image Management (In Progress - November 2025)
+### 🟡 Image Management (Partial - December 2025)
 
 | Component | Status | Design Doc | Notes |
 |-----------|--------|------------|-------|
-| Nhost Storage config | ✅ | `image-optimization-strategy.md` | Configured in nhost.toml with blog-images bucket (v0.9.1) |
-| Storage permissions | ❌ | `image-optimization-strategy.md` | Hasura permissions needed for file access |
-| Image URL extraction | ❌ | `image-optimization-strategy.md` | Utility to detect images in markdown/Notion properties |
-| File download utility | ❌ | `dynamic-file-management.md` | Download from Notion/external URLs |
-| File upload utility | ❌ | `dynamic-file-management.md` | Upload to Nhost Storage bucket |
-| URL rewriter | ❌ | `image-optimization-strategy.md` | Replace Notion URLs with Nhost URLs in markdown |
-| Cover image handler | ❌ | `image-optimization-strategy.md` | Extract first image as cover |
-| Sync integration | ❌ | `image-optimization-strategy.md` | Wire into PostBuilder/Orchestrator |
+| Nhost Storage config | 🟡 | `image-optimization-strategy.md` | Works via console/default bucket; no bucket entries in `nhost/nhost.toml` yet |
+| Storage permissions | ❌ | `image-optimization-strategy.md` | Hasura permissions for `storage.files` not set |
+| Image URL extraction | ✅ | `image-optimization-strategy.md` | `image-utils.ts` handles markdown + Notion page extraction |
+| File download/upload utilities | ✅ | `dynamic-file-management.md` | `image-upload.ts` downloads via fetch and uploads via `nhost.storage.uploadFiles` |
+| URL rewriter | ✅ | `image-processor.ts` / `image-upload.ts` | `rewriteImageUrls` updates markdown based on upload results (manual use today) |
+| Cover image handler | ❌ | `image-optimization-strategy.md` | Still need first-image extraction |
+| Sync integration | ❌ | `image-optimization-strategy.md` | Helpers not yet called from PostBuilder/Orchestrator |
 
 **Next Steps:**
-1. ✅ Configure Nhost Storage buckets (DONE)
-2. Set up Hasura permissions for storage.files table
-3. Create `src/lib/server/storage/image-processor.ts`
-4. Implement image detection and URL extraction
-5. Add URL rewriting in sync process
-6. Test with real posts containing images
+1. Commit bucket declarations + storage permissions
+2. Wire `processMarkdownImages` into sync path (batch + webhook)
+3. Add cover-image extraction and optional size hints
+4. Add regression test to ensure posts still render after image processing
 
 ### 📋 File Management (Designed, Not Implemented)
 

@@ -62,6 +62,7 @@ export type Post = {
     // Database fields (from pages table)
     page_id?: string;           // Notion page UUID (primary key)
     datasource_id?: string;     // Notion database ID
+    datasource_alias?: string;  // Human-readable datasource alias (non-secret)
     title: string | null;
     slug: string | null;        // Nullable - only generated for public posts
     content: string | null;     // Markdown content

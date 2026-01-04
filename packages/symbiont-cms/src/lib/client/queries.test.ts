@@ -57,10 +57,10 @@ describe('getPostBySlug', () => {
 			'https://test.nhost.io/v1/graphql',
 			{ fetch: undefined }
 		);
-		expect(mockRequest).toHaveBeenCalledWith(
-			expect.any(String),
-			{ slug: 'test-post' }
-		);
+		expect(mockRequest).toHaveBeenCalledWith(expect.any(String), {
+			slug: 'test-post',
+			alias: 'test-blog'
+		});
 	});
 
 	it('should return null if post not found', async () => {
@@ -81,6 +81,17 @@ describe('getPostBySlug', () => {
 			'https://test.nhost.io/v1/graphql',
 			{ fetch: customFetch }
 		);
+	});
+
+	it('should allow overriding alias for getPostBySlug', async () => {
+		mockRequest.mockResolvedValue({ pages: [] });
+
+		await getPostBySlug('test-post', { alias: 'custom-alias' });
+
+		expect(mockRequest).toHaveBeenCalledWith(expect.any(String), {
+			slug: 'test-post',
+			alias: 'custom-alias'
+		});
 	});
 
 	it('should handle posts with minimal fields', async () => {

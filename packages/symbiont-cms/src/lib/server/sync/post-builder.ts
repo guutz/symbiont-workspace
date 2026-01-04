@@ -71,6 +71,7 @@ export class PostBuilder {
 		const postData: PostData = {
 			page_id: page.id,
 			datasource_id: this.config.dataSourceId,
+			datasource_alias: this.config.alias,
 			title: meta.title,
 			slug,
 			content,
