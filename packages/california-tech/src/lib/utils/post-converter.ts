@@ -7,7 +7,8 @@ import type { Post } from '$lib/types/post';
 export function symbiontToQwerPost(post: SymbiontPost, html?: string, toc?: any[]): Post.Post {
 	return {
 		// Direct pass-through fields
-		slug: post.slug,
+		// @ts-ignore -- slug will always be present at this point
+		slug: post.slug, 
 		title: post.title ?? 'Untitled',
 		content: post.content ?? '',
 		summary: post.summary ?? post.content?.substring(0, 200) ?? '',
@@ -15,7 +16,7 @@ export function symbiontToQwerPost(post: SymbiontPost, html?: string, toc?: any[
 		language: post.language ?? 'en',
 		cover: post.cover,
 		tags: Array.isArray(post.tags) ? post.tags : [],
-		author: post.author ?? undefined,
+		authors: Array.isArray(post.authors) ? post.authors : [],
 		
 		// Date field mapping
 		published: post.publish_at ?? new Date().toISOString(),

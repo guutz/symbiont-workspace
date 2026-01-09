@@ -106,27 +106,26 @@ export async function parseMarkdown(
   md.renderer.rules.heading_open = function (tokens, idx, options, env, self) {
     const token = tokens[idx];
     const level = parseInt(token.tag.slice(1)); // h1 -> 1, h2 -> 2, etc
-    const content = tokens[idx + 1].content;
-    const slugUrl = slugify(content, { lower: true, strict: true });
     
-    // Store slug for heading_close to use
-    token.attrSet('id', slugUrl);
+    // Extract plain text from the inline token (removes markdown formatting)
+    const inlineToken = tokens[idx + 1];
+    const plainText = extractPlainText(inlineToken);
+    const slugUrl = slugify(plainText, { lower: true, strict: true });
     
     // Only add to TOC if within configured range
     if (level >= (config?.toc?.minHeadingLevel || 2) && 
         level <= (config?.toc?.maxHeadingLevel || 4)) {
-      addToTOC(toc, level, content, slugUrl);
+      addToTOC(toc, level, plainText, slugUrl);
     }
     
-    return `<h${level} id="${slugUrl}">`;
+    // Include anchor tag for clickability and permalink styling
+    return `<h${level} id="${slugUrl}"><a href="#${slugUrl}">`;
   };
   
   md.renderer.rules.heading_close = function (tokens, idx) {
     const token = tokens[idx];
     const level = token.tag.slice(1);
-    const openToken = tokens[idx - 2];
-    const slugUrl = openToken.attrGet('id');
-    return `<a href="#${slugUrl}">${tokens[idx - 1].content}</a></h${level}>\n`;
+    return `</a></h${level}>\n`;
   };
   
   // Custom fence (code block) renderer
@@ -219,6 +218,35 @@ export async function parseMarkdown(
 }
 
 // Helper functions
+
+/**
+ * Extract plain text from a markdown-it inline token
+ * This strips all markdown formatting (bold, italic, links, etc.)
+ */
+function extractPlainText(token: any): string {
+  if (!token) return '';
+  
+  // If token has children (inline tokens do), recursively extract text
+  if (token.children && Array.isArray(token.children)) {
+    return token.children
+      .map((child: any) => {
+        // Text tokens contain the actual text
+        if (child.type === 'text') {
+          return child.content;
+        }
+        // For other inline elements (strong, em, link, etc), recurse
+        if (child.children) {
+          return extractPlainText(child);
+        }
+        return '';
+      })
+      .join('');
+  }
+  
+  // Fallback to content property
+  return token.content || '';
+}
+
 function addToTOC(toc: TOCItem[], level: number, heading: string, slugUrl: string) {
   const item = { level, heading, slug: `#${slugUrl}` };
   

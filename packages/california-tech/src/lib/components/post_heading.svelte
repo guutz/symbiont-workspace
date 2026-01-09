@@ -18,16 +18,18 @@
       {new URL(data.slug, siteConfig.url).href}
     </a>
     <div class="p-author h-card flex items-center gap-1 pl-0 shrink-0">
-    {#if data.author}
+    {#if data.authors && data.authors.length > 0}
       <AuthorAvatar
         width="32px"
         height="32px"
         class="inline-block !w-8 !h-8 mr-1 object-cover aspect-1 rounded-full hover:rotate-[360deg] transition-transform duration-1000 ease-in-out" />
       <span class="font-bold text-base">
         <!-- TODO: replace with author index -->
-        <a rel="author" href={siteConfig.url} class="u-url u-uid"> 
-          <span class="p-name">{data.author}</span>
-        </a>
+        {#each data.authors as author, i}
+          <a rel="author" href={siteConfig.url} class="u-url u-uid"> 
+            <span class="p-name">{author}</span>
+          </a>{#if i < data.authors.length - 1}<span>, </span>{/if}
+        {/each}
       </span>
     {/if}
     </div>

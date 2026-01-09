@@ -160,7 +160,7 @@
 <svelte:window bind:scrollY />
 
 {#if toc && toc.length > 0}
-  <aside aria-label="Table Of Content" class="sticky top-[4rem] hidden xl:block pb8">
+  <aside aria-label="Table of Contents" class="sticky top-[4rem] hidden xl:block pb8">
     <div
       role="button"
       tabindex="0"

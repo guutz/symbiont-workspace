@@ -10,6 +10,14 @@ import { defineConfig } from 'symbiont-cms/config';
 const config = defineConfig({
 	// PUBLIC: GraphQL endpoint (not secret, just a URL)
 	graphqlEndpoint: 'https://ygsdnfrbruuhtxczekur.graphql.us-west-2.nhost.run/v1',
+
+	markdown: {
+		toc: {
+			enabled: true,
+			minHeadingLevel: 1,
+			maxHeadingLevel: 4,
+		}
+	},
 	
 	databases: [
 		{

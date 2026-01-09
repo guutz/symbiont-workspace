@@ -69,7 +69,7 @@ export async function load({ fetch, url, cookies }) {
       theme: cookies.get('theme') || 'light',
     };
   } catch (error) {
-    console.error('[+page.server] Error loading page data:', error);
+    console.error('[+page.server.ts] Error loading page data:', error);
     return { allPosts: [], posts: [], allTags: [], query: '', tag: '', theme: 'light' };
   }
 }

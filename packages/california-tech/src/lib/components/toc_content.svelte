@@ -8,12 +8,9 @@
   export let depth = 1;
 
   function handleClick() {
-    const heading = document.getElementById(`${content.slug.substring(1)}`);
-    const header_nav = document.getElementById('header-nav');
-    if (heading && header_nav) {
-      const top = heading.offsetTop - header_nav.clientHeight;
-      window.scrollTo({ top, behavior: 'smooth' });
-    }
+    // Use the slug directly as a hash to navigate
+    // The browser will handle the scrolling automatically
+    window.location.hash = content.slug;
   }
 
   let touchMoved = false;
@@ -46,7 +43,7 @@
       }
     }}
     data-toc-link
-    class="z1 group flex items-center gap2 py2 {$tocCur.get(content.slug) ? 'border-[#0096FF]' : 'border-transparent'}"
+    class="z1 group flex items-center gap2 py2 pr4 {$tocCur.get(content.slug) ? 'border-[#0096FF]' : 'border-transparent'}"
     class:pl4={depth === 1}
     class:pl8={depth === 2}
     class:pl12={depth === 3}
@@ -73,7 +70,7 @@
     <span
       class="{$tocCur.get(content.slug)
         ? '!text-black !font-900 scale-105 dark:(!text-white)'
-        : ''} cursor-pointer select-none text-black/[0.6] group-hover:(text-black) dark:(text-white/[0.6] group-hover:(text-white) group-active:(!text-black))">
+        : ''} cursor-pointer select-none text-black/[0.6] group-hover:(text-black) dark:(text-white/[0.6] group-hover:(text-white) group-active:(!text-black)) flex-1 min-w-0 break-words overflow-wrap-anywhere">
       {@html content.heading}
     </span>
   </div>

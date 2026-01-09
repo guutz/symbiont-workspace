@@ -1,7 +1,7 @@
 export const strings = {
   Tags: () => 'Tags',
   FilterTags: () => 'Filter Tags...',
-  TableOfContent: () => 'Table of Content',
+  TableOfContent: () => 'Table of Contents',
   LoadingPosts: () => 'Loading Posts...',
   LoadingPost: () => 'Loading Post...',
   NoPostFound: () => 'No Post Found.',
