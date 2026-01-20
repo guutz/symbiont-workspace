@@ -123,7 +123,7 @@ export function getUpsertPostMutation(): string {
 						datasource_alias,
 						title, 
 						slug,
-						content, 
+						content,
 						publish_at, 
 						tags, 
 						authors,

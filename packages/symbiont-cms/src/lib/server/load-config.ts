@@ -1,7 +1,14 @@
 import path from 'path';
 import fs from 'fs';
-import type { SymbiontConfig } from '../types.js';
+import type { SymbiontConfig, HydratedSymbiontConfig } from '../types.js';
 import { createLogger } from './utils/logger.js';
+
+/**
+ * Construct GraphQL endpoint from Nhost configuration
+ */
+function buildGraphQLEndpoint(subdomain: string, region: string): string {
+	return `https://${subdomain}.graphql.${region}.nhost.run/v1`;
+}
 
 /**
  * Loads the full symbiont.config.js (including server-only rules and functions).
@@ -10,7 +17,7 @@ import { createLogger } from './utils/logger.js';
  * 
  * @returns Full configuration including database rules and functions
  */
-export async function loadServerConfig(): Promise<SymbiontConfig> {
+export async function loadServerConfig(): Promise<HydratedSymbiontConfig> {
 	const logger = createLogger({ operation: 'load_config' });
 	const cwd = process.cwd();
 	const configPaths = [
@@ -35,6 +42,12 @@ export async function loadServerConfig(): Promise<SymbiontConfig> {
 	
 	const module = await import(/* @vite-ignore */ configPath);
 	const config: SymbiontConfig = module.default;
+	
+	// Construct graphqlEndpoint if not provided
+	const graphqlEndpoint = config.graphqlEndpoint || buildGraphQLEndpoint(
+		config.nhost.subdomain,
+		config.nhost.region
+	);
 	
 	// Validate databases array exists and has at least one entry
 	if (!config.databases || config.databases.length === 0) {
@@ -62,7 +75,8 @@ export async function loadServerConfig(): Promise<SymbiontConfig> {
 	// isPublicRule defaults to () => true
 	// publishDateRule defaults to reading 'Publish Date' property
 	
-	return config;
+	logger.debug({ event: "config_loaded", graphqlEndpoint, databases: config.databases.map(db => ({ alias: db.alias, dataSourceId: db.dataSourceId })) });
+	return { ...config, graphqlEndpoint } as HydratedSymbiontConfig;
 }
 
 /**

@@ -1,12 +1,16 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
-import type { DatabaseBlueprint } from '../../types.js';
-import { resolveNotionToken } from '../utils/env.server.js';
+import type { DatabaseBlueprint, HydratedSymbiontConfig } from '../../types.js';
+import { resolveNotionToken, requireEnvVar } from '../utils/env.server.js';
 import { gqlAdminClient } from '../queries.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { PostBuilder } from './post-builder.js';
 import { SyncOrchestrator } from './orchestrator.js';
+import NhostDefault from '@nhost/nhost-js';
+import type { NhostClient } from '@nhost/nhost-js';
+
+const { createClient, withAdminSession } = NhostDefault as any;
 
 /**
  * Factory function to create a fully-wired SyncOrchestrator
@@ -17,10 +21,13 @@ import { SyncOrchestrator } from './orchestrator.js';
  * - Class instantiation in the correct order
  * 
  * @example
- * const orchestrator = createSyncOrchestrator(config);
+ * const orchestrator = createSyncOrchestrator(config, fullConfig);
  * await orchestrator.syncDataSource({ syncAll: true });
  */
-export function createSyncOrchestrator(config: DatabaseBlueprint): SyncOrchestrator {
+export function createSyncOrchestrator(
+	config: DatabaseBlueprint, 
+	fullConfig: HydratedSymbiontConfig
+): SyncOrchestrator {
 	// Resolve Notion token (supports env var name, actual token, or default)
 	const notionToken = resolveNotionToken(config.notionToken, config.alias);
 	
@@ -35,8 +42,20 @@ export function createSyncOrchestrator(config: DatabaseBlueprint): SyncOrchestra
 	// Note: gqlAdminClient is a lazy-initialized wrapper that loads config on first use
 	const postRepository = new PostRepository(gqlAdminClient as any);
 
+	// Initialize Nhost client for image uploads
+	const adminSecret = requireEnvVar('NHOST_ADMIN_SECRET');
+	const nhostClient = createClient({
+		subdomain: fullConfig.nhost.subdomain,
+		region: fullConfig.nhost.region,
+		configure: [
+			withAdminSession({
+				adminSecret
+			})
+		]
+	});
+
 	// Create business logic layer (PostBuilder)
-	const postBuilder = new PostBuilder(config, notionAdapter, postRepository);
+	const postBuilder = new PostBuilder(config, notionAdapter, postRepository, nhostClient);
 
 	// Create orchestrator (coordination layer)
 	const orchestrator = new SyncOrchestrator(
@@ -53,11 +72,14 @@ export function createSyncOrchestrator(config: DatabaseBlueprint): SyncOrchestra
  * Create multiple orchestrators for multi-database sync
  * Keyed by alias for easy lookup
  */
-export function createSyncOrchestrators(configs: DatabaseBlueprint[]): Map<string, SyncOrchestrator> {
+export function createSyncOrchestrators(
+	configs: DatabaseBlueprint[],
+	fullConfig: HydratedSymbiontConfig
+): Map<string, SyncOrchestrator> {
 	const orchestrators = new Map<string, SyncOrchestrator>();
 
 	for (const config of configs) {
-		orchestrators.set(config.alias, createSyncOrchestrator(config));
+		orchestrators.set(config.alias, createSyncOrchestrator(config, fullConfig));
 	}
 
 	return orchestrators;

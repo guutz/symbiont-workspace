@@ -24,25 +24,33 @@
 			<h2 class="text-3xl">{strings.NoPostFound()}</h2>
 		</div>
 	{:else}
-		{@const years = [new Date().getFullYear()]}
+		{@const seenDates = new Set<string>()}
 		{#each posts as p, index (p.slug)}
-			{@const year = new Date(p.published).getFullYear()}
-			{#if !isNaN(year) && !years.includes(year)}
-				{#key year}
-					<div
-						class="year-divider"
-					>
-						{years.push(year) && year}
+			{@const publishDate = new Date(p.published)}
+			{@const dateKey = !isNaN(publishDate.getTime()) 
+				? publishDate.toLocaleDateString('en-US', { 
+					year: 'numeric', 
+					month: 'long', 
+					day: 'numeric',
+					timeZone: 'America/Los_Angeles'
+				})
+				: ''}
+			{#if dateKey && !seenDates.has(dateKey)}
+				{#key dateKey}
+					<div class="issue-divider">
+						{seenDates.add(dateKey) && dateKey}
 					</div>
 				{/key}
 			{/if}
-			<IndexPost data={p} {index} />
+			<div class="post-wrapper">
+				<IndexPost data={p} {index} />
+			</div>
 		{/each}
 	{/if}
 </main>
 
 <style lang="scss">
-	.year-divider {
+	.issue-divider {
 		--at-apply: 'my-4 h-4 whitespace-nowrap flex flex-row items-center self-stretch md:mx12';
 		&:before {
 			content: '';
@@ -54,6 +62,49 @@
 		}
 		&:not(:empty) {
 			--at-apply: 'gap-4';
+		}
+	}
+
+	.post-wrapper {
+		--at-apply: 'w-full max-w-100';
+	}
+
+	// Mobile: single column
+	#index-posts {
+		--at-apply: 'flex flex-col items-center';
+	}
+
+	// Tablet: 2 columns
+	@media (min-width: 640px) {
+		#index-posts {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1.5rem;
+			align-items: start;
+		}
+
+		.issue-divider {
+			grid-column: 1 / -1;
+		}
+
+		.post-wrapper {
+			max-width: none;
+		}
+	}
+
+	// Desktop: 3 columns
+	@media (min-width: 1024px) {
+		#index-posts {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 1.5rem;
+		}
+	}
+
+	// Large desktop: 4 columns
+	@media (min-width: 1536px) {
+		#index-posts {
+			grid-template-columns: repeat(4, 1fr);
+			gap: 2rem;
 		}
 	}
 </style>

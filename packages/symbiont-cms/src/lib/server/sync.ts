@@ -46,7 +46,7 @@ export async function syncFromNotion(
 	for (const dbConfig of targetDatabases) {
 		const dbLogger = logger.child({ alias: dbConfig.alias, dataSourceId: dbConfig.dataSourceId });
 		try {
-			const orchestrator = createSyncOrchestrator(dbConfig);
+			const orchestrator = createSyncOrchestrator(dbConfig, config);
 			const summary = await orchestrator.syncDataSource(syncOptions);
 			summaries.push(summary);
 		} catch (err: any) {

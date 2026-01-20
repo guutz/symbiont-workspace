@@ -296,3 +296,32 @@ function mangleString(text: string): string {
   }
   return result;
 }
+
+/**
+ * Strips all markdown formatting/HTML and returns a clean plain text string.
+ * Preserves newlines while ensuring zero HTML tags remain.
+ */
+export async function parseSummary(content: string): Promise<string> {
+  const md = new MarkdownIt({
+    html: true,
+    linkify: false,
+    breaks: true, // Render hard breaks as <br>
+    typographer: true,
+  });
+
+  md.renderer.rules.image = () => '';
+
+  return md.render(content || '')
+    // 1. Convert block closings and <br> to \n
+    .replace(/<\/p>|<br\s*\/?>/gi, '\n') 
+    // 2. Strip all remaining HTML tags
+    .replace(/<[^>]*>/g, '')
+    // 3. Decode common entities to prevent ugly &nbsp; or &amp;
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    // 4. COLLAPSE NEWLINES: 
+    // Matches 2 or more newlines (with optional whitespace between them) 
+    // and replaces them with a single \n.
+    .replace(/(\n\s*)+/g, '\n')
+    .trim();
+}

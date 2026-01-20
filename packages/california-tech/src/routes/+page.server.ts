@@ -1,14 +1,15 @@
 // packages/california-tech/src/routes/+page.server.ts
-import { getAllPosts } from 'symbiont-cms/server';
+import { postsLoad, postsConfig as config } from 'symbiont-cms/server';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
 import type { Post } from '$lib/types/post';
 import type { Tags } from '$lib/types/tags';
 
+// export { config };
 export const prerender = false;
 
 export async function load({ fetch, url, cookies }) {
   try {
-    const postsFromDb = await getAllPosts({ fetch, limit: 1000 });
+    const postsFromDb = await postsLoad({ fetch }, { limit: 20, parseSummaries: true });
     const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
 
     const tagMap = new Map<string, Set<string>>();

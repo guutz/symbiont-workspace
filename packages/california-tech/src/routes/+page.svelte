@@ -83,12 +83,12 @@
 	});
 </script>
 
-<!-- Single-column centered layout -->
+<!-- Wider container for newspaper layout -->
 <div
 	itemscope
 	itemtype="https://schema.org/Blog"
 	itemprop="blog"
-	class="flex justify-center items-start max-w-[55rem] mx-auto px-4"
+	class="flex justify-center items-start max-w-[90rem] mx-auto px-4"
 >
 	<div
 		in:fly|global={{ y: 100, duration: 300, delay: 300 }}

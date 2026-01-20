@@ -12,8 +12,11 @@
  * - SEO/crawlers
  */
 
-import { postLoad } from 'symbiont-cms/server';
+import { postLoad, config } from 'symbiont-cms/server';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
+
+// Export ISR config (caching settings from symbiont.config.ts)
+export { config };
 
 // Dynamic route - fetches posts from database at request time
 export const prerender = false;

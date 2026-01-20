@@ -2,6 +2,8 @@
   --qwer-bg-color: #ffffff;
   --qwer-text-color: black;
   --qwer-btn-hover-color: #dfdfdf;
+  --qwer-border-color: #dddddd;
+  --qwer-metadata-border-color: #dddddd;
 
   --qwer-bg-img-light: none;
   --qwer-bg-img-dark: none;
@@ -138,6 +140,8 @@
   --qwer-bg-color: #202020;
   --qwer-text-color: white;
   --qwer-btn-hover-color: #e1e3dd90;
+  --qwer-border-color: #404040;
+  --qwer-metadata-border-color: #404040;
 
   body::after {
     --qwer-bg-repeat: repeat;

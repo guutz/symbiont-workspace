@@ -15,8 +15,8 @@ export * from './index.js';
 export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webhook.js';
 export { syncFromNotion } from './server/sync.js';
 
-// Post loading
-export { createPostLoad, load as postLoad } from './server/post-loader.js';
+// Post loading (single post + lists)
+export { createPostLoad, load as postLoad, config, postsLoad, createPostsLoad, postsConfig } from './server/post-loader.js';
 export type { PostServerLoad, PostLoadResult } from './server/post-loader.js';
 
 // Markdown processing

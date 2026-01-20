@@ -8,8 +8,11 @@ import { defineConfig } from 'symbiont-cms/config';
  * @type {import('symbiont-cms').SymbiontConfig}
  */
 const config = defineConfig({
-	// PUBLIC: GraphQL endpoint (not secret, just a URL)
-	graphqlEndpoint: 'https://ygsdnfrbruuhtxczekur.graphql.us-west-2.nhost.run/v1',
+	// PUBLIC: Nhost configuration for storage and GraphQL endpoint
+	nhost: {
+		subdomain: 'ygsdnfrbruuhtxczekur',
+		region: 'us-west-2'
+	},
 
 	markdown: {
 		toc: {
@@ -72,6 +75,8 @@ const config = defineConfig({
 			tagsProperty: "Tags",
 
 			authorsProperty: "Authors",
+
+			coverProperty: "Cover Photo",
 			
 			// PRIVATE: Server-only custom slug extraction logic
 			slugRule: (page) => {

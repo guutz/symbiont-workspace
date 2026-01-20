@@ -1,8 +1,8 @@
 # California Tech Website - Next Batch of Revisions
 
 **Date:** January 8, 2026  
-**Updated:** January 10, 2026  
-**Status:** Planning Phase
+**Updated:** January 17, 2026  
+**Status:** In Progress
 
 ---
 
@@ -26,12 +26,12 @@ This memo outlines the next batch of improvements for the California Tech websit
 - ✅ Content Sync: Notion → Postgres pipeline functional
 - ✅ Markdown Pipeline: Server-side rendering with `markdown-it`
 - ✅ Testing: Basic unit tests (Vitest)
-- 🟡 Image Pipeline: Helpers exist, not wired into sync
+- � Image Pipeline: Hash-based deduplication in progress (see Revision 3)
 
 ### 🎨 Current Architecture
 - **Framework**: SvelteKit with SSR
 - **Homepage**: `index_posts.svelte` → `index_post.svelte` cards
-- **Grouping**: Currently by year (changing to date)
+- **Grouping**: ✅ Now by issue date (Jan 17, 2026)
 - **Data Flow**: `+page.server.ts` → `getAllPosts()` → `symbiontToQwerPost()` → components
 
 ---
@@ -40,7 +40,7 @@ This memo outlines the next batch of improvements for the California Tech websit
 
 ### 1. Date-Based Dividers (Replacing Year Dividers)
 
-**Priority:** High | **Complexity:** Low
+**Priority:** High | **Complexity:** Low | **Status:** ✅ Completed (Jan 17, 2026)
 
 **Location:** [index_posts.svelte](../packages/california-tech/src/lib/components/index_posts.svelte#L27-L38)
 
@@ -80,50 +80,103 @@ This memo outlines the next batch of improvements for the California Tech websit
 
 ### 2. Markdown Parsing in Post Card Previews
 
-**Priority:** High | **Complexity:** Low
+**Priority:** High | **Complexity:** Low | **Status:** ✅ Completed (Jan 17, 2026)
 
 **Location:** [index_post.svelte](../packages/california-tech/src/lib/components/index_post.svelte#L101)
 
 #### Problem
 Raw markdown displays as plain text (`**bold**` instead of **bold**)
 
+#### Architecture Decision
+Follow the same "spoon-feeding" pattern as `postLoad()`:
+- **`postLoad()`** wraps `getPostBySlug()` and returns `PostLoadResult` with HTML already parsed
+- **Need equivalent for lists:** New `postsLoad()` function that wraps `getAllPosts()` and parses summaries
+- **Eliminates boilerplate** in host code - just `export const load = postsLoad`
+
 #### Solution
-Use existing `parseMarkdown()` from `symbiont-cms/server` (markdown-it v14.1.0)
 
-**1. Update `+page.server.ts`:**
+**1. Add `postsLoad()` to Symbiont CMS** (`symbiont-cms/src/lib/server/index.ts`):
 ```typescript
-import { parseMarkdown } from 'symbiont-cms/server';
+import { parseMarkdown } from './markdown-processor';
 
-// Parse summaries server-side
-const allPosts = await Promise.all(
-  postsFromDb.map(async (post) => {
-    let summaryHtml = post.summary;
-    if (post.summary) {
-      const { html } = await parseMarkdown(post.summary, undefined);
-      summaryHtml = html.replace(/<\/?p>/g, ''); // Strip wrapper tags
-    }
-    return symbiontToQwerPost(post, undefined, undefined, summaryHtml);
-  })
-);
+export interface PostsLoadOptions {
+  limit?: number;
+  offset?: number;
+  parseSummaries?: boolean; // default true
+}
+
+export async function postsLoad(
+  { fetch }: { fetch: typeof global.fetch },
+  options: PostsLoadOptions = {}
+) {
+  const { limit, offset, parseSummaries = true } = options;
+  
+  const posts = await getAllPosts({ fetch, limit, offset });
+  
+  if (parseSummaries) {
+    return await Promise.all(
+      posts.map(async (post) => {
+        if (post.summary) {
+          const { html } = await parseMarkdown(post.summary, undefined);
+          return {
+            ...post,
+            summary_html: html.replace(/<\/?p>/g, '') // Strip wrapper <p> tags
+          };
+        }
+        return post;
+      })
+    );
+  }
+  
+  return posts;
+}
 ```
 
-**2. Update component:**
+**2. Use in California Tech** (`+page.server.ts`):
+```typescript
+import { postsLoad } from 'symbiont-cms/server';
+import { symbiontToQwerPost } from '$lib/utils/post-converter';
+
+export async function load({ fetch, url }) {
+  const postsFromDb = await postsLoad({ fetch }, { limit: 1000 });
+  const allPosts = postsFromDb.map(post => symbiontToQwerPost(post));
+  // ... rest of logic
+}
+```
+
+**3. Update component to use HTML:**
 ```svelte
 <p class="text-lg line-clamp-2" itemprop="description">
-  {@html data.summary}
+  {@html data.summary_html || data.summary}
 </p>
 ```
+
+**4. Update `Post` type in Symbiont:**
+```typescript
+export interface Post {
+  // ... existing fields
+  summary?: string;      // Raw markdown
+  summary_html?: string; // Parsed HTML (populated by postsLoad)
+}
+```
+
+#### Benefits
+- **Consistent API:** Mirrors `postLoad()` pattern
+- **Zero boilerplate:** Host just calls `postsLoad()` and gets presentation-ready data
+- **Config-driven:** Uses markdown-it config from `symbiont.config.ts`
+- **Optional:** Can disable parsing with `parseSummaries: false` if needed
 
 ---
 
 ### 3. Cover Images (Phase 2 Media Sync)
 
-**Priority:** High | **Complexity:** High
+**Priority:** High | **Complexity:** High | **Status:** 🔨 In Progress (Jan 17, 2026)
 
-#### Current Status
+#### Current Status (Updated Jan 17)
 - Post cards support covers via `index_post.svelte`
-- Cover images not synced from Notion
+- Cover extraction implemented from Notion database property (`coverProperty` config)
 - **Critical:** Notion CDN URLs expire after 1 hour
+- **Architecture Decision:** Hash-based deduplication (see below)
 
 #### Nhost Storage Status
 Storage already configured via Hasura metadata:
@@ -133,21 +186,67 @@ Storage already configured via Hasura metadata:
 - **Local dev:** Empty (needs sync or re-upload)
 - **Alternative:** Dedicated bucket for multisite (evaluate later)
 
-#### Implementation
-```typescript
-// In PostBuilder or sync orchestrator
-if (notionPage.cover) {
-  const coverUrl = await this.uploadCoverImage(notionPage);
-  postData.cover = coverUrl;
-}
-```
+#### Implementation Progress
 
-**Steps:**
-1. Review `image-processor.ts` and `image-upload.ts` helpers
-2. Verify target bucket (currently `default`)
-3. Wire cover extraction into sync flow
-4. Sync files to local dev Nhost
-5. Verify `symbiontToQwerPost()` maps `cover` field
+**✅ Completed:**
+- Added `coverProperty` config field to DatabaseBlueprint
+- Nhost client initialization with admin authentication
+- Cover extraction from `page.properties[coverProperty]`
+- Handle both `file.type === 'file'` (Notion-hosted) and `file.type === 'external'` (already permanent)
+- Store cover URL in `meta.cover` JSONB field
+- `uploadImage()` utility for single image uploads
+
+**🔨 In Progress:**
+- Hash-based deduplication to avoid re-uploading same images
+- Query Nhost Storage by hash before uploading
+
+#### Architecture: Hash-Based Deduplication
+
+**Decision Rationale:**
+After discussing proxy endpoint approach (`/api/images/[...path]`), we decided hash-based deduplication is superior for a general-purpose CMS:
+
+**Advantages:**
+1. **No deployment dependency**: First sync works in local dev immediately (Nhost URLs work from anywhere)
+2. **Notion links never break**: Original URLs stay in Notion until they expire naturally
+3. **No duplicate uploads**: Check hash before uploading (saves bandwidth and storage)
+4. **Simple adoption workflow**: Configure → Sync → Works (no need to deploy proxy endpoint first)
+5. **Database is source of truth**: Has permanent Nhost URLs regardless of Notion's state
+
+**Disadvantages of Proxy Endpoint Approach:**
+- Requires deploying API endpoint before images work
+- All existing Notion URLs would break during transition period
+- More complex for new Symbiont adopters
+- Adds extra request hop (API → Nhost Storage)
+
+#### Implementation Plan
+
+**Flow:**
+1. Extract image URL from Notion (cover or markdown)
+2. Download image and calculate hash (SHA-256 of file content)
+3. Query Nhost Storage: "Do we already have a file with this hash?"
+4. If yes → Use existing Nhost URL (skip upload)
+5. If no → Upload to Nhost with metadata: `{ filename, hash, sourceUrl }`
+6. Store Nhost URL in database
+7. **Don't update Notion** (let it keep its URLs - they still work)
+
+**Benefits:**
+- ✅ Local dev works immediately after first sync
+- ✅ Notion URLs keep working (until they naturally expire)
+- ✅ Database has permanent URLs
+- ✅ No re-uploading same images
+- ✅ New Symbiont users can sync without deploying anything first
+
+**Implementation Tasks:**
+- [ ] Add hash calculation utility (SHA-256)
+- [ ] Query Nhost Storage by hash (metadata search)
+- [ ] Update `uploadImage()` to check hash before uploading
+- [ ] Store hash in Nhost file metadata
+- [ ] Remove `syncImagesToNotion` flag (not needed with this approach)
+
+**Open Questions:**
+- How to query Nhost Storage by custom metadata (hash field)?
+- Should we store hash in database too for faster lookups?
+- What happens when Notion URL expires? (Database still has permanent URL)
 
 ---
 
@@ -598,9 +697,9 @@ sequenceDiagram
 ## 📋 Implementation Roadmap
 
 ### Phase 1: Core (Week 1)
-1. 🔨 Date-based dividers
-2. 🔨 Markdown in summaries
-3. 🔨 Wire cover image sync
+1. ✅ Date-based dividers (Jan 17, 2026)
+2. ✅ Markdown in summaries (Jan 17, 2026)
+3. 🔨 Cover image sync with hash-based deduplication (In Progress)
 
 ### Phase 2: Performance (Week 2)
 4. 🔨 Add pagination to `getAllPosts()`
@@ -617,23 +716,24 @@ sequenceDiagram
 
 ## 🔍 Investigation Tasks
 
-1. **Pagination Support**
-   ```typescript
-   // Check if getAllPosts supports offset
-   await getAllPosts({ fetch, limit: 20, offset: 40 });
-   ```
+1. ~~**Pagination Support**~~ ✅ (getAllPosts already supports offset/limit)
 
-2. **Media Helpers**
-   - Review `image-processor.ts`
-   - Review `image-upload.ts`
-   - Verify target bucket
+2. **Hash-Based Deduplication**
+   - How to query Nhost Storage by custom metadata (hash field)?
+   - Should we store hash in database too for faster lookups?
+   - Storage API capabilities for metadata search
 
-3. **Storage Sync**
+3. **Media Helpers**
+   - ✅ Reviewed `image-upload.ts` - has `uploadImage()` function
+   - ✅ Verified target bucket: `default`
+   - Need: Hash calculation utility (SHA-256)
+
+4. **Storage Sync**
    - Web instance has files in `default` bucket
    - Local dev is empty
    - Consider dedicated bucket for multisite
 
-4. **Performance Baseline**
+5. **Performance Baseline**
    - Measure current load times
    - Establish metrics before changes
 
@@ -641,23 +741,29 @@ sequenceDiagram
 
 ## 📝 Open Questions
 
-1. **Pagination:** Use `COUNT(*)` or over-fetch to check `hasMore`?
+1. ~~**Pagination:**~~ ✅ Use offset/limit (already supported)
 2. **Storage:** Stay with `default` bucket or create site-specific?
 3. **Caching:** Cache `/api/posts` responses client-side?
 4. **GraphQL:** Which fields can we omit from initial query?
+5. **Hash Lookup:** Best way to query Nhost Storage by hash metadata?
+6. **Expired Notion URLs:** What happens when Notion URL expires? (Database still has permanent URL, so no issue)
 
 ---
 
 ## 👥 Action Items
 
-- [ ] Check `getAllPosts()` offset/limit support
-- [ ] Implement date-based dividers
-- [ ] Wire markdown parsing for summaries
-- [ ] Wire Phase 2 media sync
+- [x] Check `getAllPosts()` offset/limit support
+- [x] Implement date-based dividers
+- [x] Wire markdown parsing for summaries
+- [ ] Implement hash calculation utility
+- [ ] Query Nhost Storage by hash before uploading
+- [ ] Update `uploadImage()` with hash-based deduplication
+- [ ] Wire cover image sync into PostBuilder
+- [ ] Test with real Notion data
 - [ ] Sync files to local dev Nhost
 - [ ] Implement infinite scroll
 - [ ] Measure performance baseline
 
 ---
 
-**Last Updated:** January 10, 2026
+**Last Updated:** January 17, 2026

@@ -23,7 +23,7 @@ export interface PostData {
 	updated_at: string;         // ISO 8601 timestamp (from Notion or manual)
 	tags?: any[] | null;       // JSONB array
 	authors?: any[] | null;    // JSONB array
-	meta?: Record<string, any> | null; // JSONB object
+	meta?: Record<string, any> | null; // JSONB object (includes cover: string in meta.cover)
 }
 
 /**

@@ -1,7 +1,6 @@
 <!-- packages/california-tech/src/lib/components/index_post.svelte -->
 <script lang="ts">
 	import type { Post } from '$lib/types/post';
-	import { dateConfig } from '$config/site';
 	import { UserConfig } from '$config/QWER.config';
 	import ImgBanner from '$lib/components/image_banner.svelte';
 
@@ -9,14 +8,6 @@
 
 	const numberPostsEager = 3;
 
-	const postPublishedStr = new Date(data.published).toLocaleString(
-		dateConfig.toPublishedString.locales,
-		dateConfig.toPublishedString.options
-	);
-	const postUpdatedStr = new Date(data.updated).toLocaleString(
-		dateConfig.toUpdatedString.locales,
-		dateConfig.toUpdatedString.options
-	);
 </script>
 
 {#if data}
@@ -24,11 +15,10 @@
 		itemscope
 		itemtype="https://schema.org/BlogPosting"
 		itemprop="blogPost"
-		class="index-post flex flex-col relative w-full overflow-hidden group shadow-xl hover:(shadow-2xl) transform transition duration-300 md:(w-3xl rounded-lg hover:(scale-105))"
+		class="index-post flex flex-col relative w-full overflow-hidden group shadow-lg hover:(shadow-xl) transform transition duration-300"
 	>
 		{#if data.series_tag && data.series_title}
 			<div class="series flex items-stretch gap-0 z-10">
-				<!-- This is now a simple link that works with and without JS -->
 				<a
 					href="/?tag={data.series_tag}"
 					class="series-tag py-2 cursor-pointer"
@@ -36,7 +26,7 @@
 				>
 					<div class="pl-4 pr-3 text-sm font-bold"># {data.series_tag} {UserConfig.SeriesTagName}</div>
 				</a>
-				<div class="series-title flex-1 py-2 md:rounded-tr-2xl">
+				<div class="series-title flex-1 py-2">
 					<div
 						class="px-3 text-sm font-semibold tracking-wide align-middle whitespace-normal line-clamp-1 text-ellipsis"
 					>
@@ -54,74 +44,97 @@
 					src={data.cover}
 					imgClass="z-1 blur-sm op-80 absolute object-cover w-full h-full transition transform duration-300 ease-in-out group-hover:(scale-110 blur-none)"
 				/>
-				<div class="coverStyle-IN z-2 px-8 pt-4 pb-6 flex flex-col gap-2 bg-white/[0.25] dark:bg-black/[0.25]">
-					<time class="dt-published op-80 group-hover:font-600" datetime={data.published} itemprop="datePublished">
-						{postPublishedStr}
-					</time>
-					<time class="hidden dt-updated" datetime={data.updated} itemprop="dateModified">
-						{postUpdatedStr}
-					</time>
-					<h2 class="text-2xl font-bold line-clamp-2 text-ellipsis group-hover:font-900" itemprop="name headline">
-						<a href={data.slug} class="u-url title-link-orange-500-orange-500" itemprop="url">
-							{data.title}
+				<div class="coverStyle-IN z-2 px-6 pt-4 pb-6 flex flex-col gap-2 bg-white/[0.25] dark:bg-black/[0.25]">
+					<h2 class="text-xl font-bold line-clamp-3 text-ellipsis" itemprop="name headline">
+						<a href={data.slug} class="u-url title-link" itemprop="url">
+							{data.title || 'No Title'}
 						</a>
 					</h2>
-					<p class="text-lg line-clamp-2 group-hover:font-600" itemprop="description">{data.summary}</p>
+					<div class="metadata">
+						{#if data.authors && data.authors.length > 0}
+							<p class="author" itemprop="author">
+								{data.authors.join(', ')}
+							</p>
+						{/if}
+						{#if data.tags && data.tags.length > 0}
+							<p class="category">
+								{data.tags[0]}
+							</p>
+						{/if}
+					</div>
+					{#if data.summary_html}
+						<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
+							{@html data.summary_html}
+						</p>
+					{:else if data.summary}
+						<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
+					{/if}
 				</div>
 			{:else}
-				<div class:flex-col={['TOP', 'BOT'].indexOf(data.coverStyle) !== -1} class="flex md:border-none relative">
-					<div
-						class="overflow-hidden
-            {['TOP', 'BOT'].indexOf(data.coverStyle) !== -1 ? 'coverStyle-TOPnBOT' : ''}
-            {['RIGHT', 'LEFT'].indexOf(data.coverStyle) !== -1 ? 'coverStyle-RnL' : ''}"
-						class:order-first={data.coverStyle === 'TOP' || data.coverStyle === 'LEFT'}
-						class:order-last={data.coverStyle === 'BOT' || data.coverStyle === 'RIGHT'}
-					>
+				<div class="flex flex-col">
+					<div class="overflow-hidden">
 						<a href={data.slug} class="cursor-pointer" itemprop="url">
 							<ImgBanner
 								src={data.cover}
 								loading={index < numberPostsEager ? 'eager' : 'lazy'}
 								decoding={index < numberPostsEager ? 'auto' : 'async'}
-								imgClass="op-90 group-hover:scale-110 transition transform duration-300 ease-in-out object-cover w-full h-full"
+								imgClass="op-90 group-hover:scale-105 transition transform duration-300 ease-in-out object-cover w-full h-48"
 							/>
 						</a>
 					</div>
-					<div class="index-post-panel px-8 pt-4 pb-6 flex flex-col gap-2 flex-1">
-						<time class="dt-published op-80 group-hover:font-600" datetime={data.published} itemprop="datePublished">
-							{postPublishedStr}
-						</time>
-						<time class="hidden dt-updated" datetime={data.updated} itemprop="dateModified">
-							{postUpdatedStr}
-						</time>
-						<h2 class="text-2xl font-bold line-clamp-2 text-ellipsis group-hover:font-900" itemprop="name headline">
-							<a href={data.slug} class="u-url title-link-orange-500-orange-500" itemprop="url">
-								{data.title}
+					<div class="index-post-panel px-6 pt-4 pb-6 flex flex-col gap-2 flex-1">
+						<h2 class="text-xl font-bold line-clamp-3 text-ellipsis" itemprop="name headline">
+							<a href={data.slug} class="u-url title-link" itemprop="url">
+								{data.title || 'No Title'}
 							</a>
 						</h2>
-						<p class="text-lg line-clamp-2 group-hover:font-600" itemprop="description">{data.summary}</p>
+						<div class="metadata">
+							{#if data.authors && data.authors.length > 0}
+								<p class="author" itemprop="author">
+									{data.authors.join(', ')}
+								</p>
+							{/if}
+							{#if data.tags && data.tags.length > 0}
+								<p class="category">
+									{data.tags[0]}
+								</p>
+							{/if}
+						</div>
+						{#if data.summary_html}
+							<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
+								{@html data.summary_html}
+							</p>
+						{:else if data.summary}
+							<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
+						{/if}
 					</div>
 				</div>
 			{/if}
 		{:else}
-			<div class="index-post-panel flex flex-col flex-1 gap-2 px-8 pt-4 pb-6">
-				<time class="dt-published op-80 group-hover:font-600" datetime={data.published} itemprop="datePublished">
-					{postPublishedStr}
-				</time>
-				<time class="hidden dt-updated" datetime={data.updated} itemprop="dateModified">
-					{postUpdatedStr}
-				</time>
-
-				<h2 class="text-2xl font-bold line-clamp-2 text-ellipsis group-hover:font-900" itemprop="name headline">
-					<a href={data.slug} class="u-url title-link-orange-500-orange-500" itemprop="url">
-						{#if data.title}
-							{data.title}
-						{:else}
-							No Title
-						{/if}
+			<div class="index-post-panel flex flex-col flex-1 gap-2 px-6 pt-4 pb-6">
+				<h2 class="text-xl font-bold line-clamp-3 text-ellipsis" itemprop="name headline">
+					<a href={data.slug} class="u-url title-link" itemprop="url">
+						{data.title || 'No Title'}
 					</a>
 				</h2>
-				{#if data.summary}
-					<p class="text-lg line-clamp-2 group-hover:font-600" itemprop="description">{data.summary}</p>
+				<div class="metadata">
+					{#if data.authors && data.authors.length > 0}
+						<p class="author" itemprop="author">
+							{data.authors.join(', ')}
+						</p>
+					{/if}
+					{#if data.tags && data.tags.length > 0}
+						<p class="category">
+							{data.tags[0]}
+						</p>
+					{/if}
+				</div>
+				{#if data.summary_html}
+					<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
+						{@html data.summary_html}
+					</p>
+				{:else if data.summary}
+					<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
 				{/if}
 			</div>
 		{/if}
@@ -130,9 +143,12 @@
 
 <style lang="scss">
 	.index-post {
-		border-top: var(--qwer-border-mobile);
-		border-bottom: var(--qwer-border-mobile);
+		--at-apply: 'border-1';
+		border-color: var(--qwer-border-color);
 		color: var(--qwer-text-color);
+		background-color: var(--qwer-bg-color);
+		height: 100%;
+		
 		h2 a {
 			color: var(--qwer-title-color);
 
@@ -142,36 +158,30 @@
 		}
 	}
 
-	.coverStyle-TOPnBOT {
-		height: var(--qwer-cover-height-TOPnBOT-mobile);
+	.metadata {
+		--at-apply: 'flex gap-2 items-center text-sm border-b-1 pb-2 mb-1';
+		border-color: var(--qwer-metadata-border-color);
 	}
-	.coverStyle-RnL {
-		width: var(--qwer-cover-width-RnL-mobile);
+
+	.author {
+		--at-apply: 'font-600 m-0';
+	}
+
+	.category {
+		--at-apply: 'm-0 op-70';
+	}
+
+	.summary {
+		--at-apply: 'text-base leading-relaxed';
 	}
 
 	.coverStyle-IN {
-		height: var(--qwer-cover-height-IN-mobile);
-	}
-
-	@media (min-width: 768px) {
-		.index-post {
-			border: var(--qwer-border-desktop);
-		}
-
-		.coverStyle-TOPnBOT {
-			height: var(--qwer-cover-height-TOPnBOT);
-		}
-		.coverStyle-RnL {
-			width: var(--qwer-cover-width-RnL);
-		}
-		.coverStyle-IN {
-			height: var(--qwer-cover-height-IN);
-		}
+		--at-apply: 'h-90';
 	}
 
 	.index-post-panel {
 		background-color: var(--qwer-bg-color);
-		min-height: var(--qwer-min-height);
+		--at-apply: 'min-h-60';
 	}
 
 	.series {

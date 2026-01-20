@@ -58,7 +58,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 
 		// Create orchestrator and process page
-		const orchestrator = createSyncOrchestrator(dbConfig);
+		const orchestrator = createSyncOrchestrator(dbConfig, config);
 		await orchestrator.processPage(page);
 
 		logger.info({ event: 'webhook_processed_successfully', pageId });

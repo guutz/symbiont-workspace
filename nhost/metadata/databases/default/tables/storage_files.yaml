@@ -75,7 +75,9 @@ select_permissions:
   - role: public
     permission:
       columns:
+        - bucket_id
         - created_at
+        - etag
         - id
         - is_uploaded
         - metadata
@@ -83,6 +85,7 @@ select_permissions:
         - name
         - size
         - updated_at
+        - uploaded_by_user_id
       filter:
         bucket_id:
           _eq: default

@@ -8,6 +8,8 @@ export namespace Post {
     description: string;
     authors?: Array<string>;
     summary?: string;
+    /** Pre-rendered HTML from summary markdown */
+    summary_html?: string;
     content?: string;
     html?: string;
     published: string;

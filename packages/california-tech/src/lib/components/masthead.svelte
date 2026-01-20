@@ -13,7 +13,8 @@
 			weekday: 'long',
 			year: 'numeric',
 			month: 'long',
-			day: 'numeric'
+			day: 'numeric',
+			timeZone: 'America/Los_Angeles'
 		};
 		return date.toLocaleDateString('en-US', options);
 	}
