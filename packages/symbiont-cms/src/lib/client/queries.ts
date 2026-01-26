@@ -1,17 +1,34 @@
 /**
- * Public GraphQL query wrappers for Symbiont CMS (client-safe)
+ * Public Supabase query wrappers for Symbiont CMS (client-safe)
  * 
  * These functions can be used in both client and server contexts.
- * They load public config (graphqlEndpoint) and provide read-only queries.
+ * They use the virtual config module for public configuration.
  * 
  * For admin mutations (upsert, delete), see 'symbiont-cms/server' exports.
  */
 
-import { loadConfig } from './load-config.js';
+import config from 'virtual:symbiont/config';
 import type { Post } from '../types.js';
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types.js';
 
+// --- Constants (extracted from virtual config at module level) ---
+
+const PAGES_TABLE = 'pages';
+const SUPABASE_URL = config.supabase.url;
+const SUPABASE_KEY = config.supabase.publishableKey;
+const DEFAULT_ALIAS = config.aliases?.[0];
+
+// Validate required config at module load time
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+	throw new Error(
+		'Supabase configuration is missing. Please ensure symbiont.config.js includes:\n' +
+		'  supabase: {\n' +
+		'    url: "<your-supabase-url>",\n' +
+		'    publishableKey: "<your-publishable-key>"\n' +
+		'  }'
+	);
+}
 
 // --- Query Options ---
 
@@ -33,54 +50,44 @@ export interface GetAllPostsOptions {
 	alias?: string;
 }
 
-// --- Helper: Create Client ---
+// --- Helper Functions ---
 
 /**
- * Internal helper to create a Supabase client with public config
+ * Internal helper to create a Supabase client with public config.
+ * Creates a new client per request (necessary for SSR cookie handling).
  */
-async function createClient(customFetch?: typeof globalThis.fetch): Promise<{
-	client: SupabaseClient<Database>;
-	config: Awaited<ReturnType<typeof loadConfig>>;
-}> {
-	const config = await loadConfig();
-	const client = createSupabaseClient<Database>(
-		config.supabase.url,
-		config.supabase.publishableKey,
-		{ global: { fetch: customFetch } }
-	);
-
-	return { client, config };
-}
-
-/** Execute a public query against the pages table */
-async function runPublicPagesQuery<T>(
-	variables: Record<string, any>,
-	options: { fetch?: typeof globalThis.fetch; alias?: string } = {}
-): Promise<T> {
-	const { client, config } = await createClient(options.fetch);
-	const sourceAlias = resolveAlias(config, options.alias);
-
-	return client.from(PAGES_TABLE)
-				.select('*')
-				.eq('datasource_alias', sourceAlias)
-				.match(variables)
-				.then(({ data, error }) => {
-					if (error) {
-						throw new Error(`Query error: ${error.message}`);
-					}
-					return { pages: data as T[] } as unknown as T;
-				}
+function createClient(customFetch?: typeof globalThis.fetch): SupabaseClient<Database> {
+	return createSupabaseClient<Database>(
+		SUPABASE_URL,
+		SUPABASE_KEY,
+		{ 
+			global: { fetch: customFetch },
+			auth: {
+				persistSession: false,
+				autoRefreshToken: false,
+				detectSessionInUrl: false
+			}
+		}
 	);
 }
 
-function resolveAlias(config: Awaited<ReturnType<typeof loadConfig>>, alias?: string): string {
-	const sourceAlias = alias ?? config.aliases[0];
-
-	if (!sourceAlias) {
-		throw new Error('No database alias configured or provided');
+/**
+ * Validates and returns a database alias.
+ * Falls back to DEFAULT_ALIAS if none provided.
+ * Throws error if no alias is available.
+ */
+function resolveAlias(alias?: string): string {
+	const resolvedAlias = alias ?? DEFAULT_ALIAS;
+	
+	if (!resolvedAlias) {
+		throw new Error(
+			'No database alias configured or provided. Please either:\n' +
+			'  1. Configure at least one database in symbiont.config.js, or\n' +
+			'  2. Provide an explicit alias in the query options'
+		);
 	}
-
-	return sourceAlias;
+	
+	return resolvedAlias;
 }
 
 // --- Public Query Functions ---
@@ -88,7 +95,7 @@ function resolveAlias(config: Awaited<ReturnType<typeof loadConfig>>, alias?: st
 /**
  * Fetch a single post by slug
  * 
- * Automatically loads public config and creates a GraphQL client.
+ * Automatically loads public config and creates a Supabase client.
  * Pass `fetch` from SvelteKit load context for SSR.
  * 
  * @param slug - The post slug to fetch
@@ -109,18 +116,26 @@ export async function getPostBySlug(
 	slug: string,
 	options: GetPostOptions = {}
 ): Promise<Post | null> {
-	const result = await runPublicPagesQuery<{ pages: Post[] }>(
-		buildGetPostBySlug,
-		{ slug },
-		{ fetch: options.fetch, alias: options.alias }
-	);
-	return result.pages[0] ?? null;
+	const client = createClient(options.fetch);
+	const sourceAlias = resolveAlias(options.alias);
+	
+	const { data, error } = await client.from(PAGES_TABLE)
+		.select('*')
+		.eq('datasource_alias', sourceAlias)
+		.eq('slug', slug)
+		.maybeSingle();
+	
+	if (error) {
+		throw new Error(`Query error: ${error.message}`);
+	}
+	
+	return data as Post | null;
 }
 
 /**
  * Fetch all posts for a database
  * 
- * Automatically loads public config and creates a GraphQL client.
+ * Automatically loads public config and creates a Supabase client.
  * Pass `fetch` from SvelteKit load context for SSR.
  * 
  * @param options - Fetch function, pagination, and database selection
@@ -138,14 +153,21 @@ export async function getPostBySlug(
 export async function getAllPosts(
 	options: GetAllPostsOptions = {}
 ): Promise<Post[]> {
-	const result = await runPublicPagesQuery<{ pages: Post[] }>(
-		buildGetAllPosts,
-		{
-			limit: options.limit ?? 100,
-			offset: options.offset ?? 0
-		},
-		{ fetch: options.fetch, alias: options.alias }
-	);
+	const client = createClient(options.fetch);
+	const sourceAlias = resolveAlias(options.alias);
 	
-	return result.pages;
+	const offset = options.offset ?? 0;
+	const limit = options.limit ?? 100;
+	
+	const { data, error } = await client.from(PAGES_TABLE)
+		.select('*')
+		.eq('datasource_alias', sourceAlias)
+		.order('publish_at', { ascending: false })
+		.range(offset, offset + limit - 1);
+	
+	if (error) {
+		throw new Error(`Query error: ${error.message}`);
+	}
+	
+	return data as Post[];
 }

@@ -22,10 +22,7 @@ export type {
 	PublicSymbiontConfig
 } from './types.js';
 
-// Config loading (client-safe, returns PublicSymbiontConfig)
-export { loadConfig } from './client/load-config.js';
-
-// Public GraphQL queries (client-safe)
+// Public Supabase queries (client-safe)
 export { getPostBySlug, getAllPosts } from './client/queries.js';
 export type { GetPostOptions, GetAllPostsOptions } from './client/queries.js';
 
