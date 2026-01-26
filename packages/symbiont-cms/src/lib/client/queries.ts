@@ -134,12 +134,14 @@ export async function getAllPosts(
 		throw new Error('No database alias configured or provided');
 	}
 	
+	const offset = options.offset ?? 0;
+	const limit = options.limit ?? 100;
+	
 	const { data, error } = await client.from(PAGES_TABLE)
 		.select('*')
 		.eq('datasource_alias', sourceAlias)
 		.order('publish_at', { ascending: false })
-		.limit(options.limit ?? 100)
-		.range(options.offset ?? 0, (options.offset ?? 0) + (options.limit ?? 100) - 1);
+		.range(offset, offset + limit - 1);
 	
 	if (error) {
 		throw new Error(`Query error: ${error.message}`);
