@@ -17,7 +17,18 @@ import type { Database } from '../database.types.js';
 const PAGES_TABLE = 'pages';
 const SUPABASE_URL = config.supabase.url;
 const SUPABASE_KEY = config.supabase.publishableKey;
-const DEFAULT_ALIAS = config.aliases[0] || undefined; // May be undefined if no databases configured
+const DEFAULT_ALIAS = config.aliases?.[0]; // May be undefined if no databases configured
+
+// Validate required config at module load time
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+	throw new Error(
+		'Supabase configuration is missing. Please ensure symbiont.config.js includes:\n' +
+		'  supabase: {\n' +
+		'    url: "<your-supabase-url>",\n' +
+		'    publishableKey: "<your-publishable-key>"\n' +
+		'  }'
+	);
+}
 
 // --- Query Options ---
 
