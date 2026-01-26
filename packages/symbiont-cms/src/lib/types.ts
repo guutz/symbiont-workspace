@@ -210,7 +210,13 @@ export interface PublicSymbiontConfig {
         publishableKey: string;
     }
 
-    /** All configured datasource aliases (for client-side queries) */
+    /** All configured databases (alias + dataSourceId only) */
+    databases: Array<{
+        alias: string;
+        dataSourceId: string;
+    }>;
+    
+    /** Convenience: array of just the aliases */
     aliases: string[];
 }
 
