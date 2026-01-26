@@ -73,19 +73,21 @@ export function symbiontVitePlugin(): Plugin {
 						throw new Error(`Config file ${configEntry.path} must export a default object`);
 					}
 					
-				// Extract ONLY public data (no functions, no secrets)
-				// Note: dataSourceId (Notion database UUID) is not secret - only notionToken is
-				const publicConfig = {
-					supabase: {
-						url: config.supabase?.url || '',
-						publishableKey: config.supabase?.publishableKey || ''
-					},
-					databases: config.databases?.map((db: any) => ({
-						alias: db.alias,
-						dataSourceId: db.dataSourceId
-					})) || [],
-					aliases: config.databases?.map((db: any) => db.alias) || []
-				};					// Return as a static module with only JSON data
+					// Extract ONLY public data (no functions, no secrets)
+					// Note: dataSourceId (Notion database UUID) is not secret - only notionToken is
+					const publicConfig = {
+						supabase: {
+							url: config.supabase?.url || '',
+							publishableKey: config.supabase?.publishableKey || ''
+						},
+						databases: config.databases?.map((db: any) => ({
+							alias: db.alias,
+							dataSourceId: db.dataSourceId
+						})) || [],
+						aliases: config.databases?.map((db: any) => db.alias) || []
+					};
+					
+					// Return as a static module with only JSON data
 					return `export default ${JSON.stringify(publicConfig, null, 2)};`;
 				} catch (error) {
 					// Provide helpful error message

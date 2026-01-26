@@ -17,7 +17,7 @@ import type { Database } from '../database.types.js';
 const PAGES_TABLE = 'pages';
 const SUPABASE_URL = config.supabase.url;
 const SUPABASE_KEY = config.supabase.publishableKey;
-const DEFAULT_ALIAS = config.aliases[0];
+const DEFAULT_ALIAS = config.aliases[0] || undefined; // May be undefined if no databases configured
 
 // --- Query Options ---
 
