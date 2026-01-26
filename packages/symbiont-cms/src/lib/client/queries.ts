@@ -60,30 +60,6 @@ function createClient(customFetch?: typeof globalThis.fetch): SupabaseClient<Dat
 	);
 }
 
-/** Execute a public query against the pages table */
-async function runPublicPagesQuery<T>(
-	variables: Record<string, any>,
-	options: { fetch?: typeof globalThis.fetch; alias?: string } = {}
-): Promise<T> {
-	const client = createClient(options.fetch);
-	const sourceAlias = options.alias ?? DEFAULT_ALIAS;
-	
-	if (!sourceAlias) {
-		throw new Error('No database alias configured or provided');
-	}
-
-	return client.from(PAGES_TABLE)
-		.select('*')
-		.eq('datasource_alias', sourceAlias)
-		.match(variables)
-		.then(({ data, error }) => {
-			if (error) {
-				throw new Error(`Query error: ${error.message}`);
-			}
-			return { pages: data as T[] } as unknown as T;
-		});
-}
-
 // --- Public Query Functions ---
 
 /**
@@ -110,11 +86,24 @@ export async function getPostBySlug(
 	slug: string,
 	options: GetPostOptions = {}
 ): Promise<Post | null> {
-	const result = await runPublicPagesQuery<{ pages: Post[] }>(
-		{ slug },
-		{ fetch: options.fetch, alias: options.alias }
-	);
-	return result.pages[0] ?? null;
+	const client = createClient(options.fetch);
+	const sourceAlias = options.alias ?? DEFAULT_ALIAS;
+	
+	if (!sourceAlias) {
+		throw new Error('No database alias configured or provided');
+	}
+	
+	const { data, error } = await client.from(PAGES_TABLE)
+		.select('*')
+		.eq('datasource_alias', sourceAlias)
+		.eq('slug', slug)
+		.maybeSingle();
+	
+	if (error) {
+		throw new Error(`Query error: ${error.message}`);
+	}
+	
+	return data as Post | null;
 }
 
 /**
