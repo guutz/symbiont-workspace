@@ -5,6 +5,10 @@ import { createSlug } from '../utils/slug-helpers.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { createLogger } from '../utils/logger.js';
+import { processMarkdownImages } from '../../image-processor.js';
+import { uploadImage } from '../../image-upload.js';
+import { markdownToNotionBlocks } from '../notion/markdown-to-notion.js';
+import { requireEnvVar } from '../utils/env.server.js';
 
 /**
  * PostBuilder - Business logic for transforming Notion pages into Post data
@@ -23,7 +27,7 @@ export class PostBuilder {
 	constructor(
 		private config: DatabaseBlueprint,
 		private notionAdapter: NotionAdapter,
-		private postRepository: PostRepository
+		private postRepository: PostRepository,
 	) {
 		this.logger = createLogger({
 			operation: 'post_builder',
@@ -56,8 +60,120 @@ export class PostBuilder {
 		// 3. Resolve slug only for public posts (non-public posts may not be finished)
 		const slug = isPublic ? await this.resolveSlug(page, meta.title) : null;
 
-		// 4. Get content
-		const content = await this.notionAdapter.pageToMarkdown(page.id);
+		// 4. Process cover image from database property (if configured)
+		let coverUrl: string | null = null;
+		if (this.config.coverProperty) {
+			try {
+				const coverProp = page.properties[this.config.coverProperty] as any;
+				
+				// Handle files property (can be array of files)
+				if (coverProp?.type === 'files' && coverProp.files?.length > 0) {
+					const file = coverProp.files[0];
+					
+					// Extract URL based on file type (external vs Notion-hosted)
+					if (file.type === 'file') {
+						// Notion-hosted file - upload to Nhost (these URLs expire)
+						const originalCoverUrl = file.file?.url;
+						if (originalCoverUrl) {
+							const result = await uploadImage(originalCoverUrl, {
+								
+								bucketId: 'default',
+								pathPrefix: `${page.id}/`
+							});
+							coverUrl = result.newUrl;
+							
+							this.logger.info({
+								event: 'cover_image_uploaded',
+								pageId: page.id,
+								originalUrl: originalCoverUrl,
+								newUrl: coverUrl,
+								fileId: result.fileId
+							});
+						}
+					} else if (file.type === 'external') {
+						// External URL - use as-is (already permanent)
+						coverUrl = file.external?.url || null;
+						
+						this.logger.info({
+							event: 'cover_image_external',
+							pageId: page.id,
+							coverUrl
+						});
+					}
+				}
+			} catch (error: any) {
+				this.logger.warn({
+					event: 'cover_image_upload_failed',
+					pageId: page.id,
+					error: error?.message
+				});
+			}
+		}
+
+		// 5. Get content as markdown
+		let content = await this.notionAdapter.pageToMarkdown(page.id);
+
+		// 6. Process images in content blocks (upload Notion CDN images to Nhost)
+		if (content) {
+			try {
+				const { markdown: updatedMarkdown, uploaded, failed } = await processMarkdownImages(content, {
+					
+					bucketId: 'default',
+					shouldUpload: (url) => url.includes('notion.so') // Only upload Notion CDN images
+				});
+				
+				const hasImageChanges = updatedMarkdown !== content;
+				content = updatedMarkdown;
+				
+				if (uploaded.length > 0) {
+					this.logger.info({
+						event: 'content_images_processed',
+						pageId: page.id,
+						uploadedCount: uploaded.length,
+						failedCount: failed.length
+					});
+				}
+				
+				if (failed.length > 0) {
+					this.logger.warn({
+						event: 'some_images_failed',
+						pageId: page.id,
+						failed: failed.map(f => ({ url: f.originalUrl, error: f.error }))
+					});
+				}
+				
+				// Sync updated content back to Notion
+				if (hasImageChanges) {
+					try {
+						const blocks = markdownToNotionBlocks(updatedMarkdown, {
+							strictImageUrls: false,
+							truncate: true
+						});
+						
+						await this.notionAdapter.updatePageBlocks(page.id, blocks);
+						
+						this.logger.info({
+							event: 'notion_content_synced',
+							pageId: page.id,
+							blockCount: blocks.length
+						});
+					} catch (syncError: any) {
+						this.logger.warn({
+							event: 'notion_sync_failed',
+							pageId: page.id,
+							error: syncError?.message
+						});
+						// Don't fail the whole sync if Notion update fails
+					}
+				}
+			} catch (error: any) {
+				this.logger.warn({
+					event: 'content_image_processing_failed',
+					pageId: page.id,
+					error: error?.message
+				});
+			}
+		}
 
 		if (!isPublic) {
 			this.logger.debug({
@@ -67,7 +183,13 @@ export class PostBuilder {
 			});
 		}
 
-		// 5. Build post data
+		// 7. Build post data
+		// Extract custom metadata and merge with cover URL
+		const customMeta = this.extractCustomMetadata(page);
+		const metaWithCover = coverUrl 
+			? { ...customMeta, cover: coverUrl }
+			: customMeta;
+		
 		const postData: PostData = {
 			page_id: page.id,
 			datasource_id: this.config.dataSourceId,
@@ -79,7 +201,7 @@ export class PostBuilder {
 			updated_at: page.last_edited_time, // Use Notion's last edited time
 			tags: meta.tags.length > 0 ? meta.tags : null,
 			authors: meta.authors.length > 0 ? meta.authors : null,
-			meta: this.extractCustomMetadata(page)
+			meta: metaWithCover
 		};
 
 		this.logger.info({

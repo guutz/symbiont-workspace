@@ -7,65 +7,11 @@
  * For admin mutations (upsert, delete), see 'symbiont-cms/server' exports.
  */
 
-import { GraphQLClient } from 'graphql-request';
 import { loadConfig } from './load-config.js';
 import type { Post } from '../types.js';
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../database.types.js';
 
-// Table name is centralized here; change only after aligning Hasura metadata/migrations
-const PAGES_TABLE = 'pages';
-
-// --- GraphQL Query Builders (pure) ---
-
-function buildGetPostBySlug(): string {
-	return `
-		query GetPostBySlug($slug: String!, $alias: String!) {
-			${PAGES_TABLE}(
-				where: {
-					_and: [
-						{ slug: { _eq: $slug } },
-						{ datasource_alias: { _eq: $alias } }
-					]
-				}
-				limit: 1
-			) {
-				page_id
-				datasource_alias
-				title
-				slug
-				content
-				publish_at
-				updated_at
-				tags
-				authors
-				meta
-			}
-		}
-	`;
-}
-
-function buildGetAllPosts(): string {
-	return `
-		query GetAllPosts($limit: Int, $offset: Int, $alias: String!) {
-			${PAGES_TABLE}(
-				where: { datasource_alias: { _eq: $alias } }
-				order_by: { publish_at: desc }
-				limit: $limit
-				offset: $offset
-			) {
-				page_id
-				datasource_alias
-				title
-				slug
-				content
-				publish_at
-				updated_at
-				tags
-				authors
-				meta
-			}
-		}
-	`;
-}
 
 // --- Query Options ---
 
@@ -90,31 +36,41 @@ export interface GetAllPostsOptions {
 // --- Helper: Create Client ---
 
 /**
- * Internal helper to create a GraphQL client with public config
+ * Internal helper to create a Supabase client with public config
  */
 async function createClient(customFetch?: typeof globalThis.fetch): Promise<{
-	client: GraphQLClient;
+	client: SupabaseClient<Database>;
 	config: Awaited<ReturnType<typeof loadConfig>>;
 }> {
 	const config = await loadConfig();
-	const client = new GraphQLClient(config.graphqlEndpoint, {
-		fetch: customFetch
-	});
+	const client = createSupabaseClient<Database>(
+		config.supabase.url,
+		config.supabase.publishableKey,
+		{ global: { fetch: customFetch } }
+	);
 
 	return { client, config };
 }
 
-/** Execute a public GraphQL query against the pages table */
+/** Execute a public query against the pages table */
 async function runPublicPagesQuery<T>(
-	queryBuilder: () => string,
 	variables: Record<string, any>,
 	options: { fetch?: typeof globalThis.fetch; alias?: string } = {}
 ): Promise<T> {
 	const { client, config } = await createClient(options.fetch);
 	const sourceAlias = resolveAlias(config, options.alias);
 
-	const query = queryBuilder();
-	return client.request<T>(query, { ...variables, alias: sourceAlias });
+	return client.from(PAGES_TABLE)
+				.select('*')
+				.eq('datasource_alias', sourceAlias)
+				.match(variables)
+				.then(({ data, error }) => {
+					if (error) {
+						throw new Error(`Query error: ${error.message}`);
+					}
+					return { pages: data as T[] } as unknown as T;
+				}
+	);
 }
 
 function resolveAlias(config: Awaited<ReturnType<typeof loadConfig>>, alias?: string): string {

@@ -3,11 +3,7 @@
  * Downloads external images and uploads them to Nhost Storage.
  */
 
-import type { NhostClient } from '@nhost/nhost-js';
-
 export interface ImageUploadOptions {
-	/** Nhost client instance */
-	nhost: NhostClient;
 	/** Target bucket name (default: 'uploads') */
 	bucketId?: string;
 	/** Optional path prefix within bucket (e.g., 'blog-images/') */
@@ -81,7 +77,6 @@ export async function uploadImage(
 	options: ImageUploadOptions
 ): Promise<ImageUploadResult> {
 	const {
-		nhost,
 		bucketId = 'uploads',
 		pathPrefix = '',
 		fetchImpl = fetch
@@ -98,10 +93,7 @@ export async function uploadImage(
 	const file = new File([blob], fullPath);
 
 	// Upload to Nhost Storage using the uploadFiles API
-	const uploadResp = await nhost.storage.uploadFiles({
-		'bucket-id': bucketId,
-		'file[]': [file]
-	});
+	const uploadResp = await ;
 
 	// Check for errors (FetchResponse throws on >= 300 status codes)
 	if (!uploadResp.body?.processedFiles?.[0]) {

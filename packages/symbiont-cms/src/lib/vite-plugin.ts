@@ -11,7 +11,7 @@ const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
  * 
  * This creates a virtual module 'virtual:symbiont/config' that can be
  * imported anywhere (client or server) and contains only:
- * - graphqlEndpoint
+ * - supabase url and publishableKey
  * - aliases[] (all configured datasource aliases like 'blog', 'docs')
  * 
  * All server-only data (dataSourceId, notionToken, functions, rules) stays 
@@ -36,8 +36,7 @@ export function symbiontVitePlugin(): Plugin {
 					// Look for config file (.js or .mjs only)
 					const cwd = process.cwd();
 					const configPaths = [
-						{ path: path.resolve(cwd, 'symbiont.config.js'), ext: '.js' },
-						{ path: path.resolve(cwd, 'symbiont.config.mjs'), ext: '.mjs' }
+						{ path: path.resolve(cwd, 'symbiont.config.js'), ext: '.js' }
 					];
 					
 					// Check for .ts file and provide helpful error
@@ -78,7 +77,10 @@ export function symbiontVitePlugin(): Plugin {
 				const aliases = config.databases?.map((db: any) => db.alias) || [];
 
 				const publicConfig = {
-					graphqlEndpoint: config.graphqlEndpoint,
+					supabase: {
+						url: config.supabase?.url || '',
+						publishableKey: config.supabase?.publishableKey || ''
+					},
 					aliases
 				};					// Return as a static module with only JSON data
 					return `export default ${JSON.stringify(publicConfig, null, 2)};`;
@@ -95,7 +97,7 @@ export function symbiontVitePlugin(): Plugin {
 		
 		// Enable HMR for config changes during development
 		handleHotUpdate({ file, server }) {
-			if (file.match(/symbiont\.config\.(js|mjs)$/)) {
+			if (file.match(/symbiont\.config\.js$/)) {
 				// Invalidate the virtual module so it reloads with new config
 				const module = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_MODULE_ID);
 				if (module) {
@@ -105,10 +107,4 @@ export function symbiontVitePlugin(): Plugin {
 			}
 		}
 	};
-}
-
-// Export type for virtual module (for TypeScript autocomplete)
-export interface VirtualSymbiontConfig {
-	graphqlEndpoint: string;
-	aliases: string[];
 }

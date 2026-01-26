@@ -7,10 +7,6 @@ import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { PostBuilder } from './post-builder.js';
 import { SyncOrchestrator } from './orchestrator.js';
-import NhostDefault from '@nhost/nhost-js';
-import type { NhostClient } from '@nhost/nhost-js';
-
-const { createClient, withAdminSession } = NhostDefault as any;
 
 /**
  * Factory function to create a fully-wired SyncOrchestrator
@@ -42,20 +38,8 @@ export function createSyncOrchestrator(
 	// Note: gqlAdminClient is a lazy-initialized wrapper that loads config on first use
 	const postRepository = new PostRepository(gqlAdminClient as any);
 
-	// Initialize Nhost client for image uploads
-	const adminSecret = requireEnvVar('NHOST_ADMIN_SECRET');
-	const nhostClient = createClient({
-		subdomain: fullConfig.nhost.subdomain,
-		region: fullConfig.nhost.region,
-		configure: [
-			withAdminSession({
-				adminSecret
-			})
-		]
-	});
-
 	// Create business logic layer (PostBuilder)
-	const postBuilder = new PostBuilder(config, notionAdapter, postRepository, nhostClient);
+	const postBuilder = new PostBuilder(config, notionAdapter, postRepository, );
 
 	// Create orchestrator (coordination layer)
 	const orchestrator = new SyncOrchestrator(

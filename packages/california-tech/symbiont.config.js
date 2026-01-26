@@ -8,10 +8,10 @@ import { defineConfig } from 'symbiont-cms/config';
  * @type {import('symbiont-cms').SymbiontConfig}
  */
 const config = defineConfig({
-	// PUBLIC: Nhost configuration for storage and GraphQL endpoint
-	nhost: {
-		subdomain: 'ygsdnfrbruuhtxczekur',
-		region: 'us-west-2'
+	// PUBLIC: Supabase configuration for client-side access
+	supabase: {
+		url: 'https://xguzskbxiptvhbyggkpl.supabase.co',
+		publishableKey: 'sb_publishable_6L-isfCogfHJxcnTT9WseA_U4GUHcAB',
 	},
 
 	markdown: {

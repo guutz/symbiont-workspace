@@ -5,14 +5,12 @@
  * 3. Rewrite URLs in content
  */
 
-import type { NhostClient } from '@nhost/nhost-js';
 import { extractImageUrlsFromMarkdown, extractImageUrlsFromNotionPage } from './image-utils.js';
 import { uploadImages, rewriteImageUrls } from './image-upload.js';
 import type { ImageUploadResult } from './image-upload.js';
 
 export interface ImageProcessorOptions {
-	/** Nhost client instance */
-	nhost: NhostClient;
+	
 	/** Target bucket name (default: 'uploads') */
 	bucketId?: string;
 	/** Optional path prefix within bucket (e.g., 'blog-images/') */

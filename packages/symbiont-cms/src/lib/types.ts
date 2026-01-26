@@ -1,4 +1,5 @@
 import type { PageObjectResponse } from '@notionhq/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -74,6 +75,8 @@ export type Post = {
 
     // Optional QWER-compatible fields
     summary?: string;
+    /** Pre-rendered HTML from summary markdown (populated by postsLoad) */
+    summary_html?: string;
     description?: string;
     language?: string;
     cover?: string;
@@ -143,6 +146,10 @@ export interface DatabaseBlueprint {
     authorsProperty?: string | null;
     // Default: null (no authors)
 
+    /** Cover image property name (files property) */
+    coverProperty?: string | null;
+    // Default: null (no cover image)
+
     // ============================================
     // FLEXIBLE METADATA - Pass-through to JSONB
     // ============================================
@@ -172,11 +179,14 @@ export interface DatabaseBlueprint {
 
 /**
  * Full Symbiont configuration.
- * Contains both public data (graphqlEndpoint) and private server-only configuration (databases with rules).
+ * Contains both public data and private server-only configuration (databases with rules).
  */
 export interface SymbiontConfig {
-    /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
-    graphqlEndpoint: string;
+    /** PUBLIC */
+    supabase: {
+        url: string;         // https://<project-ref>.supabase.co
+        publishableKey: string;     // Public key
+    };
 
     /** PRIVATE: Database configurations with server-only sync rules. */
     databases: DatabaseBlueprint[];
@@ -194,8 +204,11 @@ export interface SymbiontConfig {
  * Contains NO functions, NO secrets - only public identifiers.
  */
 export interface PublicSymbiontConfig {
-    /** GraphQL endpoint URL */
-    graphqlEndpoint: string;
+    /** Public Supabase client configuration */
+    supabase: {
+        url: string;
+        publishableKey: string;
+    }
 
     /** All configured datasource aliases (for client-side queries) */
     aliases: string[];
@@ -245,7 +258,6 @@ export interface CachingConfig {
 export type HydratedDatabaseConfig = DatabaseBlueprint;
 
 export interface HydratedSymbiontConfig {
-    graphqlEndpoint: string;
     databases: HydratedDatabaseConfig[];
     markdown?: MarkdownConfig;
     caching?: CachingConfig;
