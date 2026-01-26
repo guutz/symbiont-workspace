@@ -17,7 +17,7 @@ import type { Database } from '../database.types.js';
 const PAGES_TABLE = 'pages';
 const SUPABASE_URL = config.supabase.url;
 const SUPABASE_KEY = config.supabase.publishableKey;
-const DEFAULT_ALIAS = config.aliases?.[0]; // May be undefined if no databases configured
+const DEFAULT_ALIAS = config.aliases?.[0];
 
 // Validate required config at module load time
 if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -50,7 +50,7 @@ export interface GetAllPostsOptions {
 	alias?: string;
 }
 
-// --- Helper: Create Client ---
+// --- Helper Functions ---
 
 /**
  * Internal helper to create a Supabase client with public config.
@@ -69,6 +69,25 @@ function createClient(customFetch?: typeof globalThis.fetch): SupabaseClient<Dat
 			}
 		}
 	);
+}
+
+/**
+ * Validates and returns a database alias.
+ * Falls back to DEFAULT_ALIAS if none provided.
+ * Throws error if no alias is available.
+ */
+function resolveAlias(alias?: string): string {
+	const resolvedAlias = alias ?? DEFAULT_ALIAS;
+	
+	if (!resolvedAlias) {
+		throw new Error(
+			'No database alias configured or provided. Please either:\n' +
+			'  1. Configure at least one database in symbiont.config.js, or\n' +
+			'  2. Provide an explicit alias in the query options'
+		);
+	}
+	
+	return resolvedAlias;
 }
 
 // --- Public Query Functions ---
@@ -98,11 +117,7 @@ export async function getPostBySlug(
 	options: GetPostOptions = {}
 ): Promise<Post | null> {
 	const client = createClient(options.fetch);
-	const sourceAlias = options.alias ?? DEFAULT_ALIAS;
-	
-	if (!sourceAlias) {
-		throw new Error('No database alias configured or provided');
-	}
+	const sourceAlias = resolveAlias(options.alias);
 	
 	const { data, error } = await client.from(PAGES_TABLE)
 		.select('*')
@@ -139,11 +154,7 @@ export async function getAllPosts(
 	options: GetAllPostsOptions = {}
 ): Promise<Post[]> {
 	const client = createClient(options.fetch);
-	const sourceAlias = options.alias ?? DEFAULT_ALIAS;
-	
-	if (!sourceAlias) {
-		throw new Error('No database alias configured or provided');
-	}
+	const sourceAlias = resolveAlias(options.alias);
 	
 	const offset = options.offset ?? 0;
 	const limit = options.limit ?? 100;
