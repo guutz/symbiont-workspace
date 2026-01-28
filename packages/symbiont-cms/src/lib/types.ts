@@ -198,27 +198,7 @@ export interface SymbiontConfig {
     caching?: CachingConfig;
 }
 
-/**
- * Client-safe public configuration extracted from SymbiontConfig.
- * This is what gets exposed via the virtual module 'virtual:symbiont/config'.
- * Contains NO functions, NO secrets - only public identifiers.
- */
-export interface PublicSymbiontConfig {
-    /** Public Supabase client configuration */
-    supabase: {
-        url: string;
-        publishableKey: string;
-    }
 
-    /** All configured databases (alias + dataSourceId only) */
-    databases: Array<{
-        alias: string;
-        dataSourceId: string;
-    }>;
-    
-    /** Convenience: array of just the aliases */
-    aliases: string[];
-}
 
 /** Markdown configuration block from symbiont.config.js */
 export interface MarkdownConfig {

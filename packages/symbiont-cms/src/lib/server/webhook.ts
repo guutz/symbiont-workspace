@@ -1,7 +1,7 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { requireEnvVar, resolveNotionToken } from './utils/env.server.js';
-import { loadServerConfig } from './load-config.js';
+import type { SymbiontClient } from '../client.js';
 import { syncFromNotion } from './sync.js';
 import { createLogger } from './utils/logger.js';
 import { createSyncOrchestrator } from './sync/factory.js';
@@ -13,8 +13,11 @@ const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authentica
  * Handle Notion webhook requests for page updates
  * 
  * Refactored to use new SyncOrchestrator architecture
+ * 
+ * @param client - Symbiont client instance
+ * @param event - SvelteKit RequestEvent
  */
-export async function handleNotionWebhookRequest(event: RequestEvent) {
+export async function handleNotionWebhookRequest(client: SymbiontClient, event: RequestEvent) {
 	const logger = createLogger({ operation: 'webhook' });
 
 	try {
@@ -32,7 +35,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const notionDataSourceId = payload.page.parent.data_source_id;
 
 		// Find database config by dataSourceId (Notion database UUID)
-		const config = await loadServerConfig();
+		const config = client.config;
 		const dbConfig = config.databases.find((db: any) => db.dataSourceId === notionDataSourceId);
 
 		if (!dbConfig) {
@@ -58,7 +61,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 
 		// Create orchestrator and process page
-		const orchestrator = createSyncOrchestrator(dbConfig, config);
+		const orchestrator = createSyncOrchestrator(client, dbConfig);
 		await orchestrator.processPage(page);
 
 		logger.info({ event: 'webhook_processed_successfully', pageId });
@@ -75,8 +78,11 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 
 /**
  * Handle polling/cron sync requests
+ * 
+ * @param client - Symbiont client instance
+ * @param event - SvelteKit RequestEvent
  */
-export async function handlePollBlogRequest(event: RequestEvent) {
+export async function handlePollBlogRequest(client: SymbiontClient, event: RequestEvent) {
 	const logger = createLogger({ operation: 'poll_sync' });
 
 	try {
@@ -90,7 +96,7 @@ export async function handlePollBlogRequest(event: RequestEvent) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const result = await syncFromNotion({
+		const result = await syncFromNotion(client, {
 			databaseId: event.url.searchParams.get('database'),
 			since: event.url.searchParams.get('since'),
 			syncAll: event.url.searchParams.get('syncAll') === 'true',

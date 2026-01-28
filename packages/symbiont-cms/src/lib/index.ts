@@ -8,6 +8,10 @@ export { default as TOC } from './components/TOC.svelte';
 // Config helper for type-safe .js configs
 export { defineConfig } from './config.js';
 
+// Client initialization
+export { createSymbiontClient } from './client.js';
+export type { SymbiontClient, GetPostOptions, GetAllPostsOptions } from './client.js';
+
 export type {
 	ClassMap,
 	Post,
@@ -18,13 +22,8 @@ export type {
 	DatabaseBlueprint,
 	HydratedDatabaseConfig,
 	HydratedSymbiontConfig,
-	PageObjectResponse,
-	PublicSymbiontConfig
+	PageObjectResponse
 } from './types.js';
-
-// Public Supabase queries (client-safe)
-export { getPostBySlug, getAllPosts } from './client/queries.js';
-export type { GetPostOptions, GetAllPostsOptions } from './client/queries.js';
 
 // Public environment utilities (client-safe)
 export { requirePublicEnvVar } from './client/utils/env.public.js';

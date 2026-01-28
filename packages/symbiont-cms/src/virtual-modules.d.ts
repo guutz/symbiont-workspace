@@ -1,12 +1,25 @@
 /**
- * Type declarations for virtual modules provided by the Symbiont Vite plugin.
+ * Type declarations for virtual modules provided by Symbiont (DEPRECATED).
  * 
- * The symbiontVitePlugin() generates these virtual modules at build time:
- * - 'virtual:symbiont/config' - Client-safe public configuration
+ * ⚠️ The virtual module pattern has been replaced with createSymbiontClient().
+ * 
+ * New pattern:
+ * ```ts
+ * // src/lib/symbiont.ts
+ * import { createSymbiontClient } from 'symbiont-cms';
+ * import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+ * 
+ * export const symbiont = createSymbiontClient({
+ *   supabase: { url: PUBLIC_SUPABASE_URL, publishableKey: PUBLIC_SUPABASE_ANON_KEY },
+ *   databases: [...]
+ * });
+ * ```
+ * 
+ * This file is kept for backwards compatibility only.
  */
 
 declare module 'virtual:symbiont/config' {
-	import type { PublicSymbiontConfig } from './lib/types';
-	const config: PublicSymbiontConfig;
+	/** @deprecated Use createSymbiontClient() instead */
+	const config: any;
 	export default config;
 }

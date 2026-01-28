@@ -37,10 +37,6 @@
 			"types": "./dist/server.d.ts",
 			"default": "./dist/server.js"
 		},
-		"./vite": {
-			"types": "./dist/vite-plugin.d.ts",
-			"default": "./dist/vite-plugin.js"
-		},
 		"./config": {
 			"types": "./dist/config.d.ts",
 			"default": "./dist/config.js"

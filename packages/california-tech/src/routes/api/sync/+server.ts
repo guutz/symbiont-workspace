@@ -1,5 +1,11 @@
-// Re-export the handler from the symbiont package.
-// This creates the API endpoint without any custom logic.
 import { handlePollBlogRequest } from 'symbiont-cms/server';
+import { symbiont } from '$lib/symbiont.js';
+import type { RequestEvent } from '@sveltejs/kit';
 
-export const GET = handlePollBlogRequest;
+/**
+ * Sync endpoint for California Tech
+ * Authenticates with CRON_SECRET and syncs content from Notion to Supabase
+ */
+export async function GET(event: RequestEvent) {
+	return handlePollBlogRequest(symbiont, event);
+}

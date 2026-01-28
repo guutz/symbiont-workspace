@@ -23,16 +23,13 @@ export type { PostServerLoad, PostLoadResult } from './server/post-loader.js';
 export { parseMarkdown } from './server/markdown-processor.js';
 export type { MarkdownResult } from './server/markdown-processor.js';
 
-// Admin GraphQL operations
+// Admin GraphQL operations (deprecated - being migrated to Supabase)
 export { gqlAdminClient } from './server/queries.js';
 
 // Server utilities
 export { requireEnvVar, resolveNotionToken, readEnvVar } from './server/utils/env.server.js';
 export { createLogger } from './server/utils/logger.js';
 export { createSlug } from './server/utils/slug-helpers.js';
-
-// Server-side config loader (full config with secrets)
-export { loadServerConfig, getSourceByAlias } from './server/load-config.js';
 
 // Image processing utilities
 export { extractImageUrlsFromMarkdown, extractImageUrlsFromNotionPage } from './image-utils.js';

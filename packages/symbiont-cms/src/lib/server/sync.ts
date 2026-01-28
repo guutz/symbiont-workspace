@@ -1,15 +1,19 @@
 import type { DatabaseBlueprint } from '../types.js';
-import { loadServerConfig } from './load-config.js';
+import type { SymbiontClient } from '../client.js';
 import { createLogger } from './utils/logger.js';
 import { createSyncOrchestrator } from './sync/factory.js';
 import type { SyncSummary, SyncOptions } from './sync/orchestrator.js';
 
 /**
- * Sync content from Notion databases to Nhost
+ * Sync content from Notion databases to Supabase
  * 
  * Refactored to use new SyncOrchestrator architecture
+ * 
+ * @param client - Symbiont client instance (from createSymbiontClient)
+ * @param options - Sync options (database filter, time range, wipe)
  */
 export async function syncFromNotion(
+	client: SymbiontClient,
 	options: { 
 		databaseId?: string | null; 
 		since?: string | null; 
@@ -21,7 +25,7 @@ export async function syncFromNotion(
 	const logger = createLogger({ operation: 'sync' });
 	logger.info({ event: 'sync_started', options });
 	
-	const config = await loadServerConfig();
+	const config = client.config;
 
 	const sinceIso = options.syncAll ? null : options.since || new Date(Date.now() - 5 * 60 * 1000).toISOString();
 	const targetDatabases = getTargetDatabases(config.databases, options.databaseId);
@@ -46,7 +50,7 @@ export async function syncFromNotion(
 	for (const dbConfig of targetDatabases) {
 		const dbLogger = logger.child({ alias: dbConfig.alias, dataSourceId: dbConfig.dataSourceId });
 		try {
-			const orchestrator = createSyncOrchestrator(dbConfig, config);
+			const orchestrator = createSyncOrchestrator(client, dbConfig);
 			const summary = await orchestrator.syncDataSource(syncOptions);
 			summaries.push(summary);
 		} catch (err: any) {

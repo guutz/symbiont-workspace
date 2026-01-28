@@ -1,7 +1,8 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
-import type { DatabaseBlueprint, HydratedSymbiontConfig } from '../../types.js';
-import { resolveNotionToken, requireEnvVar } from '../utils/env.server.js';
+import type { DatabaseBlueprint } from '../../types.js';
+import type { SymbiontClient } from '../../client.js';
+import { resolveNotionToken } from '../utils/env.server.js';
 import { gqlAdminClient } from '../queries.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
@@ -13,16 +14,19 @@ import { SyncOrchestrator } from './orchestrator.js';
  * 
  * This handles all the dependency injection:
  * - Notion client initialization (with token resolution)
- * - GraphQL client setup
+ * - Database client setup
  * - Class instantiation in the correct order
  * 
+ * @param client - Symbiont client instance
+ * @param config - Database configuration blueprint
+ * 
  * @example
- * const orchestrator = createSyncOrchestrator(config, fullConfig);
+ * const orchestrator = createSyncOrchestrator(client, dbConfig);
  * await orchestrator.syncDataSource({ syncAll: true });
  */
 export function createSyncOrchestrator(
-	config: DatabaseBlueprint, 
-	fullConfig: HydratedSymbiontConfig
+	client: SymbiontClient,
+	config: DatabaseBlueprint
 ): SyncOrchestrator {
 	// Resolve Notion token (supports env var name, actual token, or default)
 	const notionToken = resolveNotionToken(config.notionToken, config.alias);
@@ -34,12 +38,12 @@ export function createSyncOrchestrator(
 	// Create adapter layer (Notion API)
 	const notionAdapter = new NotionAdapter(notion, n2m);
 
-	// Create repository layer (GraphQL/Database)
-	// Note: gqlAdminClient is a lazy-initialized wrapper that loads config on first use
+	// Create repository layer (Database)
+	// TODO: Replace gqlAdminClient with Supabase client during migration
 	const postRepository = new PostRepository(gqlAdminClient as any);
 
 	// Create business logic layer (PostBuilder)
-	const postBuilder = new PostBuilder(config, notionAdapter, postRepository, );
+	const postBuilder = new PostBuilder(config, notionAdapter, postRepository);
 
 	// Create orchestrator (coordination layer)
 	const orchestrator = new SyncOrchestrator(
@@ -55,15 +59,16 @@ export function createSyncOrchestrator(
 /**
  * Create multiple orchestrators for multi-database sync
  * Keyed by alias for easy lookup
+ * 
+ * @deprecated This function is rarely needed - most code should use syncFromNotion() directly
  */
 export function createSyncOrchestrators(
-	configs: DatabaseBlueprint[],
-	fullConfig: HydratedSymbiontConfig
+	client: SymbiontClient
 ): Map<string, SyncOrchestrator> {
 	const orchestrators = new Map<string, SyncOrchestrator>();
 
-	for (const config of configs) {
-		orchestrators.set(config.alias, createSyncOrchestrator(config, fullConfig));
+	for (const config of client.config.databases) {
+		orchestrators.set(config.alias, createSyncOrchestrator(client, config));
 	}
 
 	return orchestrators;
