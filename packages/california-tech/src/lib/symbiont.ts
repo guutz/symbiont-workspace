@@ -28,7 +28,6 @@ export const symbiont = createSymbiontClient({
 		{
 			alias: 'tech-article-staging',
 			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
-			notionToken: 'NOTION_TOKEN', // Env var name
 
 			isPublicRule: (page: PageObjectResponse) => {
 				const status = page.properties.Status;

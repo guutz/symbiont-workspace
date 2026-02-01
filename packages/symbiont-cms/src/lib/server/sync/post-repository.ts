@@ -1,13 +1,8 @@
-import { GraphQLClient } from 'graphql-request';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../../database.types.js';
 import type { Post } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
-import {
-	getPostByPageIdQuery,
-	getPostBySlugQuery,
-	getAllPostsForSourceQuery,
-	getUpsertPostMutation,
-	getDeletePostsForSourceMutation
-} from '../queries.js';
+import { requireEnvVar } from '../utils/env.server.js';
 
 /**
  * Data transfer object for inserting/updating posts
@@ -27,7 +22,7 @@ export interface PostData {
 }
 
 /**
- * PostRepository - Database operations via GraphQL
+ * PostRepository - Database operations via Supabase
  * 
  * Responsibilities:
  * - CRUD operations for posts table
@@ -38,8 +33,17 @@ export interface PostData {
  */
 export class PostRepository {
 	private logger = createLogger({ operation: 'post_repository' });
+	private supabase: SupabaseClient<Database>;
 
-	constructor(private gqlClient: GraphQLClient) {}
+	constructor(supabaseUrl: string, supabaseServiceRoleKey: string) {
+		// Create admin Supabase client with service role key for mutations
+		this.supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+			auth: {
+				autoRefreshToken: false,
+				persistSession: false
+			}
+		});
+	}
 
 	/**
 	 * Get post by Notion page ID and datasource ID
@@ -51,13 +55,19 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = getPostByPageIdQuery();
-		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
-			datasourceId,
-			pageId
-		});
+		const { data, error } = await this.supabase
+			.from('pages')
+			.select('*')
+			.eq('datasource_id', datasourceId)
+			.eq('page_id', pageId)
+			.maybeSingle();
 
-		return result.pages[0] || null;
+		if (error) {
+			this.logger.error({ event: 'query_error', error: error.message });
+			throw new Error(`Failed to get post by page ID: ${error.message}`);
+		}
+
+		return data as Post | null;
 	}
 
 	/**
@@ -70,13 +80,19 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = getPostBySlugQuery();
-		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
-			datasourceId,
-			slug
-		});
+		const { data, error } = await this.supabase
+			.from('pages')
+			.select('page_id, slug')
+			.eq('datasource_id', datasourceId)
+			.eq('slug', slug)
+			.maybeSingle();
 
-		return result.pages[0] || null;
+		if (error) {
+			this.logger.error({ event: 'query_error', error: error.message });
+			throw new Error(`Failed to get post by slug: ${error.message}`);
+		}
+
+		return data as Post | null;
 	}
 
 	/**
@@ -88,12 +104,17 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const query = getAllPostsForSourceQuery();
-		const result = await this.gqlClient.request<{ pages: Post[] }>(query, {
-			datasourceId
-		});
+		const { data, error } = await this.supabase
+			.from('pages')
+			.select('page_id, slug, title')
+			.eq('datasource_id', datasourceId);
 
-		return result.pages;
+		if (error) {
+			this.logger.error({ event: 'query_error', error: error.message });
+			throw new Error(`Failed to get posts for source: ${error.message}`);
+		}
+
+		return data as Post[];
 	}
 
 	/**
@@ -107,8 +128,20 @@ export class PostRepository {
 			pageId: post.page_id
 		});
 
-		const mutation = getUpsertPostMutation();
-		await this.gqlClient.request(mutation, { page: post });
+		const { error } = await this.supabase
+			.from('pages')
+			.upsert(post, {
+				onConflict: 'page_id'
+			});
+
+		if (error) {
+			this.logger.error({ 
+				event: 'upsert_error', 
+				error: error.message,
+				post 
+			});
+			throw new Error(`Failed to upsert post: ${error.message}`);
+		}
 		
 		this.logger.info({ 
 			event: 'post_upserted', 
@@ -126,13 +159,17 @@ export class PostRepository {
 			datasourceId 
 		});
 
-		const mutation = getDeletePostsForSourceMutation();
-		const result = await this.gqlClient.request<{ delete_pages: { affected_rows: number } }>(
-			mutation, 
-			{ datasourceId }
-		);
+		const { count, error } = await this.supabase
+			.from('pages')
+			.delete({ count: 'exact' })
+			.eq('datasource_id', datasourceId);
 
-		const affectedRows = result.delete_pages.affected_rows;
+		if (error) {
+			this.logger.error({ event: 'delete_error', error: error.message });
+			throw new Error(`Failed to delete posts: ${error.message}`);
+		}
+
+		const affectedRows = count ?? 0;
 
 		this.logger.info({ 
 			event: 'deleted_posts', 

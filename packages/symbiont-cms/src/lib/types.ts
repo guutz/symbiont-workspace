@@ -101,15 +101,6 @@ export interface DatabaseBlueprint {
     /** Notion database UUID (stored in DB as datasource_id). Can use env vars. */
     dataSourceId: string;
 
-    /** 
-     * Notion API integration token for this specific datasource.
-     * Can be:
-     * - Env var name (e.g., 'NOTION_TOKEN') - will be resolved from environment
-     * - Actual token value (e.g., 'secret_abc123...') - used as-is
-     * - Omitted - defaults to NOTION_TOKEN env var
-     */
-    notionToken?: string;
-
     // ============================================
     // PUBLISHING RULES
     // ============================================

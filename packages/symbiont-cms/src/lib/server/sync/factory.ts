@@ -2,8 +2,7 @@ import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { SymbiontClient } from '../../client.js';
-import { resolveNotionToken } from '../utils/env.server.js';
-import { gqlAdminClient } from '../queries.js';
+import { requireEnvVar } from '../utils/env.server.js';
 import { NotionAdapter } from '../notion/adapter.js';
 import { PostRepository } from './post-repository.js';
 import { PostBuilder } from './post-builder.js';
@@ -28,8 +27,8 @@ export function createSyncOrchestrator(
 	client: SymbiontClient,
 	config: DatabaseBlueprint
 ): SyncOrchestrator {
-	// Resolve Notion token (supports env var name, actual token, or default)
-	const notionToken = resolveNotionToken(config.notionToken, config.alias);
+	const notionToken = requireEnvVar("NOTION_TOKEN");
+	const serviceRoleKey = requireEnvVar("SUPABASE_SERVICE_ROLE_KEY");
 	
 	// Initialize Notion client with resolved token
 	const notion = new Client({ auth: notionToken });
@@ -38,9 +37,11 @@ export function createSyncOrchestrator(
 	// Create adapter layer (Notion API)
 	const notionAdapter = new NotionAdapter(notion, n2m);
 
-	// Create repository layer (Database)
-	// TODO: Replace gqlAdminClient with Supabase client during migration
-	const postRepository = new PostRepository(gqlAdminClient as any);
+	// Create repository layer (Database) with Supabase admin client
+	const postRepository = new PostRepository(
+		client.config.supabase.url,
+		serviceRoleKey
+	);
 
 	// Create business logic layer (PostBuilder)
 	const postBuilder = new PostBuilder(config, notionAdapter, postRepository);
