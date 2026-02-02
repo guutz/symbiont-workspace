@@ -1,13 +1,13 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { SymbiontConfig, Post } from './types.js';
+import type { SymbiontConfig, WebsitePage } from './types.js';
 import type { Database } from './database.types.js';
 
 const PAGES_TABLE = 'pages';
 
 /**
- * Options for fetching a single post
+ * Options for fetching a single page
  */
-export interface GetPostOptions {
+export interface GetPageOptions {
 	/** Custom fetch function for SSR context */
 	fetch?: typeof globalThis.fetch;
 	/** Database alias to query */
@@ -15,14 +15,14 @@ export interface GetPostOptions {
 }
 
 /**
- * Options for fetching multiple posts
+ * Options for fetching multiple pages
  */
-export interface GetAllPostsOptions {
+export interface GetAllPagesOptions {
 	/** Custom fetch function for SSR context */
 	fetch?: typeof globalThis.fetch;
-	/** Maximum number of posts to return */
+	/** Maximum number of pages to return */
 	limit?: number;
-	/** Number of posts to skip */
+	/** Number of pages to skip */
 	offset?: number;
 	/** Database alias to query */
 	alias?: string;
@@ -40,11 +40,11 @@ export interface SymbiontClient {
 	/** Supabase client instance (public/anon key) */
 	supabase: SupabaseClient<Database>;
 	
-	/** Fetch a single post by slug */
-	getPostBySlug(slug: string, options?: GetPostOptions): Promise<Post | null>;
+	/** Fetch a single page by slug */
+	getPageBySlug(slug: string, options?: GetPageOptions): Promise<WebsitePage | null>;
 	
-	/** Fetch all posts for a database */
-	getAllPosts(options?: GetAllPostsOptions): Promise<Post[]>;
+	/** Fetch all pages for a database */
+	getAllPages(options?: GetAllPagesOptions): Promise<WebsitePage[]>;
 }
 
 /**
@@ -80,8 +80,8 @@ export interface SymbiontClient {
  * 
  * // In +page.server.ts
  * export const load = async ({ params, fetch }) => {
- *   const post = await symbiont.getPostBySlug(params.slug, { fetch });
- *   return { post };
+ *   const page = await symbiont.getPageBySlug(params.slug, { fetch });
+ *   return { page };
  * };
  * ```
  * 
@@ -134,7 +134,7 @@ export function createSymbiontClient(config: SymbiontConfig): SymbiontClient {
 		config,
 		supabase,
 		
-		async getPostBySlug(slug: string, options: GetPostOptions = {}): Promise<Post | null> {
+		async getPageBySlug(slug: string, options: GetPageOptions = {}): Promise<WebsitePage | null> {
 			const client = getClient(options.fetch);
 			const sourceAlias = resolveAlias(options.alias);
 			
@@ -148,10 +148,10 @@ export function createSymbiontClient(config: SymbiontConfig): SymbiontClient {
 				throw new Error(`Query error: ${error.message}`);
 			}
 			
-			return data as Post | null;
+			return data as WebsitePage | null;
 		},
 		
-		async getAllPosts(options: GetAllPostsOptions = {}): Promise<Post[]> {
+		async getAllPages(options: GetAllPagesOptions = {}): Promise<WebsitePage[]> {
 			const client = getClient(options.fetch);
 			const sourceAlias = resolveAlias(options.alias);
 			
@@ -168,7 +168,7 @@ export function createSymbiontClient(config: SymbiontConfig): SymbiontClient {
 				throw new Error(`Query error: ${error.message}`);
 			}
 			
-			return data as Post[];
+			return data as WebsitePage[];
 		}
 	};
 }

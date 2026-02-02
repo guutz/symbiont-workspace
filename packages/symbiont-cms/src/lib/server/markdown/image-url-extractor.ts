@@ -15,8 +15,8 @@ export interface ImageReference {
 /**
  * Extract all image URLs from markdown content
  */
-export function extractImages(content: string): ImageReference[] {
-  const images: ImageReference[] = [];
+export function extractImageUrls(content: string): ImageReference[] {
+  const imageUrls: ImageReference[] = [];
   
   // Match: ![alt text](url) or ![alt text](url "title")
   const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
@@ -25,7 +25,7 @@ export function extractImages(content: string): ImageReference[] {
   while ((match = imageRegex.exec(content)) !== null) {
     const [fullMatch, alt, url] = match;
     
-    images.push({
+    imageUrls.push({
       url,
       alt,
       fullMatch,
@@ -33,7 +33,7 @@ export function extractImages(content: string): ImageReference[] {
     });
   }
   
-  return images;
+  return imageUrls;
 }
 
 /**

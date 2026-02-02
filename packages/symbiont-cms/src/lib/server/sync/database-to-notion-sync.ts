@@ -1,7 +1,7 @@
 import type { DatabaseBlueprint } from '../../types.js';
-import type { NotionAdapter } from '../notion/adapter.js';
-import type { PostRepository } from './post-repository.js';
-import { convertMarkdownToNotionBlocks } from '../notion/markdown-to-notion.js';
+import type { NotionClient } from '../notion/client.js';
+import type { DatabasePageCRUD } from '../database/page-crud.js';
+import { convertMarkdownToNotionBlocks } from '../notion/markdown-to-blocks.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface PublishToNotionOptions {
@@ -14,68 +14,68 @@ export interface PublishToNotionOptions {
 }
 
 /**
- * Publish a post from the database to Notion
+ * Publish a page from the database to Notion
  * 
  * Reverse sync workflow (DB → Notion):
- * 1. Fetch post from database
+ * 1. Fetch page from database
  * 2. Convert markdown content to Notion blocks
  * 3. Find corresponding Notion page
  * 4. Update Notion page content
  * 
  * This is a simple orchestration function - all the heavy lifting
- * is done by NotionAdapter and markdown-to-notion utilities.
+ * is done by NotionClient and markdown-to-blocks utilities.
  * 
- * @param postId - UUID of post in database
+ * @param pageId - UUID of page in database
  * @param config - Database blueprint for Notion connection
- * @param notionAdapter - Notion API adapter
- * @param postRepository - Database repository
+ * @param notionClient - Notion API client
+ * @param pageCrud - Database page CRUD operations
  * @param options - Publishing options
  */
 export async function publishPostToNotion(
-	postId: string,
+	pageId: string,
 	config: DatabaseBlueprint,
-	notionAdapter: NotionAdapter,
-	postRepository: PostRepository,
+	notionClient: NotionClient,
+	pageCrud: DatabasePageCRUD,
 	options: PublishToNotionOptions = {}
 ): Promise<void> {
-	const logger = createLogger({ operation: 'publish_to_notion' });
+	const logger = createLogger({ operation: 'publish_page_to_notion' });
 	
 	logger.info({ 
 		event: 'publish_started',
-		postId,
+		pageId,
 		alias: config.alias,
 		dryRun: options.dryRun 
 	});
 
 	try {
-		// 1. Fetch post from database by Notion page ID
-		// (postId in this context is actually the Notion page UUID)
-		const post = await postRepository.getByNotionPageId(postId, config.dataSourceId);
+		// 1. Fetch page from database by Notion page ID
+		// (pageId in this context is actually the Notion page UUID)
+		const page = await pageCrud.getByNotionPageId(pageId, config.dataSourceId);
 		
-		if (!post) {
-			throw new Error(`Post not found with notion_page_id: ${postId}`);
+		if (!page) {
+			throw new Error(`Page not found with notion_page_id: ${pageId}`);
 		}
 
 		logger.debug({ 
-			event: 'post_fetched',
-			postId,
-			slug: post.slug,
-			title: post.title
+			event: 'page_fetched',
+			pageId,
+			slug: page.slug,
+			title: page.title
 		});
 
 		// 2. Convert markdown to Notion blocks
-		if (!post.content) {
-			throw new Error(`Post ${postId} has no content - cannot sync to Notion`);
+		if (!page.content) {
+			throw new Error(`Page ${pageId} has no content - cannot sync to Notion`);
 		}
 		
-		const blocks = convertMarkdownToNotionBlocks(post.content, {
+		const blocks = convertMarkdownToNotionBlocks(page.content, {
 			strictImageUrls: options.strictImageUrls,
 			truncate: options.truncate,
 		});
 
 		logger.debug({ 
 			event: 'markdown_converted',
-			postId,
+			pageId,
 			blockCount: blocks.length 
 		});
 
@@ -83,16 +83,16 @@ export async function publishPostToNotion(
 		if (options.dryRun) {
 			logger.info({ 
 				event: 'dry_run',
-				postId,
+				pageId,
 				blockCount: blocks.length,
 				message: 'Would update Notion page (dry run)'
 			});
 		} else {
-			await notionAdapter.updatePageBlocks(postId, blocks);
+			await notionClient.updatePageBlocks(pageId, blocks);
 			
 			logger.info({ 
 				event: 'publish_completed',
-				postId,
+				pageId,
 				blockCount: blocks.length 
 			});
 		}
@@ -100,7 +100,7 @@ export async function publishPostToNotion(
 	} catch (error: any) {
 		logger.error({ 
 			event: 'publish_failed',
-			postId,
+			pageId,
 			error: error?.message,
 			stack: error?.stack 
 		});

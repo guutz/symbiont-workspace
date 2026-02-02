@@ -3,13 +3,13 @@ import { NotionToMarkdown } from 'notion-to-md';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { SymbiontClient } from '../../client.js';
 import { requireEnvVar } from '../utils/env.server.js';
-import { NotionAdapter } from '../notion/adapter.js';
-import { PostRepository } from './post-repository.js';
-import { PostBuilder } from './post-builder.js';
-import { SyncOrchestrator } from './orchestrator.js';
+import { NotionClient } from '../notion/client.js';
+import { DatabasePageCRUD } from '../database/page-crud.js';
+import { NotionPageToWebsitePageTransformer } from '../notion/page-to-website-page-transformer.js';
+import { NotionToDatabaseSync } from './notion-to-database-sync.js';
 
 /**
- * Factory function to create a fully-wired SyncOrchestrator
+ * Factory function to create a fully-wired NotionToDatabaseSync coordinator
  * 
  * This handles all the dependency injection:
  * - Notion client initialization (with token resolution)
@@ -20,13 +20,13 @@ import { SyncOrchestrator } from './orchestrator.js';
  * @param config - Database configuration blueprint
  * 
  * @example
- * const orchestrator = createSyncOrchestrator(client, dbConfig);
- * await orchestrator.syncDataSource({ syncAll: true });
+ * const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
+ * await sync.syncDataSource({ syncAll: true });
  */
-export function createSyncOrchestrator(
+export function createNotionToDatabaseSyncCoordinator(
 	client: SymbiontClient,
 	config: DatabaseBlueprint
-): SyncOrchestrator {
+): NotionToDatabaseSync {
 	const notionToken = requireEnvVar("NOTION_TOKEN");
 	const serviceRoleKey = requireEnvVar("SUPABASE_SERVICE_ROLE_KEY");
 	
@@ -34,25 +34,25 @@ export function createSyncOrchestrator(
 	const notion = new Client({ auth: notionToken });
 	const n2m = new NotionToMarkdown({ notionClient: notion });
 
-	// Create adapter layer (Notion API)
-	const notionAdapter = new NotionAdapter(notion, n2m);
+	// Create Notion client layer (Notion API)
+	const notionClient = new NotionClient(notion, n2m);
 
-	// Create repository layer (Database) with Supabase admin client
-	const postRepository = new PostRepository(
+	// Create page CRUD layer (Database) with Supabase admin client
+	const pageCrud = new DatabasePageCRUD(
 		client.config.supabase.url,
 		serviceRoleKey
 	);
 
-	// Create business logic layer (PostBuilder)
-	const postBuilder = new PostBuilder(config, notionAdapter, postRepository);
+	// Create transformation layer (Notion page to website page)
+	const transformer = new NotionPageToWebsitePageTransformer(config, notionClient, pageCrud);
 
-	// Create orchestrator (coordination layer)
-	const orchestrator = new SyncOrchestrator(
-		notionAdapter,
-		postBuilder,
-		postRepository,
+	// Create sync coordinator (coordination layer)
+	const sync = new NotionToDatabaseSync(
+		notionClient,
+		transformer,
+		pageCrud,
 		config
 	);
 
-	return orchestrator;
+	return sync;
 }
