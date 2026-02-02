@@ -5,7 +5,7 @@ import { createSlug } from '../utils/slug.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
-import { uploadImage } from '../bucket/image-upload.js';
+import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
 import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 
 /**
@@ -74,10 +74,11 @@ export class NotionPageToWebsitePageTransformer {
 					if (file.type === 'file') {
 						// Notion-hosted file - these URLs expire, so we need to re-upload to storage bucket
 						const originalCoverUrl = file.file?.url;
-						if (originalCoverUrl) {
-							const result = await uploadImage(originalCoverUrl, {
-								bucketId: 'default',
-								pathPrefix: `${page.id}/`
+						if (originalCoverUrl && needsUploadToSupabase(originalCoverUrl)) {
+							const result = await uploadImageToSupabase(originalCoverUrl, {
+								supabaseUrl: this.config.supabase.url,
+								serviceRoleKey: this.config.supabase.serviceRoleKey,
+								pageId: page.id
 							});
 							coverUrl = result.newUrl;
 							
@@ -86,8 +87,10 @@ export class NotionPageToWebsitePageTransformer {
 								pageId: page.id,
 								originalUrl: originalCoverUrl,
 								newUrl: coverUrl,
-								fileId: result.fileId
+								filename: result.filename
 							});
+						} else if (originalCoverUrl) {
+							coverUrl = originalCoverUrl; // Already on Supabase or external
 						}
 					} else if (file.type === 'external') {
 						// External URL - use as-is (already permanent)
@@ -112,6 +115,44 @@ export class NotionPageToWebsitePageTransformer {
 		// 5. Get content as markdown
 		const content = await this.notionClient.pageToMarkdown(page.id);
 
+		// 6. Process images in content
+		let processedContent = content;
+		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+		let match;
+		const imagePromises: Promise<void>[] = [];
+
+		while ((match = imageRegex.exec(content)) !== null) {
+			const [fullMatch, alt, url] = match;
+			
+			if (needsUploadToSupabase(url)) {
+				const imagePromise = uploadImageToSupabase(url, {
+					supabaseUrl: this.config.supabase.url,
+					serviceRoleKey: this.config.supabase.serviceRoleKey,
+					pageId: page.id,
+					altText: alt || undefined
+				}).then((uploaded) => {
+					processedContent = processedContent.replace(fullMatch, `![${alt}](${uploaded.newUrl})`);
+					this.logger.info({
+						event: 'content_image_uploaded',
+						pageId: page.id,
+						filename: uploaded.filename
+					});
+				}).catch((error) => {
+					this.logger.warn({
+						event: 'content_image_upload_failed',
+						pageId: page.id,
+						url,
+						error: error.message
+					});
+				});
+				
+				imagePromises.push(imagePromise);
+			}
+		}
+
+		// Wait for all image uploads to complete
+		await Promise.all(imagePromises);
+
 		if (!isPublic) {
 			this.logger.debug({
 				event: 'page_marked_unpublished',
@@ -120,7 +161,7 @@ export class NotionPageToWebsitePageTransformer {
 			});
 		}
 
-		// 6. Build page data
+		// 7. Build page data
 		// Extract custom metadata and merge with cover URL
 		const customMeta = this.extractCustomMetadata(page);
 		const metaWithCover = coverUrl 
@@ -133,7 +174,7 @@ export class NotionPageToWebsitePageTransformer {
 			datasource_alias: this.config.alias,
 			title: meta.title,
 			slug,
-			content,
+			content: processedContent,
 			publish_at: publishDate,
 			updated_at: page.last_edited_time, // Use Notion's last edited time
 			tags: meta.tags.length > 0 ? meta.tags : null,
