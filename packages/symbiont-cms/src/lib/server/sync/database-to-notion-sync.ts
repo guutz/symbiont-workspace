@@ -50,7 +50,7 @@ export async function publishPostToNotion(
 	try {
 		// 1. Fetch page from database by Notion page ID
 		// (pageId in this context is actually the Notion page UUID)
-		const page = await pageCrud.getByNotionPageId(pageId, config.dataSourceId);
+		const page = await pageCrud.getByNotionPageId(pageId);
 		
 		if (!page) {
 			throw new Error(`Page not found with notion_page_id: ${pageId}`);

@@ -215,7 +215,7 @@ export class NotionToDatabaseSync {
 		}
 
 		// 2. Build page data (applies all business logic - expensive)
-		const pageData = await this.pageTransformer.buildPost(page);
+		const pageData = await this.pageTransformer.transformPage(page);
 
 		// 3. Skip if not publishable
 		if (!pageData) {
