@@ -1,6 +1,6 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { requireEnvVar, resolveNotionToken } from './utils/env.server.js';
+import { requireEnvVar } from './utils/env.server.js';
 import type { SymbiontClient } from '../client.js';
 import { syncFromNotion } from './sync.js';
 import { createLogger } from './utils/logger.js';
@@ -53,10 +53,10 @@ export async function handleNotionWebhookRequest(client: SymbiontClient, event: 
 			dataSourceId: dbConfig.dataSourceId 
 		});
 
-		// Resolve Notion token (supports env var name, actual token, or default)
-		const notionToken = resolveNotionToken(dbConfig.notionToken, dbConfig.alias);
+		// Get Notion token from environment
+		const notionToken = requireEnvVar('NOTION_TOKEN');
 		
-		// Fetch page from Notion using the resolved token
+		// Fetch page from Notion
 		const notion = new Client({ auth: notionToken });
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 

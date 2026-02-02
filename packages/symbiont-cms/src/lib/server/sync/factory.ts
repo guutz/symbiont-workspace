@@ -56,21 +56,3 @@ export function createSyncOrchestrator(
 
 	return orchestrator;
 }
-
-/**
- * Create multiple orchestrators for multi-database sync
- * Keyed by alias for easy lookup
- * 
- * @deprecated This function is rarely needed - most code should use syncFromNotion() directly
- */
-export function createSyncOrchestrators(
-	client: SymbiontClient
-): Map<string, SyncOrchestrator> {
-	const orchestrators = new Map<string, SyncOrchestrator>();
-
-	for (const config of client.config.databases) {
-		orchestrators.set(config.alias, createSyncOrchestrator(client, config));
-	}
-
-	return orchestrators;
-}

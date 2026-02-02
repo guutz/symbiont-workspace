@@ -32,7 +32,7 @@ export async function syncFromNotion(
 
 	if (targetDatabases.length === 0) {
 		const hint = options.databaseId
-			? `No database matched '${options.databaseId}'. Check symbiont.config.ts for valid ids.`
+			? `No database in configuration matched '${options.databaseId}'.`
 			: 'No databases configured.';
 		logger.error({ event: 'sync_failed', reason: 'no_databases', hint });
 		throw new Error(hint);

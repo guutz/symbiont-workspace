@@ -1,9 +1,5 @@
 import { createSymbiontClient, type PageObjectResponse } from 'symbiont-cms';
 
-// Supabase configuration (from .env or hardcoded)
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL || 'https://xguzskbxiptvhbyggkpl.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_6L-isfCogfHJxcnTT9WseA_U4GUHcAB';
-
 /**
  * Symbiont CMS client for California Tech
  * 
@@ -12,8 +8,8 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || 'sb_p
  */
 export const symbiont = createSymbiontClient({
 	supabase: {
-		url: SUPABASE_URL,
-		publishableKey: SUPABASE_ANON_KEY
+		url: 'https://xguzskbxiptvhbyggkpl.supabase.co',
+		publishableKey: 'sb_publishable_6L-isfCogfHJxcnTT9WseA_U4GUHcAB'
 	},
 
 	markdown: {

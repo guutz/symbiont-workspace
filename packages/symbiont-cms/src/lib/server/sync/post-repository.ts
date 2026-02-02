@@ -2,7 +2,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type { Post } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
-import { requireEnvVar } from '../utils/env.server.js';
 
 /**
  * Data transfer object for inserting/updating posts
@@ -40,25 +39,25 @@ export class PostRepository {
 		this.supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
 			auth: {
 				autoRefreshToken: false,
-				persistSession: false
+				persistSession: false,
+				detectSessionInUrl: false
 			}
 		});
 	}
 
 	/**
-	 * Get post by Notion page ID and datasource ID
+	 * Get post by Notion page ID
+	 * Note: Page IDs are globally unique across Notion, no need to filter by datasource
 	 */
-	async getByNotionPageId(pageId: string, datasourceId: string): Promise<Post | null> {
+	async getByNotionPageId(pageId: string): Promise<Post | null> {
 		this.logger.debug({ 
 			event: 'get_by_notion_page_id', 
-			pageId, 
-			datasourceId 
+			pageId
 		});
 
 		const { data, error } = await this.supabase
 			.from('pages')
 			.select('*')
-			.eq('datasource_id', datasourceId)
 			.eq('page_id', pageId)
 			.maybeSingle();
 

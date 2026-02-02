@@ -8,7 +8,6 @@ import { createLogger } from '../utils/logger.js';
 import { processMarkdownImages } from '../../image-processor.js';
 import { uploadImage } from '../../image-upload.js';
 import { markdownToNotionBlocks } from '../notion/markdown-to-notion.js';
-import { requireEnvVar } from '../utils/env.server.js';
 
 /**
  * PostBuilder - Business logic for transforming Notion pages into Post data
@@ -34,7 +33,9 @@ export class PostBuilder {
 			alias: this.config.alias,
 			dataSourceId: this.config.dataSourceId
 		});
-	}	/**
+	}
+	
+	/**
 	 * Build a complete PostData object from a Notion page
 	 * 
 	 * Always syncs the post to the database, but sets publish_at to null
@@ -64,19 +65,18 @@ export class PostBuilder {
 		let coverUrl: string | null = null;
 		if (this.config.coverProperty) {
 			try {
-				const coverProp = page.properties[this.config.coverProperty] as any;
+				const coverProp = page.properties[this.config.coverProperty];
 				
-				// Handle files property (can be array of files)
-				if (coverProp?.type === 'files' && coverProp.files?.length > 0) {
+				// Handle files property (TypeScript will narrow the union type)
+				if (coverProp?.type === 'files' && coverProp.files.length > 0) {
 					const file = coverProp.files[0];
 					
 					// Extract URL based on file type (external vs Notion-hosted)
 					if (file.type === 'file') {
-						// Notion-hosted file - upload to Nhost (these URLs expire)
+						// Notion-hosted file - these URLs expire, so we need to re-upload to storage bucket
 						const originalCoverUrl = file.file?.url;
 						if (originalCoverUrl) {
 							const result = await uploadImage(originalCoverUrl, {
-								
 								bucketId: 'default',
 								pathPrefix: `${page.id}/`
 							});
@@ -254,10 +254,7 @@ export class PostBuilder {
 		const customSlug = this.config.slugRule?.(page) ?? null;
 
 		// 2. Check if page already exists in DB
-		const existingPost = await this.postRepository.getByNotionPageId(
-			page.id,
-			this.config.dataSourceId
-		);
+		const existingPost = await this.postRepository.getByNotionPageId(page.id);
 
 		// 3. Determine final slug
 		let slug: string;

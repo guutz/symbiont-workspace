@@ -77,27 +77,29 @@ export class SyncOrchestrator {
 			// 2. Build filter for incremental sync
 			const filter = this.buildSyncFilter(options);
 
-		// 3. Fetch all pages with pagination
-		const allPages: PageObjectResponse[] = [];
-		let cursor: string | null | undefined = undefined;
-		
-		do {
-			const result = await this.notionAdapter.queryDataSource(
-				this.config.dataSourceId,
-				filter,
-				cursor
-			);
+			// 3. Fetch all pages with pagination
+			const allPages: PageObjectResponse[] = [];
+			let cursor: string | null | undefined = undefined;
 			
-			allPages.push(...result.pages);
-			cursor = result.nextCursor;
+			do {
+				const result = await this.notionAdapter.queryDataSource(
+					this.config.dataSourceId,
+					filter,
+					cursor
+				);
+				
+				allPages.push(...result.pages);
+				cursor = result.nextCursor;
+				
+				this.logger.debug({ 
+					event: 'pages_fetched',
+					count: result.pages.length,
+					totalSoFar: allPages.length,
+					hasMore: !!cursor 
+				});
+			} while (cursor);
 			
-			this.logger.debug({ 
-				event: 'pages_fetched',
-				count: result.pages.length,
-				totalSoFar: allPages.length,
-				hasMore: !!cursor 
-			});
-		} while (cursor);			this.logger.info({ 
+			this.logger.info({ 
 				event: 'all_pages_fetched',
 				totalPages: allPages.length 
 			});
@@ -182,10 +184,7 @@ export class SyncOrchestrator {
 		});
 
 		// 1. Check if page needs updating (compare timestamps)
-		const existingPost = await this.postRepository.getByNotionPageId(
-			page.id,
-			this.config.dataSourceId
-		);
+		const existingPost = await this.postRepository.getByNotionPageId(page.id);
 
 		if (existingPost && existingPost.updated_at) {
 			const notionTime = new Date(page.last_edited_time).getTime();
