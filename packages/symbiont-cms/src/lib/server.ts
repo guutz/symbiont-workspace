@@ -13,31 +13,22 @@ export * from './index.js';
 
 // Webhook handlers & sync
 export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webhook.js';
-export { syncFromNotion } from './server/sync.js';
 
 // Markdown processing
-export { parseMarkdown } from './server/markdown-processor.js';
-export type { MarkdownResult } from './server/markdown-processor.js';
+export { renderMarkdownToHtml, renderSummaryToHtml } from './server/markdown/to-html-renderer.js';
+export type { RenderedMarkdown } from './server/markdown/to-html-renderer.js';
 
 // Server utilities
-export { requireEnvVar, readEnvVar } from './server/utils/env.server.js';
+export { requireEnvVar, readEnvVar } from './server/utils/env.js';
 export { createLogger } from './server/utils/logger.js';
-export { createSlug } from './server/utils/slug-helpers.js';
+export { createSlug } from './server/utils/slug.js';
 
 // Image processing utilities
-export { extractImageUrlsFromMarkdown, extractImageUrlsFromNotionPage } from './image-utils.js';
-export { uploadImage, uploadImages, rewriteImageUrls } from './image-upload.js';
-export type { ImageUploadOptions, ImageUploadResult, ImageUploadError } from './image-upload.js';
-export { processMarkdownImages, processNotionPageImages, isExternalUrl } from './image-processor.js';
-export type { ImageProcessorOptions, ProcessMarkdownResult } from './image-processor.js';
+export { uploadImageToSupabase, needsUploadToSupabase, getImageUrl } from './server/bucket/image-upload.js';
+export type { UploadImageOptions, UploadImageResult } from './server/bucket/image-upload.js';
 
 // Markdown to Notion conversion
-export { convertMarkdownToNotionBlocks } from './server/notion/markdown-to-notion.js';
+export { convertMarkdownToNotionBlocks } from './server/notion/markdown-to-blocks.js';
 
-// Reverse sync (DB → Notion)
-export { publishPostToNotion } from './server/sync/publish-to-notion.js';
-export type { PublishToNotionOptions } from './server/sync/publish-to-notion.js';
-
-// Markdown migration utilities
-export { extractImages, replaceImageUrls } from './server/utils/markdown-migration.js';
-export type { ImageReference } from './server/utils/markdown-migration.js';
+// Markdown image utilities
+export { extractImageUrls, replaceImageUrls } from './server/markdown/image-url-extractor.js';

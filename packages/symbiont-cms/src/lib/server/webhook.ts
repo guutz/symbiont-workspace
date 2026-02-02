@@ -1,13 +1,47 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { requireEnvVar } from './utils/env.server.js';
+import { requireEnvVar } from './utils/env.js';
 import type { SymbiontClient } from '../client.js';
-import { syncFromNotion } from './sync.js';
 import { createLogger } from './utils/logger.js';
-import { createSyncOrchestrator } from './sync/factory.js';
+import { createNotionToDatabaseSyncCoordinator } from './sync/coordinator.js';
+import type { SyncResult, SyncOptions } from './sync/notion-to-database-sync.js';
 import { Client } from '@notionhq/client';
 
-const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.'); 
+const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
+
+/**
+ * Sync one or more databases from Notion
+ */
+export async function syncFromNotion(
+	client: SymbiontClient,
+	options: { databaseId?: string | null; since?: string | null; syncAll?: boolean; wipe?: boolean } = {}
+): Promise<{ summaries: SyncResult[] }> {
+	const logger = createLogger({ operation: 'sync_from_notion' });
+
+	// Determine which databases to sync
+	const dbConfigs = options.databaseId
+		? client.config.databases.filter((db: any) => db.alias === options.databaseId || db.dataSourceId === options.databaseId)
+		: client.config.databases;
+
+	if (dbConfigs.length === 0) {
+		logger.warn({ event: 'no_databases_found', databaseId: options.databaseId });
+		return { summaries: [] };
+	}
+
+	// Sync each database
+	const summaries: SyncResult[] = [];
+	for (const dbConfig of dbConfigs) {
+		const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
+		const result = await sync.syncDataSource({
+			since: options.since,
+			syncAll: options.syncAll,
+			wipe: options.wipe
+		});
+		summaries.push(result);
+	}
+
+	return { summaries };
+} 
 
 /**
  * Handle Notion webhook requests for page updates
@@ -60,9 +94,9 @@ export async function handleNotionWebhookRequest(client: SymbiontClient, event: 
 		const notion = new Client({ auth: notionToken });
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 
-		// Create orchestrator and process page
-		const orchestrator = createSyncOrchestrator(client, dbConfig);
-		await orchestrator.processPage(page);
+		// Create sync coordinator and process page
+		const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
+		await sync.processPage(page);
 
 		logger.info({ event: 'webhook_processed_successfully', pageId });
 		return json({ message: `Successfully processed page ${pageId}` }, { status: 200 });

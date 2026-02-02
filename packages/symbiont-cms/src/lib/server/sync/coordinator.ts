@@ -2,10 +2,10 @@ import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { SymbiontClient } from '../../client.js';
-import { requireEnvVar } from '../utils/env.server.js';
+import { requireEnvVar } from '../utils/env.js';
 import { NotionClient } from '../notion/client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
-import { NotionPageToWebsitePageTransformer } from '../notion/page-to-website-page-transformer.js';
+import { NotionPageToWebsitePageTransformer } from '../notion/page-transformer.js';
 import { NotionToDatabaseSync } from './notion-to-database-sync.js';
 
 /**
@@ -44,7 +44,13 @@ export function createNotionToDatabaseSyncCoordinator(
 	);
 
 	// Create transformation layer (Notion page to website page)
-	const transformer = new NotionPageToWebsitePageTransformer(config, notionClient, pageCrud);
+	const transformer = new NotionPageToWebsitePageTransformer(
+		config,
+		notionClient,
+		pageCrud,
+		client.config.supabase.url,
+		serviceRoleKey
+	);
 
 	// Create sync coordinator (coordination layer)
 	const sync = new NotionToDatabaseSync(

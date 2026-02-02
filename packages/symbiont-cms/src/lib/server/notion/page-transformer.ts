@@ -16,6 +16,7 @@ import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
  * - Extract metadata (title, tags, authors, custom metadata)
  * - Resolve slugs (handle conflicts, sync back to Notion)
  * - Orchestrate content fetching
+ * - Process and upload images to Supabase Storage
  * 
  * This is where all the sync rules from DatabaseBlueprint are applied.
  */
@@ -26,6 +27,8 @@ export class NotionPageToWebsitePageTransformer {
 		private config: DatabaseBlueprint,
 		private notionClient: NotionClient,
 		private pageCrud: DatabasePageCRUD,
+		private supabaseUrl: string,
+		private serviceRoleKey: string
 	) {
 		this.logger = createLogger({
 			operation: 'page_transformer',
@@ -76,8 +79,8 @@ export class NotionPageToWebsitePageTransformer {
 						const originalCoverUrl = file.file?.url;
 						if (originalCoverUrl && needsUploadToSupabase(originalCoverUrl)) {
 							const result = await uploadImageToSupabase(originalCoverUrl, {
-								supabaseUrl: this.config.supabase.url,
-								serviceRoleKey: this.config.supabase.serviceRoleKey,
+								supabaseUrl: this.supabaseUrl,
+								serviceRoleKey: this.serviceRoleKey,
 								pageId: page.id
 							});
 							coverUrl = result.newUrl;
@@ -126,8 +129,8 @@ export class NotionPageToWebsitePageTransformer {
 			
 			if (needsUploadToSupabase(url)) {
 				const imagePromise = uploadImageToSupabase(url, {
-					supabaseUrl: this.config.supabase.url,
-					serviceRoleKey: this.config.supabase.serviceRoleKey,
+					supabaseUrl: this.supabaseUrl,
+					serviceRoleKey: this.serviceRoleKey,
 					pageId: page.id,
 					altText: alt || undefined
 				}).then((uploaded) => {

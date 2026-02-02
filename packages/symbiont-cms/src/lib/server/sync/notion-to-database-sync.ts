@@ -2,7 +2,7 @@ import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
 import { NotionClient } from '../notion/client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
-import { NotionPageToWebsitePageTransformer } from '../notion/page-to-website-page-transformer.js';
+import { NotionPageToWebsitePageTransformer } from '../notion/page-transformer.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface SyncOptions {
