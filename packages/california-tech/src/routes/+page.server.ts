@@ -14,7 +14,7 @@ export const prerender = false;
 
 export async function load({ fetch, url, cookies }) {
   try {
-    const postsFromDb = await symbiont.getAllPosts({ fetch, limit: 20 });
+    const postsFromDb = await symbiont.getAllPages({ fetch, limit: 20 });
     const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
 
     const tagMap = new Map<string, Set<string>>();

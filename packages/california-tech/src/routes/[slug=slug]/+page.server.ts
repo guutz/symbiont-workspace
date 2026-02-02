@@ -13,7 +13,7 @@
  */
 
 import { symbiont } from '$lib/symbiont';
-import { parseMarkdown } from 'symbiont-cms/server';
+import { renderMarkdownToHtml } from 'symbiont-cms/server';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
 import { error } from '@sveltejs/kit';
 
@@ -28,14 +28,14 @@ export const prerender = false;
 
 // Fetch post and render markdown
 export const load = async (event: any) => {
-	const post = await symbiont.getPostBySlug(event.params.slug, { fetch: event.fetch });
+	const post = await symbiont.getPageBySlug(event.params.slug, { fetch: event.fetch });
 	
 	if (!post || !post.content) {
 		throw error(404, 'Post not found');
 	}
 	
 	// Render markdown to HTML
-	const { html, toc } = await parseMarkdown(post.content, symbiont.config.markdown);
+	const { html, toc } = await renderMarkdownToHtml(post.content, symbiont.config.markdown);
 	
 	// Convert Symbiont post to QWER format
 	const qwerPost = symbiontToQwerPost(post, html, toc);
