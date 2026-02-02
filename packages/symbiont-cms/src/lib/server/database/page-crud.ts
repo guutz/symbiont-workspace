@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
-import type { Post } from '../../types.js';
+import type { WebsitePage } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
 
 /**
- * Data transfer object for inserting/updating posts
+ * Data transfer object for inserting/updating pages in the database
  */
-export interface PostData {
+export interface DatabasePage {
 	page_id: string;           // Notion page UUID (primary key)
 	datasource_id: string;      // Notion database ID
 	datasource_alias: string; // Non-secret datasource alias for public queries
@@ -21,17 +21,17 @@ export interface PostData {
 }
 
 /**
- * PostRepository - Database operations via Supabase
+ * DatabasePageCRUD - Database CRUD operations via Supabase Postgres
  * 
  * Responsibilities:
- * - CRUD operations for posts table
+ * - CRUD operations for pages table
  * - Slug uniqueness checks
  * - Batch operations (delete all for source)
  * 
  * Does NOT contain business logic - just database queries.
  */
-export class PostRepository {
-	private logger = createLogger({ operation: 'post_repository' });
+export class DatabasePageCRUD {
+	private logger = createLogger({ operation: 'database_page_crud' });
 	private supabase: SupabaseClient<Database>;
 
 	constructor(supabaseUrl: string, supabaseServiceRoleKey: string) {
@@ -46,10 +46,10 @@ export class PostRepository {
 	}
 
 	/**
-	 * Get post by Notion page ID
+	 * Get page by Notion page ID
 	 * Note: Page IDs are globally unique across Notion, no need to filter by datasource
 	 */
-	async getByNotionPageId(pageId: string): Promise<Post | null> {
+	async getByNotionPageId(pageId: string): Promise<WebsitePage | null> {
 		this.logger.debug({ 
 			event: 'get_by_notion_page_id', 
 			pageId
@@ -63,16 +63,16 @@ export class PostRepository {
 
 		if (error) {
 			this.logger.error({ event: 'query_error', error: error.message });
-			throw new Error(`Failed to get post by page ID: ${error.message}`);
+			throw new Error(`Failed to get page by page ID: ${error.message}`);
 		}
 
-		return data as Post | null;
+		return data as WebsitePage | null;
 	}
 
 	/**
-	 * Get post by slug and datasource ID
+	 * Get page by slug and datasource ID
 	 */
-	async getBySlug(slug: string, datasourceId: string): Promise<Post | null> {
+	async getBySlug(slug: string, datasourceId: string): Promise<WebsitePage | null> {
 		this.logger.debug({ 
 			event: 'get_by_slug', 
 			slug, 
@@ -88,16 +88,16 @@ export class PostRepository {
 
 		if (error) {
 			this.logger.error({ event: 'query_error', error: error.message });
-			throw new Error(`Failed to get post by slug: ${error.message}`);
+			throw new Error(`Failed to get page by slug: ${error.message}`);
 		}
 
-		return data as Post | null;
+		return data as WebsitePage | null;
 	}
 
 	/**
-	 * Get all posts for a datasource
+	 * Get all pages for a datasource
 	 */
-	async getAllForSource(datasourceId: string): Promise<Post[]> {
+	async getAllForSource(datasourceId: string): Promise<WebsitePage[]> {
 		this.logger.debug({ 
 			event: 'get_all_for_source', 
 			datasourceId 
@@ -110,26 +110,26 @@ export class PostRepository {
 
 		if (error) {
 			this.logger.error({ event: 'query_error', error: error.message });
-			throw new Error(`Failed to get posts for source: ${error.message}`);
+			throw new Error(`Failed to get pages for source: ${error.message}`);
 		}
 
-		return data as Post[];
+		return data as WebsitePage[];
 	}
 
 	/**
-	 * Upsert (insert or update) a post
+	 * Upsert (insert or update) a page
 	 */
-	async upsert(post: PostData): Promise<void> {
+	async upsert(page: DatabasePage): Promise<void> {
 		this.logger.debug({ 
-			event: 'upsert_post', 
-			datasourceId: post.datasource_id,
-			slug: post.slug,
-			pageId: post.page_id
+			event: 'upsert_page', 
+			datasourceId: page.datasource_id,
+			slug: page.slug,
+			pageId: page.page_id
 		});
 
 		const { error } = await this.supabase
 			.from('pages')
-			.upsert(post, {
+			.upsert(page, {
 				onConflict: 'page_id'
 			});
 
@@ -137,20 +137,20 @@ export class PostRepository {
 			this.logger.error({ 
 				event: 'upsert_error', 
 				error: error.message,
-				post 
+				page 
 			});
-			throw new Error(`Failed to upsert post: ${error.message}`);
+			throw new Error(`Failed to upsert page: ${error.message}`);
 		}
 		
 		this.logger.info({ 
-			event: 'post_upserted', 
-			datasourceId: post.datasource_id,
-			slug: post.slug 
+			event: 'page_upserted', 
+			datasourceId: page.datasource_id,
+			slug: page.slug 
 		});
 	}
 
 	/**
-	 * Delete all posts for a datasource
+	 * Delete all pages for a datasource
 	 */
 	async deleteForSource(datasourceId: string): Promise<number> {
 		this.logger.info({ 
@@ -165,13 +165,13 @@ export class PostRepository {
 
 		if (error) {
 			this.logger.error({ event: 'delete_error', error: error.message });
-			throw new Error(`Failed to delete posts: ${error.message}`);
+			throw new Error(`Failed to delete pages: ${error.message}`);
 		}
 
 		const affectedRows = count ?? 0;
 
 		this.logger.info({ 
-			event: 'deleted_posts', 
+			event: 'deleted_pages', 
 			datasourceId,
 			count: affectedRows 
 		});

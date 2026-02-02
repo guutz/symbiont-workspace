@@ -1,7 +1,7 @@
 import type { DatabaseBlueprint } from '../../types.js';
 import type { NotionAdapter } from '../notion/adapter.js';
 import type { PostRepository } from './post-repository.js';
-import { markdownToNotionBlocks } from '../notion/markdown-to-notion.js';
+import { convertMarkdownToNotionBlocks } from '../notion/markdown-to-notion.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface PublishToNotionOptions {
@@ -68,7 +68,7 @@ export async function publishPostToNotion(
 			throw new Error(`Post ${postId} has no content - cannot sync to Notion`);
 		}
 		
-		const blocks = markdownToNotionBlocks(post.content, {
+		const blocks = convertMarkdownToNotionBlocks(post.content, {
 			strictImageUrls: options.strictImageUrls,
 			truncate: options.truncate,
 		});

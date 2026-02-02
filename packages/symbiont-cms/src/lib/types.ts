@@ -54,12 +54,12 @@ export interface TocItem {
 }
 
 /**
- * Represents the structure of a single post or article.
+ * Represents the structure of a single page or article for rendering on the website.
  * This type mirrors the `pages` table in the database.
  * 
  * Extended to be compatible with QWER post type for seamless integration.
  */
-export type Post = {
+export type WebsitePage = {
     // Database fields (from pages table)
     page_id?: string;           // Notion page UUID (primary key)
     datasource_id?: string;     // Notion database ID
@@ -242,11 +242,8 @@ export interface HydratedSymbiontConfig {
 
 /**
  * Represents the result of a sync operation for a single database
- * 
- * Note: This type is being phased out. Use SyncSummary from sync/orchestrator.ts instead.
- * @deprecated Use orchestrator SyncResult instead
  */
-export type SyncSummary = {
+export type SyncResult = {
     /** The configured alias for this datasource */
     alias: string;
     /** The Notion database UUID */

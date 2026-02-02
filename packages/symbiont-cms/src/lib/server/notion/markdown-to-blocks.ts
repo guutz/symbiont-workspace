@@ -30,7 +30,7 @@ import { markdownToBlocks as martianMarkdownToBlocks } from '@tryfabric/martian'
  * @param options - Conversion options
  * @returns Array of Notion BlockObjectRequest objects
  */
-export function markdownToNotionBlocks(
+export function convertMarkdownToNotionBlocks(
   markdown: string,
   options?: {
     /** Convert invalid image URLs to text instead of failing (default: false) */

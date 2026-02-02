@@ -32,7 +32,7 @@ export { processMarkdownImages, processNotionPageImages, isExternalUrl } from '.
 export type { ImageProcessorOptions, ProcessMarkdownResult } from './image-processor.js';
 
 // Markdown to Notion conversion
-export { markdownToNotionBlocks } from './server/notion/markdown-to-notion.js';
+export { convertMarkdownToNotionBlocks } from './server/notion/markdown-to-notion.js';
 
 // Reverse sync (DB → Notion)
 export { publishPostToNotion } from './server/sync/publish-to-notion.js';

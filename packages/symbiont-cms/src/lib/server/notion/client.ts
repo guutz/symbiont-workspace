@@ -3,7 +3,7 @@ import { NotionToMarkdown } from 'notion-to-md';
 import { createLogger } from '../utils/logger.js';
 
 /**
- * NotionAdapter - Pure Notion API interactions
+ * NotionClient - Pure Notion API interactions
  * 
  * Responsibilities:
  * - Talk to Notion API (query databases, fetch pages, update properties)
@@ -12,8 +12,8 @@ import { createLogger } from '../utils/logger.js';
  * 
  * Does NOT contain business logic - just API calls and data extraction.
  */
-export class NotionAdapter {
-	private logger = createLogger({ operation: 'notion_adapter' });
+export class NotionClient {
+	private logger = createLogger({ operation: 'notion_client' });
 
 	constructor(private notion: Client, private n2m: NotionToMarkdown) {}
 
