@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Post } from '../types.js';
+	import type { WebsitePage } from '../types.js';
 
-	/** Post data */
-	export let post: Post;
+	/** Page data */
+	export let post: WebsitePage;
 
 	/** Custom date formatter function */
 	export let formatDate: (date: string) => string = (date) => {
