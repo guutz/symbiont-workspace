@@ -21,7 +21,7 @@
 
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
-import type { MarkdownConfig, SymbiontConfig, FrontMatterLayout } from '../../types.js';
+import type { MarkdownConfig } from '../../types.js';
 
 // @mdit plugins
 import { abbr } from '@mdit/plugin-abbr';

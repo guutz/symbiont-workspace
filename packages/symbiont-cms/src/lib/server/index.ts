@@ -51,7 +51,6 @@ export { NotionPageToWebsitePageTransformer } from './notion/page-transformer.js
 
 // Database layer
 export { DatabasePageCRUD } from './database/page-crud.js';
-export type { DatabasePage } from './database/page-crud.js';
 
 // API layer
 export { NotionClient } from './notion/client.js';

@@ -1,24 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
-import type { WebsitePage } from '../../types.js';
+import type { DatabasePage } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
-
-/**
- * Data transfer object for inserting/updating pages in the database
- */
-export interface DatabasePage {
-	page_id: string;           // Notion page UUID (primary key)
-	datasource_id: string;      // Notion database ID
-	datasource_alias: string; // Non-secret datasource alias for public queries
-	title: string;
-	slug: string | null;        // Nullable - only generated for public posts
-	content: string;
-	publish_at: string | null;
-	updated_at: string;         // ISO 8601 timestamp (from Notion or manual)
-	tags?: any[] | null;       // JSONB array
-	authors?: any[] | null;    // JSONB array
-	meta?: Record<string, any> | null; // JSONB object (includes cover: string in meta.cover)
-}
 
 /**
  * DatabasePageCRUD - Database CRUD operations via Supabase Postgres
@@ -49,7 +32,7 @@ export class DatabasePageCRUD {
 	 * Get page by Notion page ID
 	 * Note: Page IDs are globally unique across Notion, no need to filter by datasource
 	 */
-	async getByNotionPageId(pageId: string): Promise<WebsitePage | null> {
+	async getByNotionPageId(pageId: string): Promise<DatabasePage | null> {
 		this.logger.debug({ 
 			event: 'get_by_notion_page_id', 
 			pageId
@@ -66,13 +49,13 @@ export class DatabasePageCRUD {
 			throw new Error(`Failed to get page by page ID: ${error.message}`);
 		}
 
-		return data as WebsitePage | null;
+		return data as DatabasePage | null;
 	}
 
 	/**
 	 * Get page by slug and datasource ID
 	 */
-	async getBySlug(slug: string, datasourceId: string): Promise<WebsitePage | null> {
+	async getBySlug(slug: string, datasourceId: string): Promise<DatabasePage | null> {
 		this.logger.debug({ 
 			event: 'get_by_slug', 
 			slug, 
@@ -91,13 +74,13 @@ export class DatabasePageCRUD {
 			throw new Error(`Failed to get page by slug: ${error.message}`);
 		}
 
-		return data as WebsitePage | null;
+		return data as DatabasePage | null;
 	}
 
 	/**
 	 * Get all pages for a datasource
 	 */
-	async getAllForSource(datasourceId: string): Promise<WebsitePage[]> {
+	async getAllForSource(datasourceId: string): Promise<DatabasePage[]> {
 		this.logger.debug({ 
 			event: 'get_all_for_source', 
 			datasourceId 
@@ -113,7 +96,7 @@ export class DatabasePageCRUD {
 			throw new Error(`Failed to get pages for source: ${error.message}`);
 		}
 
-		return data as WebsitePage[];
+		return data as DatabasePage[];
 	}
 
 	/**

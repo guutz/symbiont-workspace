@@ -54,24 +54,37 @@ export interface TocItem {
 }
 
 /**
- * Represents the structure of a single page or article for rendering on the website.
- * This type mirrors the `pages` table in the database.
+ * Raw database page structure.
+ * Represents a row in the `pages` table exactly as stored in Postgres.
+ * Used for CRUD operations and sync processes.
+ */
+export interface DatabasePage {
+	page_id: string;           // Notion page UUID (primary key)
+	datasource_id: string;      // Notion database ID
+	datasource_alias: string;   // Human-readable datasource alias (non-secret)
+	title: string;
+	slug: string | null;        // Nullable - only generated for public posts
+	content: string;
+	publish_at: string | null;
+	updated_at: string;         // ISO 8601 timestamp (from Notion or manual)
+	tags?: any[] | null;        // JSONB array
+	authors?: any[] | null;     // JSONB array
+	meta?: Record<string, any> | null; // JSONB object (includes cover: string in meta.cover)
+}
+
+/**
+ * Enhanced page structure for website rendering.
+ * Extends DatabasePage with computed/rendered fields for UI consumption.
+ * This is the "sugared-up" version sent to +page.svelte components.
  * 
  * Extended to be compatible with QWER post type for seamless integration.
  */
-export type WebsitePage = {
-    // Database fields (from pages table)
-    page_id?: string;           // Notion page UUID (primary key)
-    datasource_id?: string;     // Notion database ID
-    datasource_alias?: string;  // Human-readable datasource alias (non-secret)
-    title: string | null;
-    slug: string | null;        // Nullable - only generated for public posts
-    content: string | null;     // Markdown content
-    publish_at: string | null;  // ISO 8601 date string
-    updated_at?: string | null; // Last updated timestamp
-    tags?: any[] | null;        // JSONB array
-    authors?: any[] | null;     // JSONB array
-    meta?: Record<string, any> | null; // JSONB object (flexible metadata)
+export interface WebsitePage extends Omit<DatabasePage, 'page_id' | 'datasource_id' | 'datasource_alias' | 'updated_at'> {
+    // Make database fields optional for flexibility
+    page_id?: string;
+    datasource_id?: string;
+    datasource_alias?: string;
+    updated_at?: string | null;
 
     // Optional QWER-compatible fields
     summary?: string;
@@ -83,7 +96,7 @@ export type WebsitePage = {
 
     // Allow any other properties from your schema
     [key: string]: any;
-};
+}
 
 /**
  * Database configuration blueprint.

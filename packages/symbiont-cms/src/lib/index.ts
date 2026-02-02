@@ -14,6 +14,7 @@ export type { SymbiontClient, GetPageOptions, GetAllPagesOptions } from './clien
 
 export type {
 	ClassMap,
+	DatabasePage,
 	WebsitePage,
 	FrontMatterLayout,
 	TocItem,
