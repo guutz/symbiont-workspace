@@ -1,12 +1,11 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
-import type { DatabasePage } from '../database/page-crud.js';
+import type { DatabasePage } from '../../types.js';
 import { createSlug } from '../utils/slug.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
-import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 
 /**
  * NotionPageToWebsitePageTransformer - Business logic for transforming Notion pages into website page data
