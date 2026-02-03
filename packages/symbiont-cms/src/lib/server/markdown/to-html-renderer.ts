@@ -1,27 +1,27 @@
 /**
- * Markdown processor for Symbiont CMS
+ * Markdown renderer for Symbiont CMS
  * 
- * Converts markdown to HTML using markdown-it with custom renderers and plugins.
+ * Renders markdown to HTML using markdown-it with custom renderers and plugins.
  * 
- * **IMPORTANT**: This processor must maintain compatibility with:
+ * **IMPORTANT**: This renderer must maintain compatibility with:
  * - Notion markdown (via notion-to-md library)
  * - Tiptap markdown (future implementation)
  * 
  * See `.docs/markdown-compatibility.md` for the full markdown syntax contract
- * and compatibility requirements between content sources and this processor.
+ * and compatibility requirements between content sources and this renderer.
  * 
- * **ARCHITECTURE NOTE**: This processor does NOT detect features (syntax highlighting,
+ * **ARCHITECTURE NOTE**: This renderer does NOT detect features (syntax highlighting,
  * math, images, etc.). Feature detection should happen during content ingestion
  * (Notion→DB or Tiptap→DB sync) and be stored in the database. This keeps the
  * renderer simple and performant. See `.docs/feature-detection-architecture.md`
  * for details on the recommended approach.
  * 
- * @module markdown-processor
+ * @module markdown-renderer
  */
 
 import MarkdownIt from 'markdown-it';
 import slugifyFn from 'slugify';
-import type { MarkdownConfig, SymbiontConfig, FrontMatterLayout } from '../types.js';
+import type { MarkdownConfig } from '../../types.js';
 
 // @mdit plugins
 import { abbr } from '@mdit/plugin-abbr';
@@ -50,22 +50,22 @@ interface TOCItem {
   child?: TOCItem[];
 }
 
-export interface MarkdownResult {
+export interface RenderedMarkdown {
   html: string;
   toc: TOCItem[];
 }
 
 
 /**
- * Configurable markdown processor using markdown-it
+ * Renders markdown to HTML using markdown-it
  * 
  * @param content - Markdown content to render
  * @param config - Markdown configuration from symbiont.config
  */
-export async function parseMarkdown(
+export async function renderMarkdownToHtml(
   content: string, 
   config: MarkdownConfig | undefined
-): Promise<MarkdownResult> {
+): Promise<RenderedMarkdown> {
   const toc: TOCItem[] = [];
   
   // Initialize markdown-it with base options
@@ -298,10 +298,10 @@ function mangleString(text: string): string {
 }
 
 /**
- * Strips all markdown formatting/HTML and returns a clean plain text string.
+ * Renders markdown summary to plain text by stripping all formatting and HTML.
  * Preserves newlines while ensuring zero HTML tags remain.
  */
-export async function parseSummary(content: string): Promise<string> {
+export async function renderSummaryToHtml(content: string): Promise<string> {
   const md = new MarkdownIt({
     html: true,
     linkify: false,

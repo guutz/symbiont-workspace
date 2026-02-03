@@ -1,53 +1,55 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
-import type { PostData } from './post-repository.js';
-import { createSlug } from '../utils/slug-helpers.js';
-import { NotionAdapter } from '../notion/adapter.js';
-import { PostRepository } from './post-repository.js';
+import type { DatabasePage } from '../database/page-crud.js';
+import { createSlug } from '../utils/slug.js';
+import { NotionClient } from './client.js';
+import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
-import { processMarkdownImages } from '../../image-processor.js';
-import { uploadImage } from '../../image-upload.js';
-import { markdownToNotionBlocks } from '../notion/markdown-to-notion.js';
+import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
+import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 
 /**
- * PostBuilder - Business logic for transforming Notion pages into Post data
+ * NotionPageToWebsitePageTransformer - Business logic for transforming Notion pages into website page data
  * 
  * Responsibilities:
  * - Apply publishing rules (isPublicRule, publishDateRule)
  * - Extract metadata (title, tags, authors, custom metadata)
  * - Resolve slugs (handle conflicts, sync back to Notion)
  * - Orchestrate content fetching
+ * - Process and upload images to Supabase Storage
  * 
  * This is where all the sync rules from DatabaseBlueprint are applied.
  */
-export class PostBuilder {
+export class NotionPageToWebsitePageTransformer {
 	private logger: ReturnType<typeof createLogger>;
 
 	constructor(
 		private config: DatabaseBlueprint,
-		private notionAdapter: NotionAdapter,
-		private postRepository: PostRepository,
+		private notionClient: NotionClient,
+		private pageCrud: DatabasePageCRUD,
+		private supabaseUrl: string,
+		private serviceRoleKey: string
 	) {
 		this.logger = createLogger({
-			operation: 'post_builder',
+			operation: 'page_transformer',
 			alias: this.config.alias,
 			dataSourceId: this.config.dataSourceId
 		});
 	}
 	
 	/**
-	 * Build a complete PostData object from a Notion page
+	 * Transform a complete DatabasePage object from a Notion page
 	 * 
-	 * Always syncs the post to the database, but sets publish_at to null
-	 * if the post doesn't pass the isPublicRule. This allows the database
-	 * to handle filtering of non-public posts.
+	 * Always syncs the page to the database, but sets publish_at to null
+	 * if the page doesn't pass the isPublicRule. This allows the database
+	 * to handle filtering of non-public pages.
 	 * 
-	 * For non-public posts, slug generation is skipped (slug set to null)
-	 * since the post may not be finished yet (including title).
+	 * For non-public pages, slug generation is skipped (slug set to null)
+	 * since the page may not be finished yet (including title).
 	 */
-	async buildPost(page: PageObjectResponse): Promise<PostData | null> {
+	async transformPage(page: PageObjectResponse): Promise<DatabasePage | null> {
 		this.logger.debug({
-			event: 'build_post_started',
+			event: 'transform_page_started',
 			pageId: page.id
 		});
 
@@ -75,10 +77,11 @@ export class PostBuilder {
 					if (file.type === 'file') {
 						// Notion-hosted file - these URLs expire, so we need to re-upload to storage bucket
 						const originalCoverUrl = file.file?.url;
-						if (originalCoverUrl) {
-							const result = await uploadImage(originalCoverUrl, {
-								bucketId: 'default',
-								pathPrefix: `${page.id}/`
+						if (originalCoverUrl && needsUploadToSupabase(originalCoverUrl)) {
+							const result = await uploadImageToSupabase(originalCoverUrl, {
+								supabaseUrl: this.supabaseUrl,
+								serviceRoleKey: this.serviceRoleKey,
+								pageId: page.id
 							});
 							coverUrl = result.newUrl;
 							
@@ -87,8 +90,10 @@ export class PostBuilder {
 								pageId: page.id,
 								originalUrl: originalCoverUrl,
 								newUrl: coverUrl,
-								fileId: result.fileId
+								filename: result.filename
 							});
+						} else if (originalCoverUrl) {
+							coverUrl = originalCoverUrl; // Already on Supabase or external
 						}
 					} else if (file.type === 'external') {
 						// External URL - use as-is (already permanent)
@@ -111,92 +116,68 @@ export class PostBuilder {
 		}
 
 		// 5. Get content as markdown
-		let content = await this.notionAdapter.pageToMarkdown(page.id);
+		const content = await this.notionClient.pageToMarkdown(page.id);
 
-		// 6. Process images in content blocks (upload Notion CDN images to Nhost)
-		if (content) {
-			try {
-				const { markdown: updatedMarkdown, uploaded, failed } = await processMarkdownImages(content, {
-					
-					bucketId: 'default',
-					shouldUpload: (url) => url.includes('notion.so') // Only upload Notion CDN images
-				});
-				
-				const hasImageChanges = updatedMarkdown !== content;
-				content = updatedMarkdown;
-				
-				if (uploaded.length > 0) {
-					this.logger.info({
-						event: 'content_images_processed',
-						pageId: page.id,
-						uploadedCount: uploaded.length,
-						failedCount: failed.length
-					});
-				}
-				
-				if (failed.length > 0) {
-					this.logger.warn({
-						event: 'some_images_failed',
-						pageId: page.id,
-						failed: failed.map(f => ({ url: f.originalUrl, error: f.error }))
-					});
-				}
-				
-				// Sync updated content back to Notion
-				if (hasImageChanges) {
-					try {
-						const blocks = markdownToNotionBlocks(updatedMarkdown, {
-							strictImageUrls: false,
-							truncate: true
-						});
-						
-						await this.notionAdapter.updatePageBlocks(page.id, blocks);
-						
-						this.logger.info({
-							event: 'notion_content_synced',
-							pageId: page.id,
-							blockCount: blocks.length
-						});
-					} catch (syncError: any) {
-						this.logger.warn({
-							event: 'notion_sync_failed',
-							pageId: page.id,
-							error: syncError?.message
-						});
-						// Don't fail the whole sync if Notion update fails
-					}
-				}
-			} catch (error: any) {
-				this.logger.warn({
-					event: 'content_image_processing_failed',
+		// 6. Process images in content
+		let processedContent = content;
+		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+		let match;
+		const imagePromises: Promise<void>[] = [];
+
+		while ((match = imageRegex.exec(content)) !== null) {
+			const [fullMatch, alt, url] = match;
+			
+			if (needsUploadToSupabase(url)) {
+				const imagePromise = uploadImageToSupabase(url, {
+					supabaseUrl: this.supabaseUrl,
+					serviceRoleKey: this.serviceRoleKey,
 					pageId: page.id,
-					error: error?.message
+					altText: alt || undefined
+				}).then((uploaded) => {
+					processedContent = processedContent.replace(fullMatch, `![${alt}](${uploaded.newUrl})`);
+					this.logger.info({
+						event: 'content_image_uploaded',
+						pageId: page.id,
+						filename: uploaded.filename
+					});
+				}).catch((error) => {
+					this.logger.warn({
+						event: 'content_image_upload_failed',
+						pageId: page.id,
+						url,
+						error: error.message
+					});
 				});
+				
+				imagePromises.push(imagePromise);
 			}
 		}
 
+		// Wait for all image uploads to complete
+		await Promise.all(imagePromises);
+
 		if (!isPublic) {
 			this.logger.debug({
-				event: 'post_marked_unpublished',
+				event: 'page_marked_unpublished',
 				pageId: page.id,
 				title: meta.title
 			});
 		}
 
-		// 7. Build post data
+		// 7. Build page data
 		// Extract custom metadata and merge with cover URL
 		const customMeta = this.extractCustomMetadata(page);
 		const metaWithCover = coverUrl 
 			? { ...customMeta, cover: coverUrl }
 			: customMeta;
 		
-		const postData: PostData = {
+		const pageData: DatabasePage = {
 			page_id: page.id,
 			datasource_id: this.config.dataSourceId,
 			datasource_alias: this.config.alias,
 			title: meta.title,
 			slug,
-			content,
+			content: processedContent,
 			publish_at: publishDate,
 			updated_at: page.last_edited_time, // Use Notion's last edited time
 			tags: meta.tags.length > 0 ? meta.tags : null,
@@ -205,14 +186,14 @@ export class PostBuilder {
 		};
 
 		this.logger.info({
-			event: 'post_built',
+			event: 'page_transformed',
 			pageId: page.id,
 			slug,
 			title: meta.title,
 			isPublic
 		});
 
-		return postData;
+		return pageData;
 	}
 
 	/**
@@ -231,16 +212,16 @@ export class PostBuilder {
 		authors: string[];
 	} {
 		// Auto-detect title (type: 'title')
-		const title = this.notionAdapter.getTitleProperty(page);
+		const title = this.notionClient.getTitleProperty(page);
 
 		// Extract tags (if configured)
 		const tags = this.config.tagsProperty
-			? this.notionAdapter.getPropertyValues(page, this.config.tagsProperty)
+			? this.notionClient.getPropertyValues(page, this.config.tagsProperty)
 			: [];
 
 		// Extract authors (if configured)
 		const authors = this.config.authorsProperty
-			? this.notionAdapter.getPropertyValues(page, this.config.authorsProperty)
+			? this.notionClient.getPropertyValues(page, this.config.authorsProperty)
 			: [];
 
 		return { title, tags, authors };
@@ -254,31 +235,31 @@ export class PostBuilder {
 		const customSlug = this.config.slugRule?.(page) ?? null;
 
 		// 2. Check if page already exists in DB
-		const existingPost = await this.postRepository.getByNotionPageId(page.id);
+		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
 
 		// 3. Determine final slug
 		let slug: string;
 		let slugChanged = false;
 
-		if (existingPost && existingPost.slug) {
-			// Existing post with slug - handle slug changes
-			if (customSlug && customSlug !== existingPost.slug) {
+		if (existingPage && existingPage.slug) {
+			// Existing page with slug - handle slug changes
+			if (customSlug && customSlug !== existingPage.slug) {
 				// User changed slug in Notion - validate uniqueness
 				slug = await this.ensureUniqueSlug(customSlug, page.id);
 				slugChanged = true;
 				this.logger.info({
 					event: 'slug_updated',
 					pageId: page.id,
-					oldSlug: existingPost.slug,
+					oldSlug: existingPage.slug,
 					newSlug: slug
 				});
 			} else {
 				// No change - keep existing slug
-				slug = existingPost.slug;
+				slug = existingPage.slug;
 				slugChanged = false;
 			}
 		} else {
-			// New post or existing post without slug - generate or use custom
+			// New page or existing page without slug - generate or use custom
 			const baseSlug = customSlug || createSlug(title);
 			slug = await this.ensureUniqueSlug(baseSlug);
 			slugChanged = true;
@@ -293,7 +274,7 @@ export class PostBuilder {
 		if (this.config.slugSyncProperty && slugChanged) {
 			// Also check if Notion already has the correct slug to avoid unnecessary updates
 			if (customSlug !== slug) {
-				await this.notionAdapter.updateProperty(page.id, this.config.slugSyncProperty, slug);
+				await this.notionClient.updateProperty(page.id, this.config.slugSyncProperty, slug);
 				this.logger.debug({
 					event: 'slug_synced_to_notion',
 					pageId: page.id,
@@ -309,17 +290,17 @@ export class PostBuilder {
 	 * Ensure slug is unique by appending numbers if needed
 	 */
 	private async ensureUniqueSlug(baseSlug: string, excludePageId?: string): Promise<string> {
-		const existingPost = await this.postRepository.getBySlug(baseSlug, this.config.dataSourceId);
+		const existingPage = await this.pageCrud.getBySlug(baseSlug, this.config.dataSourceId);
 
 		// If no conflict, or conflict is with the same page, use base slug
-		if (!existingPost || existingPost.page_id === excludePageId) {
+		if (!existingPage || existingPage.page_id === excludePageId) {
 			return baseSlug;
 		}
 
 		// Auto-resolve conflicts: try -2, -3, -4, etc.
 		for (let i = 2; i <= 100; i++) {
 			const numberedSlug = `${baseSlug}-${i}`;
-			const conflict = await this.postRepository.getBySlug(numberedSlug, this.config.dataSourceId);
+			const conflict = await this.pageCrud.getBySlug(numberedSlug, this.config.dataSourceId);
 
 			if (!conflict || conflict.page_id === excludePageId) {
 				this.logger.warn({

@@ -1,8 +1,8 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
-import { NotionAdapter } from '../notion/adapter.js';
-import { PostRepository } from './post-repository.js';
-import { PostBuilder } from './post-builder.js';
+import { NotionClient } from '../notion/client.js';
+import { DatabasePageCRUD } from '../database/page-crud.js';
+import { NotionPageToWebsitePageTransformer } from '../notion/page-transformer.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface SyncOptions {
@@ -12,11 +12,11 @@ export interface SyncOptions {
 	/** Sync all pages regardless of last_edited_time */
 	syncAll?: boolean;
 	
-	/** Delete all existing posts before syncing */
+	/** Delete all existing pages before syncing */
 	wipe?: boolean;
 }
 
-export interface SyncSummary {
+export interface SyncResult {
 	alias: string;
 	dataSourceId: string;
 	processed: number;
@@ -28,31 +28,31 @@ export interface SyncSummary {
 }
 
 /**
- * SyncOrchestrator - High-level sync coordination
+ * NotionToDatabaseSync - High-level sync coordination
  * 
  * Responsibilities:
  * - Coordinate full database sync (query → transform → upsert)
  * - Handle pagination (Notion returns max 100 pages per query)
  * - Process individual pages (webhook handler)
  * - Collect metrics and errors
- * - Wipe operations (delete all posts for a source)
+ * - Wipe operations (delete all pages for a source)
  * 
  * This is the entry point for all sync operations.
  */
-export class SyncOrchestrator {
-	private logger = createLogger({ operation: 'sync_orchestrator' });
+export class NotionToDatabaseSync {
+	private logger = createLogger({ operation: 'notion_to_database_sync' });
 
 	constructor(
-		private notionAdapter: NotionAdapter,
-		private postBuilder: PostBuilder,
-		private postRepository: PostRepository,
+		private notionClient: NotionClient,
+		private pageTransformer: NotionPageToWebsitePageTransformer,
+		private pageCrud: DatabasePageCRUD,
 		private config: DatabaseBlueprint
 	) {}
 
 	/**
 	 * Sync entire database from Notion
 	 */
-	async syncDataSource(options: SyncOptions = {}): Promise<SyncSummary> {
+	async syncDataSource(options: SyncOptions = {}): Promise<SyncResult> {
 		const startTime = Date.now();
 		
 		this.logger.info({ 
@@ -63,9 +63,9 @@ export class SyncOrchestrator {
 		});
 
 		try {
-			// 1. Wipe existing posts if requested
+			// 1. Wipe existing pages if requested
 			if (options.wipe) {
-				const deletedCount = await this.postRepository.deleteForSource(this.config.dataSourceId);
+				const deletedCount = await this.pageCrud.deleteForSource(this.config.dataSourceId);
 				this.logger.info({ 
 					event: 'wipe_completed',
 					alias: this.config.alias,
@@ -82,7 +82,7 @@ export class SyncOrchestrator {
 			let cursor: string | null | undefined = undefined;
 			
 			do {
-				const result = await this.notionAdapter.queryDataSource(
+				const result = await this.notionClient.queryDataSource(
 					this.config.dataSourceId,
 					filter,
 					cursor
@@ -184,18 +184,18 @@ export class SyncOrchestrator {
 		});
 
 		// 1. Check if page needs updating (compare timestamps)
-		const existingPost = await this.postRepository.getByNotionPageId(page.id);
+		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
 
-		if (existingPost && existingPost.updated_at) {
+		if (existingPage && existingPage.updated_at) {
 			const notionTime = new Date(page.last_edited_time).getTime();
-			const dbTime = new Date(existingPost.updated_at).getTime();
+			const dbTime = new Date(existingPage.updated_at).getTime();
 			const diff = notionTime - dbTime;
 
 			this.logger.debug({ 
 				event: 'timestamp_comparison',
 				pageId: page.id,
 				notionTime: page.last_edited_time,
-				dbTime: existingPost.updated_at,
+				dbTime: existingPage.updated_at,
 				notionTimeMs: notionTime,
 				dbTimeMs: dbTime,
 				diffMs: diff,
@@ -208,17 +208,17 @@ export class SyncOrchestrator {
 					event: 'page_already_up_to_date',
 					pageId: page.id,
 					notionTime: page.last_edited_time,
-					dbTime: existingPost.updated_at
+					dbTime: existingPage.updated_at
 				});
 				return false; // Skipped
 			}
 		}
 
-		// 2. Build post data (applies all business logic - expensive)
-		const postData = await this.postBuilder.buildPost(page);
+		// 2. Build page data (applies all business logic - expensive)
+		const pageData = await this.pageTransformer.transformPage(page);
 
 		// 3. Skip if not publishable
-		if (!postData) {
+		if (!pageData) {
 			this.logger.debug({ 
 				event: 'page_skipped',
 				pageId: page.id 
@@ -227,13 +227,13 @@ export class SyncOrchestrator {
 		}
 
 		// 4. Upsert to database
-		await this.postRepository.upsert(postData);
+		await this.pageCrud.upsert(pageData);
 
 		this.logger.info({ 
 			event: 'page_processed',
 			pageId: page.id,
-			slug: postData.slug,
-			title: postData.title 
+			slug: pageData.slug,
+			title: pageData.title 
 		});
 		
 		return true;

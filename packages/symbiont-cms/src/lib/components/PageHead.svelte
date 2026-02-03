@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Post } from '../types.js';
+	import type { WebsitePage } from '../types.js';
 
-	/** Post data for meta tags */
-	export let post: Post;
+	/** Page data for meta tags */
+	export let post: WebsitePage;
 
 	/** Site name for og:site_name */
 	export let siteName: string = '';

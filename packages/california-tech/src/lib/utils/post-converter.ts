@@ -1,10 +1,10 @@
 /**
  * Utility to convert Symbiont CMS posts to QWER post format
  */
-import type { Post as SymbiontPost } from 'symbiont-cms';
+import type { WebsitePage } from 'symbiont-cms';
 import type { Post } from '$lib/types/post';
 
-export function symbiontToQwerPost(post: SymbiontPost, html?: string, toc?: any[]): Post.Post {
+export function symbiontToQwerPost(post: WebsitePage, html?: string, toc?: any[]): Post.Post {
 	return {
 		// Direct pass-through fields
 		// @ts-ignore -- slug will always be present at this point
