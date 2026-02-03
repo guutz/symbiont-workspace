@@ -63,20 +63,20 @@ export async function publishPostToNotion(
 			title: page.title
 		});
 
-		// 2. Convert markdown to Notion blocks
-		if (!page.content) {
-			throw new Error(`Page ${pageId} has no content - cannot sync to Notion`);
-		}
-		
-		const blocks = convertMarkdownToNotionBlocks(page.content, {
-			strictImageUrls: options.strictImageUrls,
-			truncate: options.truncate,
-		});
+		// 2. Convert markdown to Notion blocks (or use empty blocks if no content)
+		// Allow syncing without content to update metadata on unwritten posts
+		const blocks = page.content 
+			? convertMarkdownToNotionBlocks(page.content, {
+					strictImageUrls: options.strictImageUrls,
+					truncate: options.truncate,
+				})
+			: [];
 
 		logger.debug({ 
 			event: 'markdown_converted',
 			pageId,
-			blockCount: blocks.length 
+			blockCount: blocks.length,
+			hasContent: !!page.content
 		});
 
 		// 3. Update Notion page
