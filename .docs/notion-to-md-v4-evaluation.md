@@ -1,13 +1,23 @@
 # Notion-to-MD v4 Evaluation
 
-**Date**: February 4, 2026  
+**Date**: February 4, 2026 (Updated)  
 **Current Version**: v3.1.9  
 **Latest Stable**: v3.1.9  
 **V4 Status**: Alpha (v4.0.0-alpha.7)
 
+> **📖 COMPREHENSIVE ANALYSIS AVAILABLE**  
+> This document provides a quick overview. For detailed feature-by-feature comparison with Symbiont CMS architecture, see:  
+> **→ [notion-to-md-v4-comprehensive-analysis.md](./notion-to-md-v4-comprehensive-analysis.md)**
+
 ## Executive Summary
 
 **Recommendation**: **Stay on v3.1.9** for now. V4 is still in alpha and brings significant architectural changes that would require substantial refactoring. The custom transformer approach in v3 solves our immediate image alt text issue effectively.
+
+**Updated Findings (Post-Comprehensive Review)**:
+- ✅ V4 solves problems we already solved (media, properties, page refs)
+- ⚠️ Architectural mismatch: V4 is file-based, Symbiont is database-first
+- 🔄 Different paradigms: V4 assumes frontmatter + static files; we use DB + SSR
+- 💡 **Score: Symbiont 7, V4 2, Tie 1** - Our custom solutions win in most areas
 
 ---
 
