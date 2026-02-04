@@ -31,6 +31,7 @@ export interface UploadImageResult {
  */
 export function needsUploadToSupabase(url: string): boolean {
 	return url.includes('prod-files-secure') ||  // Notion CDN
+		   url.includes('notion.so') ||         // Notion cache URLs
 	       url.includes('googleusercontent') ||   // Google images
 	       url.includes('ygsdnfrbruuhtxczekur');  // Old Nhost instance
 }
