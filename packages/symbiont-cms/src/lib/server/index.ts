@@ -9,7 +9,7 @@
  * ```
  * NotionClient (API layer) - Talk to Notion API
  *     ↓
- * NotionPageToWebsitePageTransformer (Business logic) - Apply sync rules, resolve slugs
+ * NotionPageToDatabasePageTransformer (Business logic) - Apply sync rules, resolve slugs
  *     ↓
  * DatabasePageCRUD (Database layer) - Postgres operations
  *     ↓
@@ -28,11 +28,11 @@
  * 
  * ### Low-level (for testing or custom workflows):
  * ```typescript
- * import { NotionClient, DatabasePageCRUD, NotionPageToWebsitePageTransformer } from 'symbiont-cms/server';
+ * import { NotionClient, DatabasePageCRUD, NotionPageToDatabasePageTransformer } from 'symbiont-cms/server';
  * 
  * const notionClient = new NotionClient(notion, n2m);
  * const pageCrud = new DatabasePageCRUD(supabaseUrl, serviceRoleKey);
- * const transformer = new NotionPageToWebsitePageTransformer(config, notionClient, pageCrud);
+ * const transformer = new NotionPageToDatabasePageTransformer(config, notionClient, pageCrud);
  * 
  * const pageData = await transformer.transformPage(page);
  * await pageCrud.upsert(pageData);
@@ -47,7 +47,7 @@ export { NotionToDatabaseSync } from './sync/notion-to-database-sync.js';
 export type { SyncOptions, SyncResult } from './sync/notion-to-database-sync.js';
 
 // Business logic layer
-export { NotionPageToWebsitePageTransformer } from './notion/page-transformer.js';
+export { NotionPageToDatabasePageTransformer } from './notion/page-transformer.js';
 
 // Database layer
 export { DatabasePageCRUD } from './database/page-crud.js';

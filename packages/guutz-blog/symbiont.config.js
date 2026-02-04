@@ -28,6 +28,13 @@ const config = defineConfig({
 			// PRIVATE: Notion API integration token (server-only, MUST use env var)
 			notionToken: process.env.NOTION_BLOG_TOKEN || '',
 			
+		// PRIVATE: Server-only function to exclude pages from sync entirely
+		// Example: Exclude archived posts and templates
+		// excludeRule: (page) => {
+		// 	const tags = page.properties.Tags?.multi_select || [];
+		// 	return tags.some((tag) => tag.name === 'archive' || tag.name === 'template');
+		// },
+		
 		// PRIVATE: Server-only function to determine if a page is published
 		isPublicRule: (page) => {
 			// @ts-ignore - Notion types are complex, this is safe at runtime
@@ -35,9 +42,6 @@ const config = defineConfig({
 			// @ts-ignore - multi_select exists on Tags property
 			return tags?.multi_select?.some((/** @type {any} */ tag) => tag.name === 'LIVE') ?? false;
 		},
-		
-		// PRIVATE: Server-only property name to sync generated slugs back to Notion
-		slugSyncProperty: 'Slug',			// PRIVATE: Server-only custom slug extraction logic
 			slugRule: (page) => {
 				// @ts-ignore - Notion types are complex, this is safe at runtime
 				const slugProperty = page.properties.Slug?.rich_text;

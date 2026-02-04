@@ -4,7 +4,7 @@ import { requireEnvVar } from './utils/env.js';
 import type { SymbiontClient } from '../client.js';
 import { createLogger } from './utils/logger.js';
 import { createNotionToDatabaseSyncCoordinator } from './sync/coordinator.js';
-import type { SyncResult, SyncOptions } from './sync/notion-to-database-sync.js';
+import type { SyncResult } from './sync/notion-to-database-sync.js';
 import { Client } from '@notionhq/client';
 
 const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
@@ -14,7 +14,7 @@ const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authentica
  */
 export async function syncFromNotion(
 	client: SymbiontClient,
-	options: { databaseId?: string | null; since?: string | null; syncAll?: boolean; wipe?: boolean } = {}
+	options: { databaseId?: string | null; since?: string | null; syncAll?: boolean; wipe?: boolean; limit?: number } = {}
 ): Promise<{ summaries: SyncResult[] }> {
 	const logger = createLogger({ operation: 'sync_from_notion' });
 
@@ -35,7 +35,8 @@ export async function syncFromNotion(
 		const result = await sync.syncDataSource({
 			since: options.since,
 			syncAll: options.syncAll,
-			wipe: options.wipe
+			wipe: options.wipe,
+			limit: options.limit
 		});
 		summaries.push(result);
 	}
@@ -130,11 +131,13 @@ export async function handlePollBlogRequest(client: SymbiontClient, event: Reque
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
+		const limitParam = event.url.searchParams.get('limit');
 		const result = await syncFromNotion(client, {
 			databaseId: event.url.searchParams.get('database'),
 			since: event.url.searchParams.get('since'),
 			syncAll: event.url.searchParams.get('syncAll') === 'true',
-			wipe: event.url.searchParams.get('wipe') === 'true'
+			wipe: event.url.searchParams.get('wipe') === 'true',
+			limit: limitParam ? parseInt(limitParam, 10) : undefined
 		});
 
 		const hasError = result.summaries.some((s) => s.status === 'error');

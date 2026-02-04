@@ -1,5 +1,5 @@
 import type { PageObjectResponse } from '@notionhq/client';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './database.types.js';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -53,23 +53,32 @@ export interface TocItem {
     children?: TocItem[]; // Nested headings
 }
 
+
+
 /**
  * Raw database page structure.
- * Represents a row in the `pages` table exactly as stored in Postgres.
- * Used for CRUD operations and sync processes.
+ * Derived from Supabase-generated types for the `pages` table.
+ * 
+ * This ensures type safety between the database schema and our TypeScript code.
+ * 
+ * NOTE: The database schema is intentionally fixed and should NOT be customized.
+ * Use the `meta` JSONB field for custom data instead of modifying the schema.
+ * The `database.types.ts` file is bundled with the package and should not be overridden.
  */
-export interface DatabasePage {
-	page_id: string;           // Notion page UUID (primary key)
-	datasource_id: string;      // Notion database ID
-	datasource_alias: string;   // Human-readable datasource alias (non-secret)
-	title: string;
-	slug: string | null;        // Nullable - only generated for public posts
-	content: string;
-	publish_at: string | null;
-	updated_at: string;         // ISO 8601 timestamp (from Notion or manual)
-	tags?: any[] | null;        // JSONB array
-	authors?: any[] | null;     // JSONB array
-	meta?: Record<string, any> | null; // JSONB object (includes cover: string in meta.cover)
+type DatabasePageRaw = Database['public']['Tables']['pages']['Row'];
+
+/**
+ * Refined database page type with properly typed JSONB fields.
+ * 
+ * Narrows the broad Supabase `Json` type to our actual data structures:
+ * - tags: string[] (array of tag names)
+ * - authors: string[] (array of author names)
+ * - meta: Record<string, any> (flexible metadata object)
+ */
+export interface DatabasePage extends Omit<DatabasePageRaw, 'tags' | 'authors' | 'meta'> {
+	tags: string[] | null;
+	authors: string[] | null;
+	meta: Record<string, any> | null;
 }
 
 /**
@@ -117,6 +126,11 @@ export interface DatabaseBlueprint {
     // ============================================
     // PUBLISHING RULES
     // ============================================
+
+    /** Boolean gate: determines IF a page should be excluded from sync entirely */
+    excludeRule?: (page: PageObjectResponse) => boolean;
+    // Default: () => false (don't exclude anything)
+    // Return true to exclude the page from being synced to the database
 
     /** Boolean gate: determines IF a page should be published */
     isPublicRule?: (page: PageObjectResponse) => boolean;

@@ -134,6 +134,61 @@ export class NotionClient {
 	}
 
 	/**
+	 * Update a file property on a Notion page with an external URL
+	 * Used to sync uploaded image URLs (Supabase/Nhost) back to Notion
+	 */
+	async updateFileProperty(
+		pageId: string,
+		propertyName: string,
+		url: string
+	): Promise<void> {
+		this.logger.debug({ 
+			event: 'update_file_property', 
+			pageId, 
+			propertyName, 
+			url 
+		});
+
+		try {
+			await this.notion.pages.update({
+				page_id: pageId,
+				properties: {
+					[propertyName]: {
+						files: [
+							{
+								type: 'external',
+								name: 'Image',
+								external: { url }
+							}
+						]
+					}
+				}
+			});
+			this.logger.info({ 
+				event: 'file_property_updated', 
+				pageId, 
+				propertyName 
+			});
+		} catch (error: any) {
+			// Check for authentication errors
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			
+			this.logger.warn({ 
+				event: 'update_file_property_failed', 
+				pageId,
+				propertyName,
+				error: error?.message 
+			});
+			// Don't throw for other errors - property updates should be non-blocking
+		}
+	}
+
+	/**
 	 * Replace all blocks in a Notion page
 	 * 
 	 * Note: Notion doesn't have a "replace all" operation, so this:

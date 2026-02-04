@@ -25,12 +25,23 @@ export const symbiont = createSymbiontClient({
 			alias: 'tech-article-staging',
 			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
 
+			// Conceivably once we get the web editor working, we might want to be able to edit Print Only articles
+			// from the web interface -- but for now, just exclude them from the sync entirely.
+			// Also this currently doesn't remove existing Print Only articles from the database,
+			// so that would be an issue if an article was synced automatically before the tag was added.
+			excludeRule: (page: PageObjectResponse) => {
+				const tags = page.properties.Tags; // @ts-ignore
+				return tags?.multi_select?.some((tag: any) => 
+					tag.name === 'Print Only' || tag.name === 'Advertisement'
+				) ?? false;
+			},
+
 			isPublicRule: (page: PageObjectResponse) => {
 				const status = page.properties.Status;
 				const tags = page.properties.Tags;
 				return ( // @ts-ignore
 					status?.status?.name === 'Published' && // @ts-ignore
-					!tags?.multi_select?.some((tag: any) => tag.name === 'Print Only')
+					!tags?.multi_select?.some((tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement')
 				);
 			},
 

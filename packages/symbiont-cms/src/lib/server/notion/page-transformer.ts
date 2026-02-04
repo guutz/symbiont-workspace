@@ -6,9 +6,10 @@ import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
+import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 
 /**
- * NotionPageToWebsitePageTransformer - Business logic for transforming Notion pages into website page data
+ * NotionPageToDatabasePageTransformer - Business logic for transforming Notion pages into database page data
  * 
  * Responsibilities:
  * - Apply publishing rules (isPublicRule, publishDateRule)
@@ -19,7 +20,7 @@ import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-up
  * 
  * This is where all the sync rules from DatabaseBlueprint are applied.
  */
-export class NotionPageToWebsitePageTransformer {
+export class NotionPageToDatabasePageTransformer {
 	private logger: ReturnType<typeof createLogger>;
 
 	constructor(
@@ -37,7 +38,7 @@ export class NotionPageToWebsitePageTransformer {
 	}
 	
 	/**
-	 * Transform a complete DatabasePage object from a Notion page
+	 * Construct a complete DatabasePage object from a Notion page
 	 * 
 	 * Always syncs the page to the database, but sets publish_at to null
 	 * if the page doesn't pass the isPublicRule. This allows the database
@@ -52,76 +53,137 @@ export class NotionPageToWebsitePageTransformer {
 			pageId: page.id
 		});
 
-		// 1. Extract metadata
-		const meta = this.extractMetadata(page);
+		// 1. Extract core metadata (title, tags, authors)
+		const coreMeta = this.extractCoreMetadata(page);
 
-		// 2. Check publishing rules first
+		// 2. Check publishing rules
 		const isPublic = this.shouldPublish(page);
 		const publishDate = isPublic ? this.getPublishDate(page) : null;
 
-		// 3. Resolve slug only for public posts (non-public posts may not be finished)
-		const slug = isPublic ? await this.resolveSlug(page, meta.title) : null;
+		// 3. Resolve slug (only for public posts)
+		const slug = isPublic ? await this.resolveSlug(page, coreMeta.title) : null;
 
-		// 4. Process cover image from database property (if configured)
-		let coverUrl: string | null = null;
-		if (this.config.coverProperty) {
-			try {
-				const coverProp = page.properties[this.config.coverProperty];
-				
-				// Handle files property (TypeScript will narrow the union type)
-				if (coverProp?.type === 'files' && coverProp.files.length > 0) {
-					const file = coverProp.files[0];
-					
-					// Extract URL based on file type (external vs Notion-hosted)
-					if (file.type === 'file') {
-						// Notion-hosted file - these URLs expire, so we need to re-upload to storage bucket
-						const originalCoverUrl = file.file?.url;
-						if (originalCoverUrl && needsUploadToSupabase(originalCoverUrl)) {
-							const result = await uploadImageToSupabase(originalCoverUrl, {
-								supabaseUrl: this.supabaseUrl,
-								serviceRoleKey: this.serviceRoleKey,
-								pageId: page.id
-							});
-							coverUrl = result.newUrl;
-							
-							this.logger.info({
-								event: 'cover_image_uploaded',
-								pageId: page.id,
-								originalUrl: originalCoverUrl,
-								newUrl: coverUrl,
-								filename: result.filename
-							});
-						} else if (originalCoverUrl) {
-							coverUrl = originalCoverUrl; // Already on Supabase or external
-						}
-					} else if (file.type === 'external') {
-						// External URL - use as-is (already permanent)
-						coverUrl = file.external?.url || null;
-						
-						this.logger.info({
-							event: 'cover_image_external',
-							pageId: page.id,
-							coverUrl
-						});
-					}
-				}
-			} catch (error: any) {
-				this.logger.warn({
-					event: 'cover_image_upload_failed',
-					pageId: page.id,
-					error: error?.message
-				});
-			}
+		// 4. Process cover image (upload + sync back to Notion)
+		// TODO: maybe combine this with metadata extraction and have some kind of flag in config that it is an image to be uploaded?
+		const coverUrl = await this.processCoverImage(page);
+
+		// 5. Get content and process inline images (upload + sync back to Notion)
+		const processedContent = await this.processContentAndUploadImages(page);
+
+		// 6. Build complete metadata object
+		const meta = this.buildMetadata(page, { coverUrl });
+
+		// 7. Construct final page data
+		const pageData: DatabasePage = {
+			page_id: page.id,
+			datasource_id: this.config.dataSourceId,
+			datasource_alias: this.config.alias,
+			title: coreMeta.title,
+			slug,
+			content: processedContent,
+			publish_at: publishDate,
+			updated_at: page.last_edited_time,
+			tags: coreMeta.tags.length > 0 ? coreMeta.tags : null,
+			authors: coreMeta.authors.length > 0 ? coreMeta.authors : null,
+			meta
+		};
+
+		this.logger.info({
+			event: 'page_transformed',
+			pageId: page.id,
+			slug,
+			title: coreMeta.title,
+			isPublic
+		});
+
+		return pageData;
+	}
+
+	/**
+	 * Process cover image: upload to Supabase and sync URL back to Notion
+	 */
+	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
+		if (!this.config.coverProperty) {
+			return null;
 		}
 
-		// 5. Get content as markdown
-		const content = await this.notionClient.pageToMarkdown(page.id);
+		try {
+			const coverProp = page.properties[this.config.coverProperty];
+			
+			if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
+				return null;
+			}
 
-		// 6. Process images in content
+			const file = coverProp.files[0];
+			
+			// Handle Notion-hosted files (need re-upload)
+			if (file.type === 'file') {
+				const originalUrl = file.file?.url;
+				if (!originalUrl) return null;
+
+				// Upload to Supabase if needed
+				if (needsUploadToSupabase(originalUrl)) {
+					const result = await uploadImageToSupabase(originalUrl, {
+						supabaseUrl: this.supabaseUrl,
+						serviceRoleKey: this.serviceRoleKey,
+						pageId: page.id
+					});
+					
+					this.logger.info({
+						event: 'cover_image_uploaded',
+						pageId: page.id,
+						originalUrl,
+						newUrl: result.newUrl,
+						filename: result.filename
+					});
+
+					// Sync permanent URL back to Notion
+					await this.notionClient.updateFileProperty(
+						page.id,
+						this.config.coverProperty,
+						result.newUrl
+					);
+
+					return result.newUrl;
+				}
+
+				return originalUrl; // Already on Supabase
+			}
+			
+			// Handle external files (use as-is)
+			if (file.type === 'external') {
+				const externalUrl = file.external?.url || null;
+				this.logger.info({
+					event: 'cover_image_external',
+					pageId: page.id,
+					coverUrl: externalUrl
+				});
+				return externalUrl;
+			}
+
+			return null;
+		} catch (error: any) {
+			this.logger.warn({
+				event: 'cover_image_upload_failed',
+				pageId: page.id,
+				error: error?.message
+			});
+			return null;
+		}
+	}
+
+	/**
+	 * Process content and images: upload to Supabase and sync markdown back to Notion
+	 */
+	private async processContentAndUploadImages(page: PageObjectResponse): Promise<string> {
+		// Get content as markdown
+		const content = await this.notionClient.pageToMarkdown(page.id);
+		
+		// Find and process all images
 		let processedContent = content;
 		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-		let match;
 		const imagePromises: Promise<void>[] = [];
+		let match;
 
 		while ((match = imageRegex.exec(content)) !== null) {
 			const [fullMatch, alt, url] = match;
@@ -152,73 +214,90 @@ export class NotionPageToWebsitePageTransformer {
 			}
 		}
 
-		// Wait for all image uploads to complete
+		// Wait for all uploads
 		await Promise.all(imagePromises);
 
-		if (!isPublic) {
-			this.logger.debug({
-				event: 'page_marked_unpublished',
-				pageId: page.id,
-				title: meta.title
-			});
+		// Sync updated content back to Notion if images changed
+		// TODO: Decide if we want to keep images that are in Notion CDN, in Notion CDN -- or replace all images in Notion with Supabase URLs
+		// As is, not sure if Martian convertMarkdownToNotionBlocks rebuilds Notion internal image blocks correctly
+		// Probably want to move away from Martian at some point anyway since it's a black box and it's unclear how it deals with api limits
+		if (processedContent !== content) {
+			try {
+				const blocks = convertMarkdownToNotionBlocks(processedContent, {
+					strictImageUrls: false,
+					truncate: true,
+					onLimitExceeded: (err) => this.logger.warn({
+						event: 'notion_content_limit_exceeded',
+						pageId: page.id,
+						error: err.message
+					})
+				});
+
+				await this.notionClient.updatePageBlocks(page.id, blocks);
+				
+				this.logger.info({
+					event: 'notion_content_images_synced',
+					pageId: page.id,
+					message: 'Updated Notion page with Supabase image URLs'
+				});
+			} catch (error: any) {
+				this.logger.warn({
+					event: 'notion_content_sync_failed',
+					pageId: page.id,
+					error: error?.message
+				});
+			}
 		}
 
-		// 7. Build page data
-		// Extract custom metadata and merge with cover URL
-		const customMeta = this.extractCustomMetadata(page);
-		const metaWithCover = coverUrl 
-			? { ...customMeta, cover: coverUrl }
-			: customMeta;
-		
-		const pageData: DatabasePage = {
-			page_id: page.id,
-			datasource_id: this.config.dataSourceId,
-			datasource_alias: this.config.alias,
-			title: meta.title,
-			slug,
-			content: processedContent,
-			publish_at: publishDate,
-			updated_at: page.last_edited_time, // Use Notion's last edited time
-			tags: meta.tags.length > 0 ? meta.tags : null,
-			authors: meta.authors.length > 0 ? meta.authors : null,
-			meta: metaWithCover
-		};
-
-		this.logger.info({
-			event: 'page_transformed',
-			pageId: page.id,
-			slug,
-			title: meta.title,
-			isPublic
-		});
-
-		return pageData;
+		return processedContent;
 	}
 
 	/**
-	 * Check if page should be published (apply isPublicRule)
+	 * Build complete metadata object from all sources
+	 * 
+	 * Merges:
+	 * - System-managed fields (cover URL, etc.)
+	 * - Custom user-extracted metadata
+	 * 
+	 * This makes it easy to add more system fields in the future
+	 * (e.g., processing status, image count, word count, etc.)
 	 */
-	private shouldPublish(page: PageObjectResponse): boolean {
-		return this.config.isPublicRule?.(page) ?? true;
+	private buildMetadata(
+		page: PageObjectResponse,
+		systemFields: { coverUrl: string | null }
+	): Record<string, any> | null {
+		// Start with system-managed fields
+		const metadata: Record<string, any> = {};
+
+		// Add cover URL if present
+		if (systemFields.coverUrl) {
+			metadata.cover = systemFields.coverUrl;
+		}
+
+		// Merge custom metadata from user's extractor
+		const customMeta = this.config.metadataExtractor?.(page);
+		if (customMeta) {
+			Object.assign(metadata, customMeta);
+		}
+
+		// Return null if empty (cleaner than empty object in database)
+		return Object.keys(metadata).length > 0 ? metadata : null;
 	}
 
 	/**
-	 * Extract standard metadata (title, tags, authors)
+	 * Extract core metadata (title, tags, authors)
 	 */
-	private extractMetadata(page: PageObjectResponse): {
+	private extractCoreMetadata(page: PageObjectResponse): {
 		title: string;
 		tags: string[];
 		authors: string[];
 	} {
-		// Auto-detect title (type: 'title')
 		const title = this.notionClient.getTitleProperty(page);
 
-		// Extract tags (if configured)
 		const tags = this.config.tagsProperty
 			? this.notionClient.getPropertyValues(page, this.config.tagsProperty)
 			: [];
 
-		// Extract authors (if configured)
 		const authors = this.config.authorsProperty
 			? this.notionClient.getPropertyValues(page, this.config.authorsProperty)
 			: [];
@@ -322,33 +401,19 @@ export class NotionPageToWebsitePageTransformer {
 	}
 
 	/**
+	 * Check if page should be published (apply isPublicRule)
+	 */
+	private shouldPublish(page: PageObjectResponse): boolean {
+		return this.config.isPublicRule?.(page) ?? true;
+	}
+
+	/**
 	 * Get publish date (apply publishDateRule)
 	 */
 	private getPublishDate(page: PageObjectResponse): string | null {
 		if (this.config.publishDateRule) {
 			return this.config.publishDateRule(page);
 		}
-		// Default: use last_edited_time
 		return page.last_edited_time;
-	}
-
-	/**
-	 * Extract custom metadata via metadataExtractor
-	 */
-	private extractCustomMetadata(page: PageObjectResponse): Record<string, any> | null {
-		if (!this.config.metadataExtractor) {
-			return null;
-		}
-
-		try {
-			return this.config.metadataExtractor(page);
-		} catch (error: any) {
-			this.logger.warn({
-				event: 'metadata_extractor_failed',
-				pageId: page.id,
-				error: error?.message
-			});
-			return null;
-		}
 	}
 }

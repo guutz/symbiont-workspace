@@ -56,39 +56,39 @@ function getExtensionFromUrl(urlOrFilename: string): string {
  * Priority: Notion CDN filename > alt text > content hash
  */
 function resolveFilename(url: string, buffer: Buffer, altText?: string): string {
-	// 1. Try to extract filename from Notion CDN URLs
-	if (url.includes('prod-files-secure') || url.includes('s3.us-west-2.amazonaws.com')) {
-		try {
-			const urlObj = new URL(url);
-			const pathname = urlObj.pathname;
-			const segments = pathname.split('/');
-			const lastSegment = segments[segments.length - 1];
+	// // 1. Try to extract filename from Notion CDN URLs
+	// if (url.includes('prod-files-secure') || url.includes('s3.us-west-2.amazonaws.com')) {
+	// 	try {
+	// 		const urlObj = new URL(url);
+	// 		const pathname = urlObj.pathname;
+	// 		const segments = pathname.split('/');
+	// 		const lastSegment = segments[segments.length - 1];
 			
-			// Check if it looks like a real filename (has extension)
-			if (lastSegment && /\.\w{2,4}$/.test(lastSegment)) {
-				const sanitized = lastSegment
-					.replace(/[^a-zA-Z0-9._-]/g, '_')
-					.substring(0, 100); // Limit length
-				return sanitized;
-			}
-		} catch {
-			// URL parsing failed, continue to fallback
-		}
-	}
+	// 		// Check if it looks like a real filename (has extension)
+	// 		if (lastSegment && /\.\w{2,4}$/.test(lastSegment) && lastSegment) {
+	// 			const sanitized = lastSegment
+	// 				.replace(/[^a-zA-Z0-9._-]/g, '_')
+	// 				.substring(0, 100); // Limit length
+	// 			return sanitized;
+	// 		}
+	// 	} catch {
+	// 		// URL parsing failed, continue to fallback
+	// 	}
+	// }
 	
-	// 2. Try to use alt text from markdown (if provided and looks reasonable)
-	if (altText && altText.length > 0 && altText.length < 100) {
-		const sanitized = altText
-			.toLowerCase()
-			.replace(/\s+/g, '-')
-			.replace(/[^a-z0-9._-]/g, '')
-			.substring(0, 80);
+	// // 2. Try to use alt text from markdown (if provided and looks reasonable)
+	// if (altText && altText.length > 0 && altText.length < 100) {
+	// 	const sanitized = altText
+	// 		.toLowerCase()
+	// 		.replace(/\s+/g, '-')
+	// 		.replace(/[^a-z0-9._-]/g, '')
+	// 		.substring(0, 80);
 		
-		if (sanitized.length > 3) { // Only use if we got something meaningful
-			const ext = getExtensionFromUrl(url) || 'jpg';
-			return `${sanitized}.${ext}`;
-		}
-	}
+	// 	if (sanitized.length > 3) { // Only use if we got something meaningful
+	// 		const ext = getExtensionFromUrl(url) || 'jpg';
+	// 		return `${sanitized}.${ext}`;
+	// 	}
+	// }
 	
 	// 3. Fall back to content hash
 	const hash = crypto.createHash('sha256')

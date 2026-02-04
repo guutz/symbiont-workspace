@@ -15,7 +15,7 @@ All transformations, syncs, and data flows use explicit source/destination namin
 **Examples:**
 - `NotionToDatabaseSync` - Syncs from Notion to Supabase database
 - `DatabaseToNotionSync` - Syncs from Supabase database to Notion
-- `NotionPageToWebsitePageTransformer` - Transforms Notion page to website page object
+- `NotionPageToDatabasePageTransformer` - Transforms Notion page to website page object
 - `MarkdownToHtmlRenderer` - Renders markdown to HTML
 - `MarkdownToNotionBlocks` - Converts markdown to Notion blocks
 
@@ -219,7 +219,7 @@ lib/
 | Old Name | New Name | File |
 |----------|----------|------|
 | `PostRepository` | `DatabasePageCRUD` | `server/database/page-crud.ts` |
-| `PostBuilder` | `NotionPageToWebsitePageTransformer` | `server/notion/page-to-website-page-transformer.ts` |
+| `PostBuilder` | `NotionPageToDatabasePageTransformer` | `server/notion/page-to-website-page-transformer.ts` |
 | `SyncOrchestrator` | `NotionToDatabaseSync` | `server/sync/notion-to-database-sync.ts` |
 | `NotionAdapter` | `NotionClient` | `server/notion/client.ts` |
 | `SyncMetrics` | `SyncMetrics` | No change (clear as-is) |
@@ -261,7 +261,7 @@ lib/
 | **NotionPage** | Entry in Notion database | `NotionPage`, `notionPageId` |
 | **WebsitePage** | Rendered page for display | `WebsitePage`, rendered content |
 | **DatabasePage** | Row in Postgres pages table | `DatabasePage`, database record |
-| **Transform** | Convert one format to another | `NotionPageToWebsitePageTransformer` |
+| **Transform** | Convert one format to another | `NotionPageToDatabasePageTransformer` |
 | **CRUD** | Database create/read/update/delete | `DatabasePageCRUD` |
 | **Bucket** | Supabase Storage container | `uploadImageToBucket`, `mediaBucket` |
 | **Database** | Supabase Postgres | `DatabasePageCRUD`, `NotionToDatabaseSync` |
@@ -415,7 +415,7 @@ export function createNotionToDatabaseSyncCoordinator(config: HydratedSymbiontCo
   );
   
   const notionClient = new NotionClient(notionToken);
-  const transformer = new NotionPageToWebsitePageTransformer(config, logger);
+  const transformer = new NotionPageToDatabasePageTransformer(config, logger);
   
   return new NotionToDatabaseSync(pageCrud, notionClient, transformer, logger);
 }

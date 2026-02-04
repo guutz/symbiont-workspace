@@ -5,7 +5,7 @@ import type { SymbiontClient } from '../../client.js';
 import { requireEnvVar } from '../utils/env.js';
 import { NotionClient } from '../notion/client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
-import { NotionPageToWebsitePageTransformer } from '../notion/page-transformer.js';
+import { NotionPageToDatabasePageTransformer } from '../notion/page-transformer.js';
 import { NotionToDatabaseSync } from './notion-to-database-sync.js';
 
 /**
@@ -44,7 +44,7 @@ export function createNotionToDatabaseSyncCoordinator(
 	);
 
 	// Create transformation layer (Notion page to website page)
-	const transformer = new NotionPageToWebsitePageTransformer(
+	const transformer = new NotionPageToDatabasePageTransformer(
 		config,
 		notionClient,
 		pageCrud,

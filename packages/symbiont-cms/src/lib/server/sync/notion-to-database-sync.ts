@@ -2,7 +2,7 @@ import type { PageObjectResponse } from '@notionhq/client';
 import type { DatabaseBlueprint } from '../../types.js';
 import { NotionClient } from '../notion/client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
-import { NotionPageToWebsitePageTransformer } from '../notion/page-transformer.js';
+import { NotionPageToDatabasePageTransformer } from '../notion/page-transformer.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface SyncOptions {
@@ -14,6 +14,9 @@ export interface SyncOptions {
 	
 	/** Delete all existing pages before syncing */
 	wipe?: boolean;
+	
+	/** Maximum number of pages to process (stops early if reached) */
+	limit?: number;
 }
 
 export interface SyncResult {
@@ -44,7 +47,7 @@ export class NotionToDatabaseSync {
 
 	constructor(
 		private notionClient: NotionClient,
-		private pageTransformer: NotionPageToWebsitePageTransformer,
+		private pageTransformer: NotionPageToDatabasePageTransformer,
 		private pageCrud: DatabasePageCRUD,
 		private config: DatabaseBlueprint
 	) {}
@@ -104,12 +107,22 @@ export class NotionToDatabaseSync {
 				totalPages: allPages.length 
 			});
 
-			// 4. Process each page
+			// 4. Process each page (with optional limit)
 			let processed = 0;
 			let skipped = 0;
 			let failed = 0;
+			const pagesToProcess = options.limit ? allPages.slice(0, options.limit) : allPages;
 			
-			for (const page of allPages) {
+			if (options.limit && allPages.length > options.limit) {
+				this.logger.info({ 
+					event: 'applying_limit',
+					limit: options.limit,
+					totalPages: allPages.length,
+					willProcess: pagesToProcess.length
+				});
+			}
+			
+			for (const page of pagesToProcess) {
 				try {
 					const wasProcessed = await this.processPage(page);
 					if (wasProcessed) {
@@ -183,6 +196,15 @@ export class NotionToDatabaseSync {
 			pageId: page.id 
 		});
 
+		// 0. Check exclusion rule first (before any expensive operations)
+		if (this.shouldExclude(page)) {
+			this.logger.info({ 
+				event: 'page_excluded_by_rule',
+				pageId: page.id
+			});
+			return false; // Excluded
+		}
+
 		// 1. Check if page needs updating (compare timestamps)
 		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
 
@@ -255,5 +277,15 @@ export class NotionToDatabaseSync {
 		}
 
 		return undefined;
+	}
+
+	/**
+	 * Check if page should be excluded from sync
+	 */
+	private shouldExclude(page: PageObjectResponse): boolean {
+		if (!this.config.excludeRule) {
+			return false; // No exclusion rule defined
+		}
+		return this.config.excludeRule(page);
 	}
 }
