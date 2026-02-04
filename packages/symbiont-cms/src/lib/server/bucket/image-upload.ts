@@ -8,7 +8,6 @@
  * - Organize by page ID: media/{page_id}/{hash}.{ext}
  * - Use content hash for filenames to prevent collisions
  * - Store original URL in file metadata for reference
- * - Enable upsert to skip re-uploading identical content
  */
 
 import crypto from 'crypto';
@@ -59,21 +58,13 @@ function getExtensionFromUrl(urlOrFilename: string): string {
  * 
  * Strategy:
  * - Always use content hash as the primary filename to avoid collisions
- * - Hash ensures files with same name but different content don't overwrite
- * - Hash allows upsert=true to skip re-uploading identical content
- * - Original filename/URL preserved in file metadata (TODO: implement metadata)
- * 
- * Note: Notion CDN URLs often use generic names like "image.png" which would
- * cause different images to overwrite each other with upsert=true.
+ * - Original filename/URL preserved in file metadata
  */
 function resolveFilename(url: string, buffer: Buffer, _altText?: string): string {
-	// Use content hash for filename to ensure uniqueness
-	// This prevents different images with the same filename from overwriting each other
-	// and allows efficient re-sync detection (same hash = same content = skip upload)
 	const hash = crypto.createHash('sha256')
 		.update(buffer)
 		.digest('hex')
-		.substring(0, 12); // 12 chars = 48 bits
+		.substring(0, 12);
 	
 	const ext = getExtensionFromUrl(url) || 'jpg';
 	return `${hash}.${ext}`;
