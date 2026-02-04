@@ -60,7 +60,7 @@ function getExtensionFromUrl(urlOrFilename: string): string {
  * - Always use content hash as the primary filename to avoid collisions
  * - Original filename/URL preserved in file metadata
  */
-function resolveFilename(url: string, buffer: Buffer, _altText?: string): string {
+function resolveFilename(url: string, buffer: Buffer): string {
 	const hash = crypto.createHash('sha256')
 		.update(buffer)
 		.digest('hex')
@@ -90,7 +90,7 @@ export async function uploadImageToSupabase(
 	const buffer = Buffer.from(arrayBuffer);
 	
 	// Resolve filename (with optional alt text)
-	const filename = resolveFilename(url, buffer, altText);
+	const filename = resolveFilename(url, buffer);
 	const path = `${pageId}/${filename}`;
 	
 	// Get content type
