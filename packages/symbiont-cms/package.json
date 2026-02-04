@@ -80,7 +80,7 @@
 		"@mdit/plugin-tasklist": "0.22.1",
 		"@notionhq/client": "5.1.0",
 		"@supabase/supabase-js": "^2.91.0",
-		"@tryfabric/martian": "^1.2.4",
+		"@tryfabric/martian": "workspace:*",
 		"graphql": "16.11.0",
 		"graphql-request": "7.2.0",
 		"gray-matter": "4.0.3",
