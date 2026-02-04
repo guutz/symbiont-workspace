@@ -87,7 +87,7 @@ const hello = "hello";
         notion.paragraph([notion.richText('This is a paragraph!')]),
         notion.blockquote([], [notion.paragraph([notion.richText('Quote')])]),
         notion.paragraph([notion.richText('Paragraph')]),
-        notion.image('https://url.com/image.jpg'),
+        notion.image('https://url.com/image.jpg', [notion.richText('title')]),
         notion.table_of_contents(),
       ];
 
@@ -175,8 +175,12 @@ const hello = "hello";
           notion.richText('This is an image in a paragraph '),
           notion.richText(', which isnt supported in Notion.'),
         ]),
-        notion.image('https://image.com/url.jpg'),
-        notion.image('https://image.com/paragraph.jpg'),
+        notion.image('https://image.com/url.jpg', [
+          notion.richText('image-test'),
+        ]),
+        notion.image('https://image.com/paragraph.jpg', [
+          notion.richText('image-paragraph'),
+        ]),
         notion.paragraph([notion.richText('https://image.com/blah')]),
       ];
 
@@ -193,10 +197,38 @@ const hello = "hello";
           notion.richText('This is an image in a paragraph '),
           notion.richText(', which isnt supported in Notion.'),
         ]),
-        notion.image('https://image.com/url.jpg'),
-        notion.image('https://image.com/paragraph.jpg'),
-        notion.image('https://image.com/blah'),
+        notion.image('https://image.com/url.jpg', [
+          notion.richText('image-test'),
+        ]),
+        notion.image('https://image.com/paragraph.jpg', [
+          notion.richText('image-paragraph'),
+        ]),
+        notion.image('https://image.com/blah', [
+          notion.richText('image-invalid'),
+        ]),
       ];
+
+      expect(actual).toStrictEqual(expected);
+    });
+
+    it('should preserve alt text as caption in image blocks', () => {
+      const text = '![My image caption](https://example.com/image.jpg)';
+      const actual = markdownToBlocks(text, {strictImageUrls: false});
+
+      const expected = [
+        notion.image('https://example.com/image.jpg', [
+          notion.richText('My image caption'),
+        ]),
+      ];
+
+      expect(actual).toStrictEqual(expected);
+    });
+
+    it('should parse images without alt text without caption', () => {
+      const text = '![](https://example.com/image.jpg)';
+      const actual = markdownToBlocks(text, {strictImageUrls: false});
+
+      const expected = [notion.image('https://example.com/image.jpg')];
 
       expect(actual).toStrictEqual(expected);
     });

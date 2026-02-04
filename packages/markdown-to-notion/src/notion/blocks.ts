@@ -80,7 +80,7 @@ export function image(url: string, caption?: RichText[]): Block {
       external: {
         url: url,
       },
-      ...(caption && caption.length > 0 ? { caption } : {}),
+      ...(caption && caption.length > 0 ? {caption} : {}),
     },
   };
 }

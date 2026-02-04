@@ -86,18 +86,14 @@ function parseImage(image: md.Image, options: BlocksOptions): notion.Block {
       const fileType = path.extname(parsedUrl.pathname);
       if (allowedTypes.includes(fileType)) {
         // Convert alt text to caption if present
-        const caption = image.alt 
-          ? [notion.richText(image.alt)]
-          : undefined;
+        const caption = image.alt ? [notion.richText(image.alt)] : undefined;
         return notion.image(image.url, caption);
       } else {
         return dealWithError();
       }
     } else {
       // Convert alt text to caption if present
-      const caption = image.alt 
-        ? [notion.richText(image.alt)]
-        : undefined;
+      const caption = image.alt ? [notion.richText(image.alt)] : undefined;
       return notion.image(image.url, caption);
     }
   } catch (error: unknown) {
