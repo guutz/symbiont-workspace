@@ -12,6 +12,8 @@ import { createSymbiontClient, type PageObjectResponse } from 'symbiont-cms';
 export const symbiont = createSymbiontClient({
 	supabase: {
 		// TODO: Replace with actual Supabase project URL
+		// These are placeholders - get your values from: Supabase Dashboard → Project Settings → API
+		// Note: publishableKey (anon key) is safe to commit - it's public by design
 		url: 'https://your-project.supabase.co',
 		// TODO: Replace with actual publishable (anon) key - this is safe to expose
 		publishableKey: 'your-supabase-anon-key'
