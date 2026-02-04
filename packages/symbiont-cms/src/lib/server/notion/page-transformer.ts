@@ -218,9 +218,8 @@ export class NotionPageToDatabasePageTransformer {
 		await Promise.all(imagePromises);
 
 		// Sync updated content back to Notion if images changed
-		// TODO: Decide if we want to keep images that are in Notion CDN, in Notion CDN -- or replace all images in Notion with Supabase URLs
-		// As is, not sure if Martian convertMarkdownToNotionBlocks rebuilds Notion internal image blocks correctly
-		// Probably want to move away from Martian at some point anyway since it's a black box and it's unclear how it deals with api limits
+		// TODO: Decide if we want to keep images that are in Notion CDN, in Notion CDN -- or replace all images in Notion with Supabase URLs (current behavior)
+		// As is, Martian convertMarkdownToNotionBlocks does not rebuild Notion internal image blocks correctly, so that would need to be fixed first
 		if (processedContent !== content) {
 			try {
 				const blocks = convertMarkdownToNotionBlocks(processedContent, {

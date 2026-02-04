@@ -10,7 +10,7 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## Implementation Guides
 
-- **`QUICKSTART.md`** – Minimal steps to boot the workspace against Nhost
+- **`QUICKSTART.md`** – Minimal steps to boot the workspace against Supabase
 - **`HYBRID_STRATEGY.md`** – **⭐ Complete guide: SvelteKit file types + why Symbiont uses 4-file hybrid rendering**
 - **`INTEGRATION_GUIDE.md`** – How Symbiont wires into QWER, including data transforms and store behaviour
 - **`TYPE_COMPATIBILITY.md`** – Snapshot of key type mappings and conventions (linked from the integration guide)
@@ -24,8 +24,10 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## Platform Strategy
 
+- **`2026-01-19-supabase-migration-plan.md`** – Migration strategy from Nhost to Supabase
+- **`2026-02-01-supabase-image-strategy.md`** – Image storage implementation with Supabase
 - **`dynamic-file-management.md`** – File storage approach, bucket configuration, and migration phases
-- **`image-optimization-strategy.md`** – Concrete plan for normalising images into Nhost Storage with size hints
+- **`image-optimization-strategy.md`** – Plan for normalizing images into Supabase Storage with size hints
 - **`dynamic-redirects-strategy.md`** – Database-driven redirects, middleware patterns, and analytics follow-up
 
 ## Future Designs
@@ -34,6 +36,12 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
+- **Feb 4, 2026:** Supabase migration completion
+  - **Completed Nhost → Supabase migration** - All services migrated
+  - **Integrated Martian fork** - markdown-to-notion package added to workspace
+  - **Implemented image upload** - Content-hash based filenames with metadata
+  - **Updated guutz-blog config** - Matches california-tech structure with symbiont.ts
+  - Updated root README, copilot instructions, and .docs references
 - **Oct 9, 2025:** Major documentation consolidation
   - **Deleted `rendering-strategy.md`** - Content merged into HYBRID_STRATEGY.md (configuration + bandwidth adaptation)
   - **Deleted `RENDERING_GUIDE.md`** - SvelteKit reference table merged into HYBRID_STRATEGY.md
@@ -50,11 +58,11 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
   - Created `IMPLEMENTATION_STATUS.md` for transparent tracking
   - Updated all strategy docs with implementation status banners
   - Clarified Phase 2-3 are designed but not yet implemented
-  - Identified gaps: testing, observability, Nhost Storage config
+  - Identified gaps: testing, observability, Storage config
 - Consolidated overlapping guidance and removed deprecated documents
 - Folded ID usage notes and type-alignment context into the integration and core docs
 - Updated statuses so "implemented" means shipped in the repo as of October 2025
 
 ---
 
-**Last refreshed:** October 9, 2025
+**Last refreshed:** February 4, 2026

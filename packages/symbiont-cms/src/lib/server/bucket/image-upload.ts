@@ -5,8 +5,9 @@
  * Strategy:
  * - Upload Notion CDN images (expire after ~1 hour)
  * - Migrate old Nhost-hosted images
- * - Organize by page ID: media/{page_id}/{filename}.{ext}
- * - Preserve original filenames when available
+ * - Organize by page ID: media/{page_id}/{hash}.{ext}
+ * - Use content hash for filenames to prevent collisions
+ * - Store original URL in file metadata for reference
  */
 
 import crypto from 'crypto';
@@ -54,44 +55,12 @@ function getExtensionFromUrl(urlOrFilename: string): string {
 
 /**
  * Resolve filename for an image
- * Priority: Notion CDN filename > alt text > content hash
+ * 
+ * Strategy:
+ * - Always use content hash as the primary filename to avoid collisions
+ * - Original filename/URL preserved in file metadata
  */
-function resolveFilename(url: string, buffer: Buffer, altText?: string): string {
-	// // 1. Try to extract filename from Notion CDN URLs
-	// if (url.includes('prod-files-secure') || url.includes('s3.us-west-2.amazonaws.com')) {
-	// 	try {
-	// 		const urlObj = new URL(url);
-	// 		const pathname = urlObj.pathname;
-	// 		const segments = pathname.split('/');
-	// 		const lastSegment = segments[segments.length - 1];
-			
-	// 		// Check if it looks like a real filename (has extension)
-	// 		if (lastSegment && /\.\w{2,4}$/.test(lastSegment) && lastSegment) {
-	// 			const sanitized = lastSegment
-	// 				.replace(/[^a-zA-Z0-9._-]/g, '_')
-	// 				.substring(0, 100); // Limit length
-	// 			return sanitized;
-	// 		}
-	// 	} catch {
-	// 		// URL parsing failed, continue to fallback
-	// 	}
-	// }
-	
-	// // 2. Try to use alt text from markdown (if provided and looks reasonable)
-	// if (altText && altText.length > 0 && altText.length < 100) {
-	// 	const sanitized = altText
-	// 		.toLowerCase()
-	// 		.replace(/\s+/g, '-')
-	// 		.replace(/[^a-z0-9._-]/g, '')
-	// 		.substring(0, 80);
-		
-	// 	if (sanitized.length > 3) { // Only use if we got something meaningful
-	// 		const ext = getExtensionFromUrl(url) || 'jpg';
-	// 		return `${sanitized}.${ext}`;
-	// 	}
-	// }
-	
-	// 3. Fall back to content hash
+function resolveFilename(url: string, buffer: Buffer): string {
 	const hash = crypto.createHash('sha256')
 		.update(buffer)
 		.digest('hex')
@@ -121,19 +90,23 @@ export async function uploadImageToSupabase(
 	const buffer = Buffer.from(arrayBuffer);
 	
 	// Resolve filename (with optional alt text)
-	const filename = resolveFilename(url, buffer, altText);
+	const filename = resolveFilename(url, buffer);
 	const path = `${pageId}/${filename}`;
 	
 	// Get content type
 	const contentType = response.headers.get('content-type') || `image/${getExtensionFromUrl(filename)}`;
 	
 	// Upload (upsert to handle re-syncs)
+	// Store original URL in custom metadata for reference/debugging
 	const { error } = await supabase.storage
 		.from('media')
 		.upload(path, buffer, {
 			contentType,
 			cacheControl: '31536000', // 1 year
-			upsert: true
+			upsert: true,
+			metadata: {
+				originalUrl: url
+			}
 		});
 	
 	if (error) {

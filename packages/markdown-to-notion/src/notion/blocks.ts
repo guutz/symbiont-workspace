@@ -71,7 +71,7 @@ export function blockquote(
   };
 }
 
-export function image(url: string): Block {
+export function image(url: string, caption?: RichText[]): Block {
   return {
     object: 'block',
     type: 'image',
@@ -80,6 +80,7 @@ export function image(url: string): Block {
       external: {
         url: url,
       },
+      ...(caption && caption.length > 0 ? {caption} : {}),
     },
   };
 }
