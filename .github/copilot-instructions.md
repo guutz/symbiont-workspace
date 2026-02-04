@@ -36,22 +36,23 @@ See `.docs/IMPLEMENTATION_STATUS.md` for the source of truth. It is updated regu
 ## Project Structure
 
 - **`packages/symbiont-cms/`** - The core CMS package (NPM package)
-- **`packages/qwer-test/`** - Example integration with QWER template
+- **`packages/california-tech/`** - California Tech newspaper site implementation
 - **`packages/guutz-blog/`** - Personal blog implementation
-- **`nhost/`** - Nhost backend configuration (database, GraphQL, storage)
+- **`packages/markdown-to-notion/`** - Forked Martian package for Notion block conversion
+- **`supabase/`** - Supabase backend configuration (database, storage)
 
 ## Key Architectural Principles
 
 1. **Zero-Rebuild CMS** - Content updates should appear instantly without rebuilds
 2. **Notion as Control Panel** - Notion is the primary content authoring interface
-3. **Database as Source of Truth** - Nhost Postgres stores all content
-4. **Type-Safe Configuration** - `symbiont.config.ts` defines all sync rules
+3. **Database as Source of Truth** - Supabase Postgres stores all content
+4. **Type-Safe Configuration** - `src/lib/symbiont.ts` client configuration with type safety
 5. **SSR First** - SvelteKit SSR for SEO and performance
 
 ## Technology Stack
 
 - **Frontend**: SvelteKit (SSR)
-- **Backend**: Nhost (Postgres + Hasura GraphQL + Storage)
+- **Backend**: Supabase (Postgres + Storage + Auth)
 - **CMS**: Notion (via API)
 - **Package**: `symbiont-cms` (TypeScript, published to npm)
 
@@ -67,9 +68,9 @@ See `.docs/IMPLEMENTATION_STATUS.md` for the source of truth. It is updated regu
 
 1. **Add testing infrastructure** (Vitest setup, unit tests for core functions)
 2. **Implement observability** (structured logging, error tracking)
-3. **Configure Nhost Storage** (foundation for Phase 2 media features)
-4. **Build file upload utilities** (Phase 2 implementation)
+3. **Configure Supabase Storage policies** (RLS policies for media bucket)
+4. **Complete bidirectional sync** (write changes from database back to Notion)
 
 ---
 
-**Last Updated**: December 9, 2025
+**Last Updated**: February 4, 2026
