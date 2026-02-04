@@ -106,6 +106,7 @@ export interface Link extends Parent, Resource {
 
 export interface Image extends Resource {
   type: 'image';
+  alt?: string;
 }
 
 export interface LinkReference extends Parent {

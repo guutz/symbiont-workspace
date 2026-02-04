@@ -73,7 +73,7 @@ function resolveFilename(url: string, buffer: Buffer, _altText?: string): string
 	const hash = crypto.createHash('sha256')
 		.update(buffer)
 		.digest('hex')
-		.substring(0, 16); // 16 chars = 64 bits, collision probability ~1 in 18 quintillion
+		.substring(0, 12); // 12 chars = 48 bits
 	
 	const ext = getExtensionFromUrl(url) || 'jpg';
 	return `${hash}.${ext}`;
@@ -114,8 +114,7 @@ export async function uploadImageToSupabase(
 			cacheControl: '31536000', // 1 year
 			upsert: true,
 			metadata: {
-				originalUrl: url,
-				uploadedAt: new Date().toISOString()
+				originalUrl: url
 			}
 		});
 	
