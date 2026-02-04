@@ -5,8 +5,10 @@
  * Strategy:
  * - Upload Notion CDN images (expire after ~1 hour)
  * - Migrate old Nhost-hosted images
- * - Organize by page ID: media/{page_id}/{filename}.{ext}
- * - Preserve original filenames when available
+ * - Organize by page ID: media/{page_id}/{hash}.{ext}
+ * - Use content hash for filenames to prevent collisions
+ * - Store original URL in file metadata for reference
+ * - Enable upsert to skip re-uploading identical content
  */
 
 import crypto from 'crypto';
@@ -54,48 +56,24 @@ function getExtensionFromUrl(urlOrFilename: string): string {
 
 /**
  * Resolve filename for an image
- * Priority: Notion CDN filename > alt text > content hash
+ * 
+ * Strategy:
+ * - Always use content hash as the primary filename to avoid collisions
+ * - Hash ensures files with same name but different content don't overwrite
+ * - Hash allows upsert=true to skip re-uploading identical content
+ * - Original filename/URL preserved in file metadata (TODO: implement metadata)
+ * 
+ * Note: Notion CDN URLs often use generic names like "image.png" which would
+ * cause different images to overwrite each other with upsert=true.
  */
-function resolveFilename(url: string, buffer: Buffer, altText?: string): string {
-	// // 1. Try to extract filename from Notion CDN URLs
-	// if (url.includes('prod-files-secure') || url.includes('s3.us-west-2.amazonaws.com')) {
-	// 	try {
-	// 		const urlObj = new URL(url);
-	// 		const pathname = urlObj.pathname;
-	// 		const segments = pathname.split('/');
-	// 		const lastSegment = segments[segments.length - 1];
-			
-	// 		// Check if it looks like a real filename (has extension)
-	// 		if (lastSegment && /\.\w{2,4}$/.test(lastSegment) && lastSegment) {
-	// 			const sanitized = lastSegment
-	// 				.replace(/[^a-zA-Z0-9._-]/g, '_')
-	// 				.substring(0, 100); // Limit length
-	// 			return sanitized;
-	// 		}
-	// 	} catch {
-	// 		// URL parsing failed, continue to fallback
-	// 	}
-	// }
-	
-	// // 2. Try to use alt text from markdown (if provided and looks reasonable)
-	// if (altText && altText.length > 0 && altText.length < 100) {
-	// 	const sanitized = altText
-	// 		.toLowerCase()
-	// 		.replace(/\s+/g, '-')
-	// 		.replace(/[^a-z0-9._-]/g, '')
-	// 		.substring(0, 80);
-		
-	// 	if (sanitized.length > 3) { // Only use if we got something meaningful
-	// 		const ext = getExtensionFromUrl(url) || 'jpg';
-	// 		return `${sanitized}.${ext}`;
-	// 	}
-	// }
-	
-	// 3. Fall back to content hash
+function resolveFilename(url: string, buffer: Buffer, _altText?: string): string {
+	// Use content hash for filename to ensure uniqueness
+	// This prevents different images with the same filename from overwriting each other
+	// and allows efficient re-sync detection (same hash = same content = skip upload)
 	const hash = crypto.createHash('sha256')
 		.update(buffer)
 		.digest('hex')
-		.substring(0, 12);
+		.substring(0, 16); // 16 chars = 64 bits, collision probability ~1 in 18 quintillion
 	
 	const ext = getExtensionFromUrl(url) || 'jpg';
 	return `${hash}.${ext}`;
@@ -128,12 +106,17 @@ export async function uploadImageToSupabase(
 	const contentType = response.headers.get('content-type') || `image/${getExtensionFromUrl(filename)}`;
 	
 	// Upload (upsert to handle re-syncs)
+	// Store original URL in custom metadata for reference/debugging
 	const { error } = await supabase.storage
 		.from('media')
 		.upload(path, buffer, {
 			contentType,
 			cacheControl: '31536000', // 1 year
-			upsert: true
+			upsert: true,
+			metadata: {
+				originalUrl: url,
+				uploadedAt: new Date().toISOString()
+			}
 		});
 	
 	if (error) {
