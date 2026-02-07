@@ -21,6 +21,8 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 - **`markdown-compatibility.md`** – Supported markdown syntax (Notion/Tiptap → markdown-it rendering)
 - **`feature-detection-architecture.md`** – Design for feature detection at ingestion (Phase 1.5 - partially implemented)
 - **`notion-color-workaround.md`** – Temporary workaround for text colors (until notion-to-md v4)
+- **`notion-to-md-v4-evaluation.md`** – Quick evaluation of notion-to-md v4 features and migration path
+- **`notion-to-md-v4-comprehensive-analysis.md`** – **⭐ Deep dive: V4 architecture analysis vs. Symbiont's approach (Feb 2026)**
 
 ## Platform Strategy
 
@@ -36,6 +38,12 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
+- **Feb 4, 2026:** notion-to-md v4 comprehensive analysis
+  - **Completed comprehensive v4 evaluation** - Full architectural comparison
+  - **Added notion-to-md-v4-comprehensive-analysis.md** - Feature-by-feature analysis vs. Symbiont
+  - **Recommendation: Stay on v3.1.9** - V4 architectural mismatch (file-based vs. database-first)
+  - **Identified key differences** - Exporter plugins, frontmatter, media strategies
+  - **Score: Symbiont 7, V4 2, Tie 1** - Our custom solutions win in most areas
 - **Feb 4, 2026:** Supabase migration completion
   - **Completed Nhost → Supabase migration** - All services migrated
   - **Integrated Martian fork** - markdown-to-notion package added to workspace

@@ -32,7 +32,36 @@ export function createNotionToDatabaseSyncCoordinator(
 	
 	// Initialize Notion client with resolved token
 	const notion = new Client({ auth: notionToken });
-	const n2m = new NotionToMarkdown({ notionClient: notion });
+	// Note: Type assertion needed because notion-to-md types expect older @notionhq/client version
+	// The runtime API is compatible, it's just a TypeScript version mismatch
+	const n2m = new NotionToMarkdown({ notionClient: notion as any });
+
+	// Custom transformer: Use empty alt text when image has no caption
+	// This prevents notion-to-md from using the filename as alt text
+	n2m.setCustomTransformer('image', async (block: any) => {
+		const { image } = block;
+		if (!image?.type) return false; // use default behavior
+
+		// Get caption from Notion block
+		const caption = image.caption
+			?.map((item: any) => item.plain_text)
+			.join('')
+			.trim();
+
+		// Get image URL
+		let url = '';
+		if (image.type === 'external') {
+			url = image.external?.url || '';
+		} else if (image.type === 'file') {
+			url = image.file?.url || '';
+		}
+
+		if (!url) return false; // use default behavior if no URL
+
+		// Use caption if provided, otherwise empty string (no alt text)
+		const altText = caption || '';
+		return `![${altText}](${url})`;
+	});
 
 	// Create Notion client layer (Notion API)
 	const notionClient = new NotionClient(notion, n2m);
