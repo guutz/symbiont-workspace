@@ -7,22 +7,23 @@ Monorepo for Symbiont CMS and integrated blog applications.
 ## 📦 Packages
 
 ### `symbiont-cms`
-Database-backed CMS that syncs content from Notion to Nhost/Postgres via GraphQL.
+Database-backed CMS that syncs content from Notion to Supabase/Postgres.
 
 **Key Features:**
-- Notion → Database sync via webhooks
-- GraphQL client/server utilities
+- Notion → Database sync via webhooks and polling
+- Supabase client/server utilities
 - Markdown rendering components
 - Type-safe post management
+- Image upload to Supabase Storage
 
-### `qwer-test`
-Beautiful blog UI built with QWER theme, now powered by Symbiont's database backend.
+### `california-tech`
+California Tech newspaper site built with SvelteKit, powered by Symbiont's database backend.
 
 **Integration:**
 - Dynamic post loading from database
 - Real-time updates without rebuilds
-- Full QWER UI/UX maintained
 - Server-side rendering with SvelteKit
+- Image optimization with Supabase Storage
 
 ### `guutz-blog`
 Personal blog implementation using Symbiont CMS.
@@ -30,14 +31,18 @@ Personal blog implementation using Symbiont CMS.
 ## 🚀 Quick Start
 
 **What's Working:**
-- ✅ Dynamic post loading from Notion → Nhost → SvelteKit
+- ✅ Dynamic post loading from Notion → Supabase → SvelteKit
 - ✅ Real-time updates without rebuilds
-- ✅ GraphQL client/server utilities
+- ✅ Supabase client/server utilities
 - ✅ Markdown rendering with feature detection
 - ✅ Feed generation (Atom, JSON, Sitemap)
+- ✅ Image upload to Supabase Storage with content-hash filenames
+
+**What's In Progress:**
+- 🚧 Bidirectional sync (database → Notion)
+- 🚧 Markdown-to-Notion block conversion (Martian fork integrated)
 
 **What's Designed (Not Yet Implemented):**
-- 📋 File upload system (design in `.docs/dynamic-file-management.md`)
 - 📋 Dynamic redirects (design in `.docs/dynamic-redirects-strategy.md`)
 - 📋 Observability/logging infrastructure
 
@@ -47,9 +52,9 @@ Personal blog implementation using Symbiont CMS.
 
 1. **Configure environment:**
    ```bash
-   cd packages/qwer-test
+   cd packages/california-tech  # or packages/guutz-blog
    cp .env.example .env
-   # Add your PUBLIC_NHOST_GRAPHQL_URL
+   # Add your Supabase credentials and Notion token
    ```
 
 2. **Build Symbiont:**
@@ -59,7 +64,8 @@ Personal blog implementation using Symbiont CMS.
 
 3. **Run development server:**
    ```bash
-   pnpm -F qwer-test dev
+   pnpm dev:tech    # for california-tech
+   pnpm dev:guutz   # for guutz-blog
    ```
 
 ## 📚 Documentation
@@ -72,6 +78,13 @@ Detailed documentation is available in the `.docs/` folder (gitignored):
 These docs are AI-generated and can be regenerated as needed.
 
 ## 🔧 Recent Changes
+
+**Feb 4, 2026:**
+- ✅ Completed Supabase migration from Nhost
+- ✅ Integrated forked Martian package for markdown-to-Notion conversion
+- ✅ Implemented content-hash based filename management for images
+- ✅ Added original URL metadata to uploaded images
+- ✅ Updated guutz-blog to use new symbiont.ts client configuration
 
 **Oct 8, 2025:**
 - 📝 Documentation accuracy update: clarified implementation status
@@ -103,16 +116,16 @@ pnpm -F <package-name> dev
 ```
 Notion Database
       ↓
-Symbiont Webhook Sync
+Symbiont Webhook/Poll Sync
       ↓
-Nhost/Postgres + GraphQL
+Supabase (Postgres + Storage)
       ↓
 SvelteKit Load Functions
       ↓
-QWER UI Components
+UI Components
 ```
 
 ---
 
 **Workspace Type:** pnpm monorepo  
-**Primary Stack:** SvelteKit, TypeScript, GraphQL, Nhost
+**Primary Stack:** SvelteKit, TypeScript, Supabase, Notion API

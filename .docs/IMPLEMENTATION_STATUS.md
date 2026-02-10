@@ -1,7 +1,7 @@
 # Implementation Status Tracker
 
 > **Purpose:** Quick reference for what's actually implemented vs. designed vs. conceptual  
-> **Last Updated:** December 9, 2025
+> **Last Updated:** February 3, 2026
 
 This document provides an honest assessment of the Symbiont CMS implementation status, helping contributors understand what works, what's ready to build, and what's still in the idea phase.
 
@@ -9,15 +9,17 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ## 🚀 Quick Summary (TL;DR)
 
-**What's Working (December 2025):**
+**What's Working (February 2026):**
 - ✅ Notion → Postgres sync pipeline (orchestrator/builder/repo) with slug resolution and `pages` table migrations
 - ✅ Server-side markdown rendering pipeline and structured logging
 - ✅ Basic unit tests (6 test files, Vitest configured) for sync utilities and helpers
-- ✅ Image upload/rewrite helpers to Nhost Storage (`processMarkdownImages` / `processNotionPageImages` + `uploadImages`) validated against the default bucket
+- ✅ Image upload to Supabase Storage + URL rewrite in markdown content
+- ✅ **Image URL sync-back to Notion** - Cover images and markdown images are uploaded to Supabase, then Notion pages are updated with permanent Supabase URLs (replaces expired Notion CDN URLs)
+- ✅ **Slug sync-back to Notion** - Generated/resolved slugs are synced to configured Notion property
+- ✅ **Exclude rule for pre-sync filtering** - `excludeRule` in config allows filtering pages before they enter the database (templates, archives, test pages)
 
 **What's Risky/Broken Right Now:**
 - ⚠️ Local dev (SvelteKit apps) currently renders zero posts — likely a too-strict `isPublicRule`/publishing rule or query shape change; needs verification
-- ⚠️ Image pipeline is not wired into the sync flow yet; markdown/cover URLs stay unchanged unless the helpers are called manually
 - ⚠️ Storage bucket/permission config is not checked into `nhost/nhost.toml` (using console/default bucket only)
 
 **What's Next:**
@@ -29,6 +31,24 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 ---
 
 ## 🆕 Recent Changes
+
+### February 3, 2026 (PM)
+- **Exclude Rule**: Added `excludeRule` to `DatabaseBlueprint` config for pre-sync filtering
+  - Applied before timestamp comparison (most efficient)
+  - Return `true` to exclude pages from database entirely
+  - Use cases: archive pages, templates, test content, workspace organization
+  - Added `shouldExclude()` method to `NotionToDatabaseSync` class
+  - Updated documentation in `publishing-rules.md` with examples and decision flow
+  - Added example usage in `guutz-blog/symbiont.config.js`
+
+### February 3, 2026 (AM)
+- **Metadata Sync Strategy**: Clarified that only **slugs** sync back to Notion during normal sync (not title/tags/dates)
+- **Image Sync-Back**: Implemented full image URL sync-back to Notion:
+  - Cover images: After uploading to Supabase, update Notion cover property with permanent URL
+  - Markdown images: After processing content images, update Notion page blocks with Supabase URLs
+  - Replaces expired Notion CDN URLs with permanent Supabase Storage URLs
+  - Added `NotionClient.updateFileProperty()` method for file property updates
+- **Migration Note**: Critical for Nhost→Supabase migration - ensures Notion pages reference new Supabase URLs
 
 ### December 9, 2025
 - **Media**: Shipped image upload/rewrite helpers (`src/lib/image-processor.ts`, `image-upload.ts`, `image-utils.ts`) using Nhost `uploadFiles`; tested against default bucket
@@ -99,18 +119,30 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 | Sync endpoint | ✅ | `src/lib/server/sync.ts` | Simplified to ~90 lines using new classes |
 | Webhook handler | ✅ | `src/lib/server/webhook.ts` | Single-page processing via orchestrator |
 
-### ✅ Configuration System (Shipped - Updated November 2025)
+**Metadata Sync-Back Strategy (Notion → DB → Notion):**
+- ✅ **Slugs**: Auto-generated slugs sync back to `slugSyncProperty` (if configured)
+- ✅ **Image URLs**: Cover and markdown images sync back with permanent Supabase URLs
+- ❌ **Title/Tags/Dates**: NOT synced back during normal sync (Notion is source of truth)
+- 📋 **Future**: Web editor changes will push metadata per-page (not via batch sync)
+
+### ✅ Configuration System (Shipped - Updated February 2026)
+
+**Current Pattern**: `createSymbiontClient()` in `src/lib/symbiont.ts`
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
+| Client factory | ✅ | `src/lib/client.ts` | `createSymbiontClient()` with type-safe config |
+| Supabase integration | ✅ | Client + SSR support | Public credentials in config, service role from env |
 | Config schema | ✅ | `src/lib/types.ts` | Complete TypeScript types for DatabaseBlueprint |
-| Config loader | ✅ | `src/lib/server/load-config.ts` | Runtime import with validation |
-| Vite plugin | ✅ | `src/lib/vite-plugin.ts` | Virtual module resolution |
 | Multi-database support | ✅ | Config `databases[]` array | Via `datasource_id` |
-| Publishing rules | ✅ | `isPublicRule` + `publishDateRule` | Complementary boolean gate + date extraction |
-| Property mapping | ✅ | `tagsProperty`, `authorsProperty` | Flexible property name config |
+| Publishing rules | ✅ | `excludeRule` + `isPublicRule` + `publishDateRule` | Pre-filter + boolean gate + date extraction |
+| Property mapping | ✅ | `tagsProperty`, `authorsProperty`, `coverProperty` | Flexible property name config |
 | Slug configuration | ✅ | `slugRule`, `slugSyncProperty` | Custom extraction + sync-back |
 | Metadata extraction | ✅ | `metadataExtractor` | Flexible JSONB metadata via function |
+
+**Old Pattern (Deprecated)**: `defineConfig()` in `symbiont.config.js` - DO NOT USE
+- Still exported for backwards compatibility but not recommended
+- See [california-tech/src/lib/symbiont.ts](../packages/california-tech/src/lib/symbiont.ts) for current pattern
 
 ### ✅ Database Schema (Shipped - Migrated November 2025)
 

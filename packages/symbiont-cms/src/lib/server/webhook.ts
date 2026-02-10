@@ -1,20 +1,58 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { requireEnvVar, resolveNotionToken } from './utils/env.server.js';
-import { loadServerConfig } from './load-config.js';
-import { syncFromNotion } from './sync.js';
+import { requireEnvVar } from './utils/env.js';
+import type { SymbiontClient } from '../client.js';
 import { createLogger } from './utils/logger.js';
-import { createSyncOrchestrator } from './sync/factory.js';
+import { createNotionToDatabaseSyncCoordinator } from './sync/coordinator.js';
+import type { SyncResult } from './sync/notion-to-database-sync.js';
 import { Client } from '@notionhq/client';
 
-const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.'); 
+const CRON_SECRET = requireEnvVar('CRON_SECRET', 'Set CRON_SECRET for authenticating scheduled jobs.');
+
+/**
+ * Sync one or more databases from Notion
+ */
+export async function syncFromNotion(
+	client: SymbiontClient,
+	options: { databaseId?: string | null; since?: string | null; syncAll?: boolean; wipe?: boolean; limit?: number } = {}
+): Promise<{ summaries: SyncResult[] }> {
+	const logger = createLogger({ operation: 'sync_from_notion' });
+
+	// Determine which databases to sync
+	const dbConfigs = options.databaseId
+		? client.config.databases.filter((db: any) => db.alias === options.databaseId || db.dataSourceId === options.databaseId)
+		: client.config.databases;
+
+	if (dbConfigs.length === 0) {
+		logger.warn({ event: 'no_databases_found', databaseId: options.databaseId });
+		return { summaries: [] };
+	}
+
+	// Sync each database
+	const summaries: SyncResult[] = [];
+	for (const dbConfig of dbConfigs) {
+		const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
+		const result = await sync.syncDataSource({
+			since: options.since,
+			syncAll: options.syncAll,
+			wipe: options.wipe,
+			limit: options.limit
+		});
+		summaries.push(result);
+	}
+
+	return { summaries };
+} 
 
 /**
  * Handle Notion webhook requests for page updates
  * 
  * Refactored to use new SyncOrchestrator architecture
+ * 
+ * @param client - Symbiont client instance
+ * @param event - SvelteKit RequestEvent
  */
-export async function handleNotionWebhookRequest(event: RequestEvent) {
+export async function handleNotionWebhookRequest(client: SymbiontClient, event: RequestEvent) {
 	const logger = createLogger({ operation: 'webhook' });
 
 	try {
@@ -32,7 +70,7 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 		const notionDataSourceId = payload.page.parent.data_source_id;
 
 		// Find database config by dataSourceId (Notion database UUID)
-		const config = await loadServerConfig();
+		const config = client.config;
 		const dbConfig = config.databases.find((db: any) => db.dataSourceId === notionDataSourceId);
 
 		if (!dbConfig) {
@@ -50,16 +88,16 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 			dataSourceId: dbConfig.dataSourceId 
 		});
 
-		// Resolve Notion token (supports env var name, actual token, or default)
-		const notionToken = resolveNotionToken(dbConfig.notionToken, dbConfig.alias);
+		// Get Notion token from environment
+		const notionToken = requireEnvVar('NOTION_TOKEN');
 		
-		// Fetch page from Notion using the resolved token
+		// Fetch page from Notion
 		const notion = new Client({ auth: notionToken });
 		const page = (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
 
-		// Create orchestrator and process page
-		const orchestrator = createSyncOrchestrator(dbConfig, config);
-		await orchestrator.processPage(page);
+		// Create sync coordinator and process page
+		const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
+		await sync.processPage(page);
 
 		logger.info({ event: 'webhook_processed_successfully', pageId });
 		return json({ message: `Successfully processed page ${pageId}` }, { status: 200 });
@@ -75,8 +113,11 @@ export async function handleNotionWebhookRequest(event: RequestEvent) {
 
 /**
  * Handle polling/cron sync requests
+ * 
+ * @param client - Symbiont client instance
+ * @param event - SvelteKit RequestEvent
  */
-export async function handlePollBlogRequest(event: RequestEvent) {
+export async function handlePollBlogRequest(client: SymbiontClient, event: RequestEvent) {
 	const logger = createLogger({ operation: 'poll_sync' });
 
 	try {
@@ -90,11 +131,13 @@ export async function handlePollBlogRequest(event: RequestEvent) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const result = await syncFromNotion({
+		const limitParam = event.url.searchParams.get('limit');
+		const result = await syncFromNotion(client, {
 			databaseId: event.url.searchParams.get('database'),
 			since: event.url.searchParams.get('since'),
 			syncAll: event.url.searchParams.get('syncAll') === 'true',
-			wipe: event.url.searchParams.get('wipe') === 'true'
+			wipe: event.url.searchParams.get('wipe') === 'true',
+			limit: limitParam ? parseInt(limitParam, 10) : undefined
 		});
 
 		const hasError = result.summaries.some((s) => s.status === 'error');

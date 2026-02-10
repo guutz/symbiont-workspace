@@ -37,13 +37,14 @@ Notion → Supabase (Postgres + PostgREST + Storage + Realtime) → Vercel (Svel
 
 ## 📋 Migration Phases
 
-### Phase 0: Preparation (Day 0)
-- [ ] Create Supabase account
-- [ ] Create new project (choose region close to users)
-- [ ] Note credentials (project URL, anon key, service role key)
-- [ ] Install Supabase CLI locally
+### Phase 0: Preparation (Day 0) ✅ COMPLETED
+- [x] Create Supabase account
+- [x] Create new project (us-west-1 region)
+- [x] Note credentials (project URL, anon key, service role key)
+- [x] Install Supabase CLI locally (`brew install supabase/tap/supabase`)
+- [x] Initialize Supabase project (`supabase init`)
 
-### Phase 1: Database Migration (Day 1)
+### Phase 1: Database Migration (Day 1) ✅ COMPLETED
 
 #### 1.1 Export from Nhost
 
@@ -82,28 +83,39 @@ pg_dump "postgres://postgres:[YOUR-PASSWORD]@ygsdnfrbruuhtxczekur.db.us-west-2.n
 
 **Replace `[YOUR-PASSWORD]`** with your actual Nhost Postgres password.
 
-#### 1.2 Create Schema in Supabase
+#### 1.2 Create Schema in Supabase ✅
+
+**Applied via SQL Editor:**
+- Schema created from `supabase/schemas/symbiont_pages.sql`
+- Includes all tables, indexes, constraints
+- RLS (Row Level Security) policies applied
+
+#### 1.3 Import Data ✅
+
+**What Worked: Session Pooler Connection**
+
 ```bash
-# Initialize Supabase locally
-supabase init
-
-# Link to cloud project
-supabase link --project-ref <project-id>
-
-# Review schema, apply to Supabase
-supabase db push
+# Use Session Pooler (IPv4 compatible)
+psql "postgresql://postgres.xguzskbxiptvhbyggkpl:[PASSWORD]@aws-1-us-west-1.pooler.supabase.com:5432/postgres" < nhost_data.sql
 ```
 
-#### 1.3 Import Data
-```bash
-# Import data (via Supabase dashboard SQL editor or CLI)
-psql -h db.<project-ref>.supabase.co -U postgres -d postgres < nhost_data.sql
-```
+**Result:** `COPY 405` - Successfully imported 405 rows.
+
+**Why Session Pooler?**
+- Direct connection requires IPv6 (may not resolve on some networks)
+- Session Pooler is IPv4 compatible and more reliable
+- Format: `postgresql://postgres.<project-ref>:[PASSWORD]@aws-1-<region>.pooler.supabase.com:5432/postgres`
+
+**Note:** SQL Editor doesn't work for large data files. Use psql with Session Pooler connection string.
 
 #### 1.4 Verify Data
-- [ ] Check row counts match
-- [ ] Verify indexes exist
-- [ ] Test GraphQL queries in Supabase dashboard
+- [x] Check row counts match (405 rows imported)
+- [x] Verify indexes exist (from schema)
+- [x] Test PostgREST queries in API Docs
+
+**Next Steps:**
+- Clear data and regenerate via sync (images need Supabase Storage URLs)
+- Run migration script to re-upload all images from Notion/Nhost to Supabase Storage
 
 ---
 
@@ -131,15 +143,122 @@ curl 'https://<project-ref>.supabase.co/rest/v1/pages?slug=eq.test-article&selec
   -H "Authorization: Bearer <anon-key>"
 ```
 
-#### 2.3 Review Generated TypeScript Types (Optional)
+#### 2.3 TypeScript Types & End-User Setup Strategy
 
-Supabase CLI can generate TypeScript types from your schema:
-
+**Generating Types:**
 ```bash
-supabase gen types typescript --project-id <project-ref> > src/lib/database.types.ts
+# Generate types from live Supabase project
+supabase gen types typescript --project-id <project-ref> > database.types.ts
+
+# Or from local schema
+supabase gen types typescript --local > database.types.ts
 ```
 
-This gives you full type safety for queries.
+**End-User Setup Strategy:**
+
+Symbiont adopters need:
+1. Create Supabase project
+2. Apply schema
+3. Configure RLS policies
+4. Get credentials (URL, anon key, service role key)
+5. Add to config
+
+**Approach A: Template Schema in Symbiont Package (Recommended)**
+
+```
+symbiont-cms/
+  schemas/
+    pages.sql          # Core pages table schema
+    storage.sql        # Storage buckets and policies
+    rls.sql           # RLS policies
+  setup-scripts/
+    init-supabase.sh  # Automated setup script
+```
+
+**Setup Flow:**
+```bash
+# User creates Supabase project, then:
+cd my-blog
+npx symbiont init
+
+# Prompts:
+# > Supabase project URL: https://xxx.supabase.co
+# > Supabase anon key: eyJxxx...
+# > Supabase service role key: eyJxxx...
+# > Apply schema to Supabase? (Y/n)
+
+# Generates:
+# - symbiont.config.ts with Supabase credentials
+# - Applies schema via Supabase Management API
+# - Creates .env.example
+# - Optionally generates database.types.ts
+```
+
+**TypeScript Types Strategy:**
+
+**Option 1: Bake Types into Symbiont Package**
+```typescript
+// symbiont-cms/src/lib/database.types.ts (shipped with package)
+export interface Database {
+  public: {
+    Tables: {
+      pages: {
+        Row: { page_id: string; title: string; /* ... */ };
+        Insert: { /* ... */ };
+        Update: { /* ... */ };
+      };
+    };
+  };
+}
+```
+
+**Pros:**
+- ✅ Works out of the box
+- ✅ No user setup needed
+- ✅ Types always match schema
+
+**Cons:**
+- ❌ User can't extend schema easily
+- ❌ Custom columns require forking types
+
+**Option 2: Generate Types During User Setup (Recommended)**
+```bash
+# During `npx symbiont init`
+supabase gen types typescript --project-id <user-project-ref> > src/lib/database.types.ts
+
+# Add to .gitignore
+echo "database.types.ts" >> .gitignore
+
+# Regenerate types when schema changes
+npx symbiont sync-types
+```
+
+**Pros:**
+- ✅ Supports custom schema extensions
+- ✅ Always matches user's actual database
+- ✅ User can add custom columns/tables
+
+**Cons:**
+- ⚠️ Requires Supabase CLI installed
+- ⚠️ User must regenerate types after schema changes
+
+**Hybrid Approach (Best):**
+- Ship base types with package (for core `pages` table)
+- Allow user to override with generated types
+- Provide `symbiont sync-types` command for convenience
+
+```typescript
+// symbiont-cms/src/lib/types.ts
+export type Database = typeof import('./database.types').Database;
+
+// User can override in their project:
+// src/database.types.ts (generated, takes precedence)
+```
+
+**Recommendation for Initial Release:**
+- Ship with baked-in types for core schema
+- Document how to extend schema + regenerate types
+- Add `symbiont sync-types` command in v2
 
 ---
 
@@ -455,10 +574,48 @@ CREATE POLICY "Public read access"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'images');
 
--- Allow authenticated uploads (for sync process)
-CREATE POLICY "Authenticated upload"
+-- Allow service role uploads (for sync process)
+CREATE POLICY "Service role upload"
 ON storage.objects FOR INSERT
-WITH CHECK (bucket_id = 'images' AND auth.role() = 'authenticated');
+WITH CHECK (bucket_id = 'images' AND auth.role() = 'service_role');
+```
+
+#### 5.2b Set Row Level Security (RLS) on Pages Table
+
+**Enable RLS on pages table:**
+```sql
+-- Enable RLS
+ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access (only published pages)
+CREATE POLICY "Public pages read access"
+ON pages FOR SELECT
+USING ((publish_at IS NOT NULL) AND (publish_at <= NOW()));
+
+-- Allow service role full access (for sync process)
+CREATE POLICY "Service role full access"
+ON pages FOR ALL
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');
+```
+
+**Why RLS?**
+- Secures database at row level (defense in depth)
+- Service role key bypasses RLS for server-side operations
+- Anon key respects RLS policies (read-only for public)
+- Prevents accidental data exposure
+
+**Testing RLS:**
+```sql
+-- As anon user (should work)
+SELECT * FROM pages WHERE slug = 'test-article';
+
+-- As anon user (should fail)
+INSERT INTO pages (page_id, title, slug, datasource_id, datasource_alias, updated_at)
+VALUES ('test', 'Test', 'test', 'test', 'test', NOW());
+
+-- As service role (should work)
+-- Use service_role key in Authorization header
 ```
 
 #### 5.3 Re-upload Images from Nhost
@@ -537,16 +694,26 @@ pnpm dev
 # - Sync endpoint works
 ```
 
-#### 6.2 Test Sync
+#### 6.2 Test Sync (After Data Regeneration)
+
+**Note:** After code migration, clear existing data and regenerate via sync:
+
+```sql
+-- Clear old data (with Nhost URLs)
+DELETE FROM pages;
+```
+
+**Then trigger full sync:**
 ```bash
-# Trigger manual sync
+# Trigger manual sync (re-fetches all pages from Notion)
 curl -H "Authorization: Bearer $CRON_SECRET" \
   http://localhost:5173/api/sync/poll-blog
 
 # Verify:
-# - New posts from Notion appear in Supabase
-# - Images upload to correct paths
-# - Cover images work
+# - All posts from Notion appear in Supabase
+# - Images upload to Supabase Storage with correct paths
+# - Cover images use Supabase URLs
+# - Content images use Supabase URLs
 ```
 
 #### 6.3 Test Queries

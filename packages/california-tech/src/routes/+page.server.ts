@@ -1,16 +1,22 @@
 // packages/california-tech/src/routes/+page.server.ts
-import { postsLoad, postsConfig as config } from 'symbiont-cms/server';
+import { symbiont } from '$lib/symbiont';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
 import type { Post } from '$lib/types/post';
 import type { Tags } from '$lib/types/tags';
 
-// export { config };
+// ISR config - enable SvelteKit's ISR caching
+export const config = {
+	maxage: 60,
+	revalidate: 60
+};
+
 export const prerender = false;
 
 export async function load({ fetch, url, cookies }) {
   try {
-    const postsFromDb = await postsLoad({ fetch }, { limit: 20, parseSummaries: true });
+    const postsFromDb = await symbiont.getAllPages({ fetch, limit: 20 });
     const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+    // TODO: maybe don't send the whole content of all posts to the client on the homepage.
 
     const tagMap = new Map<string, Set<string>>();
     for (const post of allPosts) {

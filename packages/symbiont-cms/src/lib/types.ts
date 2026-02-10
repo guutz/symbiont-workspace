@@ -1,4 +1,5 @@
 import type { PageObjectResponse } from '@notionhq/client';
+import type { Database } from './database.types.js';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -52,35 +53,57 @@ export interface TocItem {
     children?: TocItem[]; // Nested headings
 }
 
+
+
 /**
- * Represents the structure of a single post or article.
- * This type mirrors the `pages` table in the database.
+ * Raw database page structure.
+ * Derived from Supabase-generated types for the `pages` table.
+ * 
+ * This ensures type safety between the database schema and our TypeScript code.
+ * 
+ * NOTE: The database schema is intentionally fixed and should NOT be customized.
+ * Use the `meta` JSONB field for custom data instead of modifying the schema.
+ * The `database.types.ts` file is bundled with the package and should not be overridden.
+ */
+type DatabasePageRaw = Database['public']['Tables']['pages']['Row'];
+
+/**
+ * Refined database page type with properly typed JSONB fields.
+ * 
+ * Narrows the broad Supabase `Json` type to our actual data structures:
+ * - tags: string[] (array of tag names)
+ * - authors: string[] (array of author names)
+ * - meta: Record<string, any> (flexible metadata object)
+ */
+export interface DatabasePage extends Omit<DatabasePageRaw, 'tags' | 'authors' | 'meta'> {
+	tags: string[] | null;
+	authors: string[] | null;
+	meta: Record<string, any> | null;
+}
+
+/**
+ * Enhanced page structure for website rendering.
+ * Extends DatabasePage with computed/rendered fields for UI consumption.
+ * This is the "sugared-up" version sent to +page.svelte components.
  * 
  * Extended to be compatible with QWER post type for seamless integration.
  */
-export type Post = {
-    // Database fields (from pages table)
-    page_id?: string;           // Notion page UUID (primary key)
-    datasource_id?: string;     // Notion database ID
-    datasource_alias?: string;  // Human-readable datasource alias (non-secret)
-    title: string | null;
-    slug: string | null;        // Nullable - only generated for public posts
-    content: string | null;     // Markdown content
-    publish_at: string | null;  // ISO 8601 date string
-    updated_at?: string | null; // Last updated timestamp
-    tags?: any[] | null;        // JSONB array
-    authors?: any[] | null;     // JSONB array
-    meta?: Record<string, any> | null; // JSONB object (flexible metadata)
+export interface WebsitePage extends Omit<DatabasePage, 'page_id' | 'datasource_id' | 'datasource_alias' | 'updated_at'> {
+    // Make database fields optional for flexibility
+    page_id?: string;
+    datasource_id?: string;
+    datasource_alias?: string;
+    updated_at?: string | null;
 
-    // Optional QWER-compatible fields
-    summary?: string;
+    /** Pre-rendered HTML from summary markdown (populated by postsLoad) */
+    summary_html?: string;
     description?: string;
     language?: string;
     cover?: string;
 
     // Allow any other properties from your schema
     [key: string]: any;
-};
+}
 
 /**
  * Database configuration blueprint.
@@ -98,18 +121,14 @@ export interface DatabaseBlueprint {
     /** Notion database UUID (stored in DB as datasource_id). Can use env vars. */
     dataSourceId: string;
 
-    /** 
-     * Notion API integration token for this specific datasource.
-     * Can be:
-     * - Env var name (e.g., 'NOTION_TOKEN') - will be resolved from environment
-     * - Actual token value (e.g., 'secret_abc123...') - used as-is
-     * - Omitted - defaults to NOTION_TOKEN env var
-     */
-    notionToken?: string;
-
     // ============================================
     // PUBLISHING RULES
     // ============================================
+
+    /** Boolean gate: determines IF a page should be excluded from sync entirely */
+    excludeRule?: (page: PageObjectResponse) => boolean;
+    // Default: () => false (don't exclude anything)
+    // Return true to exclude the page from being synced to the database
 
     /** Boolean gate: determines IF a page should be published */
     isPublicRule?: (page: PageObjectResponse) => boolean;
@@ -143,6 +162,14 @@ export interface DatabaseBlueprint {
     authorsProperty?: string | null;
     // Default: null (no authors)
 
+    /** Summary property name (text or rich_text) */
+    summaryProperty?: string | null;
+    // Default: null (no summary)
+
+    /** Cover image property name (files property) */
+    coverProperty?: string | null;
+    // Default: null (no cover image)
+
     // ============================================
     // FLEXIBLE METADATA - Pass-through to JSONB
     // ============================================
@@ -172,11 +199,14 @@ export interface DatabaseBlueprint {
 
 /**
  * Full Symbiont configuration.
- * Contains both public data (graphqlEndpoint) and private server-only configuration (databases with rules).
+ * Contains both public data and private server-only configuration (databases with rules).
  */
 export interface SymbiontConfig {
-    /** PUBLIC: GraphQL endpoint URL. Not secret, just a URL. */
-    graphqlEndpoint: string;
+    /** PUBLIC */
+    supabase: {
+        url: string;         // https://<project-ref>.supabase.co
+        publishableKey: string;     // Public key
+    };
 
     /** PRIVATE: Database configurations with server-only sync rules. */
     databases: DatabaseBlueprint[];
@@ -188,18 +218,7 @@ export interface SymbiontConfig {
     caching?: CachingConfig;
 }
 
-/**
- * Client-safe public configuration extracted from SymbiontConfig.
- * This is what gets exposed via the virtual module 'virtual:symbiont/config'.
- * Contains NO functions, NO secrets - only public identifiers.
- */
-export interface PublicSymbiontConfig {
-    /** GraphQL endpoint URL */
-    graphqlEndpoint: string;
 
-    /** All configured datasource aliases (for client-side queries) */
-    aliases: string[];
-}
 
 /** Markdown configuration block from symbiont.config.js */
 export interface MarkdownConfig {
@@ -245,7 +264,6 @@ export interface CachingConfig {
 export type HydratedDatabaseConfig = DatabaseBlueprint;
 
 export interface HydratedSymbiontConfig {
-    graphqlEndpoint: string;
     databases: HydratedDatabaseConfig[];
     markdown?: MarkdownConfig;
     caching?: CachingConfig;
@@ -253,11 +271,8 @@ export interface HydratedSymbiontConfig {
 
 /**
  * Represents the result of a sync operation for a single database
- * 
- * Note: This type is being phased out. Use SyncSummary from sync/orchestrator.ts instead.
- * @deprecated Use orchestrator SyncResult instead
  */
-export type SyncSummary = {
+export type SyncResult = {
     /** The configured alias for this datasource */
     alias: string;
     /** The Notion database UUID */

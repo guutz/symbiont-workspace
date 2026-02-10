@@ -1,11 +1,11 @@
 # Publishing Rules Guide
 
-> **Updated in v0.1.0**: Complementary `isPublicRule` and `publishDateRule` system
+> **Updated in v0.2.0**: Added `excludeRule` for filtering pages before sync
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [The Two Rules](#the-two-rules)
+- [The Three Rules](#the-three-rules)
 - [How They Work Together](#how-they-work-together)
 - [Common Patterns](#common-patterns)
 - [Real-World Examples](#real-world-examples)
@@ -15,38 +15,67 @@
 
 ## Overview
 
-Symbiont CMS uses **complementary publishing rules** that work together to determine which pages should be published and when. Both rules are optional and have sensible defaults.
+Symbiont CMS uses **complementary publishing rules** that work together to determine which pages should be synced to your database and when they should be published. All rules are optional and have sensible defaults.
 
 ### Quick Summary
 
-- **`isPublicRule`** - Boolean gate: determines IF a page should be published
-- **`publishDateRule`** - Date extraction: determines WHEN a page should be published
-- **Both must pass** for a page to be published
-- **Both are optional** with sensible defaults
+- **`excludeRule`** - Pre-filter: determines if a page should be synced to the database at all
+- **`isPublicRule`** - Boolean gate: determines IF a synced page should be published
+- **`publishDateRule`** - Date extraction: determines WHEN a published page should be published
+- **Rules are applied in order** for optimal performance
+- **All are optional** with sensible defaults
 
-## The Two Rules
+## The Three Rules
 
-### 1. `isPublicRule` (Boolean Gate)
+### 1. `excludeRule` (Pre-Sync Filter)
 
-**Purpose**: Determines IF a page should be published  
+**Purpose**: Determines if a page should be synced to the database at all  
 **Type**: `(page: PageObjectResponse) => boolean`  
-**Default**: `() => true` (all pages pass the gate)
+**Default**: `() => false` (don't exclude anything)  
+**Applied**: Before any processing (most efficient filter)
 
-This is your "on/off switch" for publishing. Use it for:
+This is your **early filter** that prevents pages from ever entering your database. Return `true` to exclude the page completely. Use it for:
+- Filtering by tag (`#archive`, `#draft`, `#template`)
+- Excluding specific database entries (templates, testing pages)
+- Workspace organization (ignore certain page types)
+- Performance optimization (skip expensive transformations entirely)
+
+**Example:**
+```typescript
+excludeRule: (page) => {
+  const tags = page.properties.Tags?.multi_select || [];
+  return tags.some(tag => tag.name === 'archive' || tag.name === 'template');
+}
+```
+
+**Important**: Excluded pages are never written to the database, never transformed, and never accessible via API. Use `isPublicRule` instead if you want to store the page but keep it unpublished.
+
+### 2. `isPublicRule` (Boolean Gate)
+
+**Purpose**: Determines IF a synced page should be published  
+**Type**: `(page: PageObjectResponse) => boolean`  
+**Default**: `() => true` (all pages pass the gate)  
+**Applied**: After sync, during transformation
+
+This is your "on/off switch" for publishing **synced** pages. Use it for:
 - Status checks (`Status === 'Published'`)
 - Boolean flags (`Ready checkbox === true`)
 - Simple published/unpublished logic
+- Pages that should be stored but not public
 
 **Example:**
 ```typescript
 isPublicRule: (page) => page.properties.Status?.select?.name === 'Published'
 ```
 
-### 2. `publishDateRule` (Date Extraction)
+**Note**: Pages that fail `isPublicRule` are still synced to the database with `publish_at = null`, making them available for previews or drafts.
 
-**Purpose**: Determines WHEN a page should be published  
+### 3. `publishDateRule` (Date Extraction)
+
+**Purpose**: Determines WHEN a published page should be published  
 **Type**: `(page: PageObjectResponse) => string | null`  
-**Default**: Uses `page.last_edited_time` (always available in Notion)
+**Default**: Uses `page.last_edited_time` (always available in Notion)  
+**Applied**: After `isPublicRule` passes
 
 This extracts the publish date from your Notion pages. Use it for:
 - Custom date properties (`'Go Live Date'`)
@@ -102,46 +131,87 @@ If either condition fails, the page is **unpublished** (`publish_at = null`).
                                      └───────────────┘
 ```
 
+### Key Differences
+
+| Rule | When Applied | What Happens on Fail | Use Case |
+|------|--------------|---------------------|----------|
+| `excludeRule` | Before transformation | Page never synced, not in database | Archive pages, templates, tests |
+| `isPublicRule` | During transformation | Page synced with `publish_at = null` | Draft mode, status-based publishing |
+| `publishDateRule` | After `isPublicRule` passes | Page synced with `publish_at = null` | Scheduled publishing, future dates |
+
 ## Common Patterns
 
-### Pattern 1: Simple Status Gate (Default Date)
+### Pattern 1: Exclude Archive Pages (Never Sync)
 
-Most common pattern - just check if published, use last edited time as publish date.
+Most efficient - pages with `#archive` tag never enter the database.
 
 ```typescript
-{
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
-  
-  // Only publish pages marked as "Published"
-  isPublicRule: (page) => page.properties.Status?.select?.name === 'Published',
-  // publishDateRule omitted → uses page.last_edited_time
-  
-  sourceOfTruthRule: () => 'NOTION'
-}
+// src/lib/symbiont.ts
+import { createSymbiontClient } from 'symbiont-cms';
+
+export const symbiont = createSymbiontClient({
+  supabase: {
+    url: 'https://your-project.supabase.co',
+    publishableKey: 'your-publishable-key'
+  },
+  databases: [
+    {
+      alias: 'blog',
+      dataSourceId: 'your-notion-database-uuid',
+      
+      // Exclude archived pages completely
+      excludeRule: (page) => {
+        const tags = page.properties.Tags?.multi_select || [];
+        return tags.some(tag => tag.name === 'archive');
+      },
+    }
+  ]
+});
+```
+
+### Pattern 2: Simple Status Gate (Default Date)
+
+Common pattern - just check if published, use last edited time as publish date.
+
+```typescript
+// src/lib/symbiont.ts
+export const symbiont = createSymbiontClient({
+  supabase: { url: SUPABASE_URL, publishableKey: SUPABASE_KEY },
+  databases: [
+    {
+      alias: 'blog',
+      dataSourceId: 'your-notion-database-uuid',
+      
+      // Gate: only published pages
+      isPublicRule: (page) => page.properties.Status?.select?.name === 'Published',
+      
+      // Date: omit publishDateRule to use default (page.last_edited_time)
+    }
+  ]
+});
+```
 ```
 
 **Result**: Only "Published" pages appear, using their last edit time.
 
 ---
 
-### Pattern 2: Custom Date Property (No Gate)
+### Pattern 3: Custom Date Property (No Gate)
 
 Use a custom date property, allow all pages through the gate.
 
 ```typescript
+// In databases array:
 {
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid',
   
   // isPublicRule omitted → defaults to () => true (all pages pass)
   
   // Use custom "Go Live" date property
   publishDateRule: (page) => {
     return page.properties['Go Live']?.date?.start || null;
-  },
-  
-  sourceOfTruthRule: () => 'NOTION'
+  }
 }
 ```
 
@@ -149,14 +219,15 @@ Use a custom date property, allow all pages through the gate.
 
 ---
 
-### Pattern 3: Both Rules (Complex Logic)
+### Pattern 4: Both Rules (Complex Logic)
 
 Combine status checks with custom date logic.
 
 ```typescript
+// In databases array:
 {
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid',
   
   // Gate: only ready pages pass
   isPublicRule: (page) => page.properties.Ready?.checkbox === true,
@@ -165,9 +236,7 @@ Combine status checks with custom date logic.
   publishDateRule: (page) => {
     const embargo = page.properties['Embargo Date']?.date?.start;
     return embargo || page.last_edited_time;
-  },
-  
-  sourceOfTruthRule: () => 'NOTION'
+  }
 }
 ```
 
@@ -175,14 +244,15 @@ Combine status checks with custom date logic.
 
 ---
 
-### Pattern 4: Scheduled Publishing with Fallback
+### Pattern 5: Scheduled Publishing with Fallback
 
 Different date properties for different statuses.
 
 ```typescript
+// In databases array:
 {
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid',
   
   // Gate: published or scheduled
   isPublicRule: (page) => {
@@ -200,9 +270,7 @@ Different date properties for different statuses.
     
     // For 'Published' status, use last edited time
     return page.last_edited_time;
-  },
-  
-  sourceOfTruthRule: () => 'NOTION'
+  }
 }
 ```
 
@@ -210,20 +278,19 @@ Different date properties for different statuses.
 
 ---
 
-### Pattern 5: All Pages Published (Default Everything)
+### Pattern 6: All Pages Published (Default Everything)
 
 Simplest config - publish everything with last edited time.
 
 ```typescript
+// In databases array:
 {
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid'
   
   // Both rules omitted → all defaults
   // isPublicRule: () => true (implicit)
   // publishDateRule: (page) => page.last_edited_time (implicit)
-  
-  sourceOfTruthRule: () => 'NOTION'
 }
 ```
 
@@ -231,14 +298,15 @@ Simplest config - publish everything with last edited time.
 
 ---
 
-### Pattern 6: Multiple Date Properties with Priority
+### Pattern 7: Multiple Date Properties with Priority
 
 Use the first available date from multiple properties.
 
 ```typescript
+// In databases array:
 {
-  short_db_ID: 'blog',
-  notionDatabaseId: 'abc123...',
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid',
   
   isPublicRule: (page) => page.properties.Status?.select?.name === 'Published',
   
@@ -247,9 +315,7 @@ Use the first available date from multiple properties.
     return page.properties['Publish Date']?.date?.start 
         || page.created_time 
         || page.last_edited_time;
-  },
-  
-  sourceOfTruthRule: () => 'NOTION'
+  }
 }
 ```
 
@@ -365,12 +431,65 @@ Handle draft → review → scheduled → published lifecycle:
 
 ---
 
-### Example 4: Checkbox + Custom Date
+### Example 4: Complete Three-Rule System
+
+Using all three rules for maximum control:
+
+```typescript
+// src/lib/symbiont.ts
+import { createSymbiontClient } from 'symbiont-cms';
+
+export const symbiont = createSymbiontClient({
+  supabase: {
+    url: 'https://your-project.supabase.co',
+    publishableKey: 'your-publishable-key'
+  },
+  databases: [
+    {
+      alias: 'blog',
+      dataSourceId: 'your-notion-database-uuid',
+      
+      // Rule 1: Exclude templates and archived pages (never sync)
+      excludeRule: (page) => {
+        const tags = page.properties.Tags?.multi_select || [];
+        return tags.some(tag => 
+          tag.name === 'template' || 
+          tag.name === 'archive' || 
+          tag.name === 'test'
+        );
+      },
+      
+      // Rule 2: Only publish pages with "Published" status (sync but unpublish drafts)
+      isPublicRule: (page) => {
+        return page.properties.Status?.select?.name === 'Published';
+      },
+      
+      // Rule 3: Use custom publish date or fallback to last edited
+      publishDateRule: (page) => {
+        return page.properties['Go Live']?.date?.start || page.last_edited_time;
+      }
+    }
+  ]
+});
+```
+
+**Result**: 
+- Pages tagged `#template`, `#archive`, or `#test` are never synced to the database
+- Draft pages are synced to database but unpublished (`publish_at = null`)
+- Published pages use their "Go Live" date or last edited time
+
+---
+
+### Example 5: Checkbox + Custom Date
 
 Simple visible/hidden toggle with custom date:
 
 ```typescript
+// In databases array:
 {
+  alias: 'blog',
+  dataSourceId: 'your-notion-database-uuid',
+  
   isPublicRule: (page) => {
     return page.properties['Visible on Site']?.checkbox === true;
   },
@@ -383,7 +502,7 @@ Simple visible/hidden toggle with custom date:
 
 ---
 
-### Example 5: Multi-Select Status with Priorities
+### Example 6: Multi-Select Status with Priorities
 
 Using multi-select for multiple states:
 

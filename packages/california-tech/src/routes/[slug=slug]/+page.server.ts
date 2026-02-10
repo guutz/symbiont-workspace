@@ -12,21 +12,33 @@
  * - SEO/crawlers
  */
 
-import { postLoad, config } from 'symbiont-cms/server';
+import { symbiont } from '$lib/symbiont';
+import { renderMarkdownToHtml } from 'symbiont-cms/server';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
+import { error } from '@sveltejs/kit';
 
-// Export ISR config (caching settings from symbiont.config.ts)
-export { config };
+// ISR config - enable SvelteKit's ISR caching
+export const config = {
+	maxage: 60,
+	revalidate: 60
+};
 
 // Dynamic route - fetches posts from database at request time
 export const prerender = false;
 
-// Wrap the symbiont post loader and convert to QWER format
+// Fetch post and render markdown
 export const load = async (event: any) => {
-	const data = await postLoad(event);
+	const post = await symbiont.getPageBySlug(event.params.slug, { fetch: event.fetch });
+	
+	if (!post || !post.content) {
+		throw error(404, 'Post not found');
+	}
+	
+	// Render markdown to HTML
+	const { html, toc } = await renderMarkdownToHtml(post.content, symbiont.config.markdown);
 	
 	// Convert Symbiont post to QWER format
-	const qwerPost = symbiontToQwerPost(data.post, data.html, data.toc);
+	const qwerPost = symbiontToQwerPost(post, html, toc);
 	
 	// Set cache headers for client-side navigation
 	event.setHeaders({
@@ -35,7 +47,7 @@ export const load = async (event: any) => {
 	
 	return {
 		post: qwerPost,
-		html: data.html,
-		toc: data.toc,
+		html,
+		toc,
 	};
 };

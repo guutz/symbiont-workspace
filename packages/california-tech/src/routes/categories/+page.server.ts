@@ -1,5 +1,5 @@
 // packages/california-tech/src/routes/categories/+page.server.ts
-import { getAllPosts } from 'symbiont-cms/server';
+import { symbiont } from '$lib/symbiont';
 import { symbiontToQwerPost } from '$lib/utils/post-converter';
 import type { Tags } from '$lib/types/tags';
 
@@ -7,7 +7,7 @@ export const prerender = false;
 
 export async function load({ fetch }) {
 	try {
-		const postsFromDb = await getAllPosts({ fetch, limit: 1000 });
+		const postsFromDb = await symbiont.getAllPages({ fetch, limit: 1000 });
 		const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
 
 		// Build tag statistics

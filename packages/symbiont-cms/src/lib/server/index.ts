@@ -7,58 +7,53 @@
  * ## Architecture Layers
  * 
  * ```
- * NotionAdapter (API layer) - Talk to Notion API
+ * NotionClient (API layer) - Talk to Notion API
  *     ↓
- * PostBuilder (Business logic) - Apply sync rules, resolve slugs
+ * NotionPageToDatabasePageTransformer (Business logic) - Apply sync rules, resolve slugs
  *     ↓
- * PostRepository (Database layer) - GraphQL operations
+ * DatabasePageCRUD (Database layer) - Postgres operations
  *     ↓
- * SyncOrchestrator (Coordination) - Coordinate full sync flow
+ * NotionToDatabaseSync (Coordination) - Coordinate full sync flow
  * ```
  * 
  * ## Usage
  * 
  * ### High-level (recommended):
  * ```typescript
- * import { createSyncOrchestrator } from 'symbiont-cms/server/sync';
+ * import { createNotionToDatabaseSyncCoordinator } from 'symbiont-cms/server';
  * 
- * const orchestrator = createSyncOrchestrator(config);
- * await orchestrator.syncDataSource({ syncAll: true });
+ * const sync = createNotionToDatabaseSyncCoordinator(config);
+ * await sync.syncDataSource({ syncAll: true });
  * ```
  * 
  * ### Low-level (for testing or custom workflows):
  * ```typescript
- * import { NotionAdapter, PostRepository, PostBuilder } from 'symbiont-cms/server/sync';
+ * import { NotionClient, DatabasePageCRUD, NotionPageToDatabasePageTransformer } from 'symbiont-cms/server';
  * 
- * const adapter = new NotionAdapter(notion, n2m);
- * const repo = new PostRepository(gqlClient);
- * const builder = new PostBuilder(config, adapter, repo);
+ * const notionClient = new NotionClient(notion, n2m);
+ * const pageCrud = new DatabasePageCRUD(supabaseUrl, serviceRoleKey);
+ * const transformer = new NotionPageToDatabasePageTransformer(config, notionClient, pageCrud);
  * 
- * const postData = await builder.buildPost(page);
- * await repo.upsert(postData);
+ * const pageData = await transformer.transformPage(page);
+ * await pageCrud.upsert(pageData);
  * ```
  */
 
 // Factory functions (recommended entry point)
-export { createSyncOrchestrator, createSyncOrchestrators } from './sync/factory.js';
+export { createNotionToDatabaseSyncCoordinator } from './sync/coordinator.js';
 
 // Orchestration layer
-export { SyncOrchestrator } from './sync/orchestrator.js';
-export type { SyncOptions, SyncSummary } from './sync/orchestrator.js';
+export { NotionToDatabaseSync } from './sync/notion-to-database-sync.js';
+export type { SyncOptions, SyncResult } from './sync/notion-to-database-sync.js';
 
 // Business logic layer
-export { PostBuilder } from './sync/post-builder.js';
+export { NotionPageToDatabasePageTransformer } from './notion/page-transformer.js';
 
 // Database layer
-export { PostRepository } from './sync/post-repository.js';
-export type { PostData } from './sync/post-repository.js';
+export { DatabasePageCRUD } from './database/page-crud.js';
 
 // API layer
-export { NotionAdapter } from './notion/adapter.js';
+export { NotionClient } from './notion/client.js';
 
-// High-level sync functions (legacy API - still works)
-export { syncFromNotion } from './sync.js';
+// Webhook handlers
 export { handleNotionWebhookRequest, handlePollBlogRequest } from './webhook.js';
-
-// Configuration helpers
-export { getSourceByAlias } from './load-config.js';
