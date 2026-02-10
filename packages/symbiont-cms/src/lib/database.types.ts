@@ -24,6 +24,7 @@ export type Database = {
           page_id: string
           publish_at: string | null
           slug: string | null
+          summary: string | null
           tags: Json | null
           title: string
           updated_at: string
@@ -37,6 +38,7 @@ export type Database = {
           page_id: string
           publish_at?: string | null
           slug?: string | null
+          summary?: string | null
           tags?: Json | null
           title: string
           updated_at: string
@@ -50,6 +52,7 @@ export type Database = {
           page_id?: string
           publish_at?: string | null
           slug?: string | null
+          summary?: string | null
           tags?: Json | null
           title?: string
           updated_at?: string

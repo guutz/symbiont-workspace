@@ -154,13 +154,6 @@ export async function renderMarkdownToHtml(
     const token = tokens[idx];
     const href = token.attrGet('src');
     
-    if (href) {
-      // Detect Nhost Storage URLs and add optimization hints
-      if (config?.images?.nhostStorage && isNhostStorageUrl(href)) {
-        token.attrSet('data-nhost-optimized', 'true');
-      }
-    }
-    
     return defaultImageRender(tokens, idx, options, env, self);
   };
   
@@ -275,10 +268,6 @@ function escapeHtml(html: string): string {
   });
 }
 
-function isNhostStorageUrl(url: string): boolean {
-  return url.includes('nhost') || url.includes('/storage/');
-}
-
 /**
  * Mangle string by converting characters to HTML character references
  * This helps prevent email harvesting bots from collecting addresses
@@ -301,7 +290,7 @@ function mangleString(text: string): string {
  * Renders markdown summary to plain text by stripping all formatting and HTML.
  * Preserves newlines while ensuring zero HTML tags remain.
  */
-export async function renderSummaryToHtml(content: string): Promise<string> {
+export function renderSummaryToHtml(content: string): string {
   const md = new MarkdownIt({
     html: true,
     linkify: false,

@@ -103,11 +103,12 @@ export class DatabasePageCRUD {
 	 * Upsert (insert or update) a page
 	 */
 	async upsert(page: DatabasePage): Promise<void> {
-		this.logger.debug({ 
+		this.logger.info({ 
 			event: 'upsert_page', 
 			datasourceId: page.datasource_id,
 			slug: page.slug,
-			pageId: page.page_id
+			pageId: page.page_id,
+			summary: page.summary ? `${page.summary.substring(0, 100)}...` : null // Log a truncated summary for debugging, if available
 		});
 
 		const { error } = await this.supabase
@@ -125,7 +126,7 @@ export class DatabasePageCRUD {
 			throw new Error(`Failed to upsert page: ${error.message}`);
 		}
 		
-		this.logger.info({ 
+		this.logger.debug({ 
 			event: 'page_upserted', 
 			datasourceId: page.datasource_id,
 			slug: page.slug 

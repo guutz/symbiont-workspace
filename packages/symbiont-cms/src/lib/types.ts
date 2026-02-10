@@ -95,8 +95,6 @@ export interface WebsitePage extends Omit<DatabasePage, 'page_id' | 'datasource_
     datasource_alias?: string;
     updated_at?: string | null;
 
-    // Optional QWER-compatible fields
-    summary?: string;
     /** Pre-rendered HTML from summary markdown (populated by postsLoad) */
     summary_html?: string;
     description?: string;
@@ -163,6 +161,10 @@ export interface DatabaseBlueprint {
     /** Authors property name (people or multi_select) */
     authorsProperty?: string | null;
     // Default: null (no authors)
+
+    /** Summary property name (text or rich_text) */
+    summaryProperty?: string | null;
+    // Default: null (no summary)
 
     /** Cover image property name (files property) */
     coverProperty?: string | null;

@@ -3,6 +3,7 @@
  */
 import type { WebsitePage } from 'symbiont-cms';
 import type { Post } from '$lib/types/post';
+import { renderSummaryToHtml } from 'symbiont-cms/server';
 
 export function symbiontToQwerPost(post: WebsitePage, html?: string, toc?: any[]): Post.Post {
 	return {
@@ -12,11 +13,10 @@ export function symbiontToQwerPost(post: WebsitePage, html?: string, toc?: any[]
 		title: post.title ?? 'Untitled',
 		content: post.content ?? '',
 		summary: post.summary ?? '',
-		summary_html: post.summary_html ?? '',
 		description: post.description ?? '',
 		language: post.language ?? 'en',
-		cover: post.cover,
-		tags: Array.isArray(post.tags) ? post.tags : [],
+		cover: post.meta?.cover ?? undefined,
+		tags: Array.isArray(post.tags) ? post.tags.filter(tag => !['web submission', 'Web Only'].includes(tag)) : [],
 		authors: Array.isArray(post.authors) ? post.authors : [],
 		
 		// Date field mapping
@@ -27,9 +27,10 @@ export function symbiontToQwerPost(post: WebsitePage, html?: string, toc?: any[]
 		// Rendered content
 		html: html ?? '',
 		toc: toc as any,
+		summary_html: post.summary ? renderSummaryToHtml(post.summary) : post.content ? renderSummaryToHtml(post.content).substring(0, 200) : '',
 		
 		// QWER-specific UI fields (defaults)
-		coverStyle: 'NONE' as Post.CoverStyle,
+		coverStyle: 'TOP' as Post.CoverStyle,
 		coverInPost: true,
 		coverCaption: undefined,
 		options: [],

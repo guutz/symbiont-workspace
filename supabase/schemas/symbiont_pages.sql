@@ -56,6 +56,7 @@ CREATE TABLE public.pages (
     publish_at timestamp with time zone,
     meta jsonb DEFAULT jsonb_build_object(),
     content text,
+    summary text,
     updated_at timestamp with time zone NOT NULL,
     datasource_id text NOT NULL,
     datasource_alias text NOT NULL
@@ -133,6 +134,13 @@ CREATE INDEX idx_pages_publish_at ON public.pages USING btree (publish_at);
 --
 
 CREATE INDEX idx_pages_tags ON public.pages USING gin (tags);
+
+
+
+CREATE INDEX pages_summary_idx ON public.pages USING btree (summary);
+
+
+CREATE INDEX pages_title_idx ON public.pages USING btree (title);
 
 
 --

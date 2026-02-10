@@ -16,6 +16,7 @@ export async function load({ fetch, url, cookies }) {
   try {
     const postsFromDb = await symbiont.getAllPages({ fetch, limit: 20 });
     const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+    // TODO: maybe don't send the whole content of all posts to the client on the homepage.
 
     const tagMap = new Map<string, Set<string>>();
     for (const post of allPosts) {

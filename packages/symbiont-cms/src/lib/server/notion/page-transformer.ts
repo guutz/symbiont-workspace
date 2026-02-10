@@ -53,7 +53,7 @@ export class NotionPageToDatabasePageTransformer {
 			pageId: page.id
 		});
 
-		// 1. Extract core metadata (title, tags, authors)
+		// 1. Extract core metadata (title, tags, authors, summary)
 		const coreMeta = this.extractCoreMetadata(page);
 
 		// 2. Check publishing rules
@@ -81,6 +81,7 @@ export class NotionPageToDatabasePageTransformer {
 			title: coreMeta.title,
 			slug,
 			content: processedContent,
+			summary: coreMeta.summary,
 			publish_at: publishDate,
 			updated_at: page.last_edited_time,
 			tags: coreMeta.tags.length > 0 ? coreMeta.tags : null,
@@ -101,6 +102,7 @@ export class NotionPageToDatabasePageTransformer {
 
 	/**
 	 * Process cover image: upload to Supabase and sync URL back to Notion
+	 * Falls back to extracting first image from content if no cover is set
 	 */
 	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
 		if (!this.config.coverProperty) {
@@ -110,8 +112,9 @@ export class NotionPageToDatabasePageTransformer {
 		try {
 			const coverProp = page.properties[this.config.coverProperty];
 			
+			// No cover image in property - try to find one in content
 			if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
-				return null;
+				return await this.extractCoverFromContent(page);
 			}
 
 			const file = coverProp.files[0];
@@ -150,9 +153,38 @@ export class NotionPageToDatabasePageTransformer {
 				return originalUrl; // Already on Supabase
 			}
 			
-			// Handle external files (use as-is)
+			// Handle external files
 			if (file.type === 'external') {
-				const externalUrl = file.external?.url || null;
+				const externalUrl = file.external?.url;
+				if (!externalUrl) return null;
+
+				// Check if external URL needs to be uploaded
+				if (needsUploadToSupabase(externalUrl)) {
+					const result = await uploadImageToSupabase(externalUrl, {
+						supabaseUrl: this.supabaseUrl,
+						serviceRoleKey: this.serviceRoleKey,
+						pageId: page.id
+					});
+					
+					this.logger.info({
+						event: 'cover_image_external_uploaded',
+						pageId: page.id,
+						originalUrl: externalUrl,
+						newUrl: result.newUrl,
+						filename: result.filename
+					});
+
+					// Sync permanent URL back to Notion
+					await this.notionClient.updateFileProperty(
+						page.id,
+						this.config.coverProperty,
+						result.newUrl
+					);
+
+					return result.newUrl;
+				}
+
+				// Already a permanent URL
 				this.logger.info({
 					event: 'cover_image_external',
 					pageId: page.id,
@@ -165,6 +197,59 @@ export class NotionPageToDatabasePageTransformer {
 		} catch (error: any) {
 			this.logger.warn({
 				event: 'cover_image_upload_failed',
+				pageId: page.id,
+				error: error?.message
+			});
+			return null;
+		}
+	}
+
+	/**
+	 * Extract first image from page content to use as cover
+	 */
+	private async extractCoverFromContent(page: PageObjectResponse): Promise<string | null> {
+		try {
+			// Get content as markdown
+			const content = await this.notionClient.pageToMarkdown(page.id);
+			
+			// Find first image in content
+			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/;
+			const match = content.match(imageRegex);
+			
+			if (!match) return null;
+			
+			const [, alt, url] = match;
+			
+			// Upload to Supabase if needed
+			if (needsUploadToSupabase(url)) {
+				const result = await uploadImageToSupabase(url, {
+					supabaseUrl: this.supabaseUrl,
+					serviceRoleKey: this.serviceRoleKey,
+					pageId: page.id,
+					altText: alt || undefined
+				});
+				
+				this.logger.info({
+					event: 'cover_image_extracted_from_content',
+					pageId: page.id,
+					originalUrl: url,
+					newUrl: result.newUrl,
+					filename: result.filename
+				});
+				
+				return result.newUrl;
+			}
+			
+			// Use URL as-is if already permanent
+			this.logger.info({
+				event: 'cover_image_extracted_from_content',
+				pageId: page.id,
+				coverUrl: url
+			});
+			return url;
+		} catch (error: any) {
+			this.logger.warn({
+				event: 'cover_image_content_extraction_failed',
 				pageId: page.id,
 				error: error?.message
 			});
@@ -290,6 +375,7 @@ export class NotionPageToDatabasePageTransformer {
 		title: string;
 		tags: string[];
 		authors: string[];
+		summary: string;
 	} {
 		const title = this.notionClient.getTitleProperty(page);
 
@@ -301,7 +387,11 @@ export class NotionPageToDatabasePageTransformer {
 			? this.notionClient.getPropertyValues(page, this.config.authorsProperty)
 			: [];
 
-		return { title, tags, authors };
+		const summary = this.config.summaryProperty
+			? this.notionClient.getPropertyValues(page, this.config.summaryProperty)?.[0] || ''
+			: '';
+
+		return { title, tags, authors, summary };
 	}
 
 	/**

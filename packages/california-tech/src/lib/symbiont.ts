@@ -50,7 +50,17 @@ export const symbiont = createSymbiontClient({
 				const issueProperty = page.properties.Issue?.select?.name;
 
 				if (!issueProperty) {
-					return null;
+					// @ts-ignore
+					const websiteDate = page.properties['Website Publish Date']?.date?.start;
+					if (websiteDate) {
+						const date = new Date(websiteDate);
+						if (!isNaN(date.getTime())) {
+							return date.toISOString();
+						} else {
+							console.warn(`Invalid date format in Website Publish Date property: "${websiteDate}"`);
+							return null;
+						}
+					}
 				}
 
 				try {
@@ -73,6 +83,7 @@ export const symbiont = createSymbiontClient({
 			tagsProperty: 'Tags',
 			authorsProperty: 'Authors',
 			coverProperty: 'Cover Photo',
+			summaryProperty: 'Website Summary',
 
 			slugRule: (page: PageObjectResponse) => {
 				// @ts-ignore
