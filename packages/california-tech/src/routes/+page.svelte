@@ -4,92 +4,77 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { fly } from 'svelte/transition';
+	import { onMount } from 'svelte';
 
 	import IndexPosts from '$lib/components/index_posts.svelte';
 
 	let { data } = $props();
 
-	// Initialize state from URL params
-	let query = $state(data.query || '');
-	let activeTag = $state(data.tag || '');
+	// State for progressive enhancement
+	let allPreviews = $state<any[]>([]);
+	let previewsLoaded = $state(false);
+	let isLoadingPreviews = $state(false);
 
-	// Sync URL params to state when they change (external navigation)
-	$effect(() => {
-		if (!browser) return;
-		
-		const urlQuery = $page.url.searchParams.get('q') || '';
-		const urlTag = $page.url.searchParams.get('tag') || '';
-		
-		// Only update if URL changed (avoid infinite loop)
-		if (urlQuery !== query) {
-			query = urlQuery;
-		}
-		if (urlTag !== activeTag) {
-			activeTag = urlTag;
-		}
-	});
+	// Always derive from URL (single source of truth)
+	const query = $derived($page.url.searchParams.get('q') || '');
+	const activeTag = $derived($page.url.searchParams.get('tag') || '');
 
-	// Client-side filtering (with JS)
-	const displayedPosts = $derived(
-		browser ? data.allPosts.filter((post) => {
-			const byQuery = query
-				? (post.title?.toLowerCase() || '').includes(query.toLowerCase()) ||
-					(post.summary?.toLowerCase() || '').includes(query.toLowerCase()) ||
-					(post.content?.toLowerCase() || '').includes(query.toLowerCase())
-				: true;
-
-			const byTag = activeTag
-				? post.tags?.some((tag) => typeof tag === 'string' && tag === activeTag)
-				: true;
-
-			return byQuery && byTag;
-		}) : data.posts // Server-filtered posts (no JS)
-	);
-
-	// Sync state changes to URL (when user interacts with filters)
-	// Skip initial mount to avoid overwriting URL params
-	let isInitialMount = true;
-	$effect(() => {
-		if (!browser) return;
-		
-		// Skip the first run (initial mount)
-		if (isInitialMount) {
-			isInitialMount = false;
-			return;
-		}
-
-		const url = new URL($page.url);
-		const params = url.searchParams;
-
-		const currentQuery = params.get('q') || '';
-		const currentTag = params.get('tag') || '';
-
-		// Only update URL if our state is different
-		if (query !== currentQuery || activeTag !== currentTag) {
+	// Client-side filtered posts (uses previews if available, otherwise server data)
+	const displayedPosts = $derived.by(() => {
+		// Use client-side filtering only when filters are active AND previews loaded
+		if (browser && previewsLoaded && allPreviews.length > 0 && (query || activeTag)) {
+			let filtered = allPreviews;
+			
 			if (query) {
-				params.set('q', query);
-			} else {
-				params.delete('q');
+				filtered = filtered.filter((post) =>
+					(post.title?.toLowerCase() || '').includes(query.toLowerCase()) ||
+					(post.summary?.toLowerCase() || '').includes(query.toLowerCase())
+				);
 			}
-
+			
 			if (activeTag) {
-				params.set('tag', activeTag);
-			} else {
-				params.delete('tag');
+				filtered = filtered.filter((post) => post.tags?.includes(activeTag));
 			}
+			
+			return filtered.slice(0, 50); // Show up to 50 results
+		}
+		
+		// Default: use server-rendered posts (always fresh on navigation)
+		return data.posts ?? [];
+	});
 
-			goto(`?${params.toString()}`, { replaceState: true, keepFocus: true, noScroll: true });
+	// Load post previews in background after initial render
+	onMount(async () => {
+		if (!browser || isLoadingPreviews) return;
+		
+		try {
+			isLoadingPreviews = true;
+			const response = await fetch('/api/posts/previews');
+			if (response.ok) {
+				allPreviews = await response.json();
+				previewsLoaded = true;
+			}
+		} catch (error) {
+			console.error('Failed to load post previews:', error);
+		} finally {
+			isLoadingPreviews = false;
 		}
 	});
+
 </script>
 
-<!-- Wider container for newspaper layout -->
 <div
 	itemscope
 	itemtype="https://schema.org/Blog"
 	itemprop="blog"
 	class="flex justify-center items-start max-w-[90rem] mx-auto px-4"
 >
+	{#if isLoadingPreviews && !previewsLoaded}
+		<div class="fixed bottom-4 right-4 px-4 py-2 bg-black/80 text-white dark:bg-white/80 dark:text-black rounded-lg text-sm z-50">
+			Loading enhanced search...
+		</div>
+	{/if}
+	
 	<div
 		in:fly|global={{ y: 100, duration: 300, delay: 300 }}
 		out:fly|global={{ y: -100, duration: 300 }}

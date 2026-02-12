@@ -1,17 +1,27 @@
 <script lang="ts">
-  let className: string | undefined = undefined;
-  export { className as class };
-
-  export let autoplay = true;
-  export let loop = true;
-  export let poster: string | undefined = undefined;
-  export let width: string | undefined = undefined;
-  export let height: string | undefined = undefined;
-  export let title: string | undefined = undefined;
-  export let id: string | undefined = undefined;
-
-  export let webm: string | undefined = undefined;
-  export let mp4: string | undefined = undefined;
+  let {
+    class: className,
+    autoplay = true,
+    loop = true,
+    poster = undefined,
+    width = undefined,
+    height = undefined,
+    title = undefined,
+    id = undefined,
+    webm = undefined,
+    mp4 = undefined,
+  }: {
+    class?: string;
+    autoplay?: boolean;
+    loop?: boolean;
+    poster?: string;
+    width?: string;
+    height?: string;
+    title?: string;
+    id?: string;
+    webm?: string;
+    mp4?: string;
+  } = $props();
 </script>
 
 <video

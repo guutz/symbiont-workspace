@@ -1,6 +1,15 @@
 <script lang="ts">
-  export let statusName: string | undefined = undefined;
-  export let statusType: 'info' | 'tip' | 'caution' | 'error' | 'danger' | undefined = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    statusName = undefined,
+    statusType = undefined,
+    children,
+  }: {
+    statusName?: string;
+    statusType?: 'info' | 'tip' | 'caution' | 'error' | 'danger';
+    children?: Snippet;
+  } = $props();
 </script>
 
 {#if statusType}
@@ -30,7 +39,7 @@
     </div>
 
     <section>
-      <slot />
+      {@render children?.()}
     </section>
   </aside>
 {/if}

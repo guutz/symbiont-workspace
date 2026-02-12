@@ -3,20 +3,17 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
 
-  let className: string | undefined = undefined;
-  export { className as class };
+  let { class: className, width = '128px', height = '128px' }: { class?: string; width?: string; height?: string } =
+    $props();
 
-  export let width = '128px';
-  export let height = '128px';
-
-  let loaded = false;
+  let loaded = $state(false);
   onMount(() => {
     loaded = true;
   });
 </script>
 
 <figure class="avatar select-none">
-  {#if loaded && siteConfig.author.avatar && siteConfig.author.avatar_128}
+  {#if loaded && siteConfig.author?.avatar && siteConfig.author?.avatar_128}
     <picture in:fade|global={{ duration: 300, delay: 300 }} out:fade|global={{ duration: 300 }} class="u-photo">
       <!--
         /@imagetools/... get transformed to ./_app/immutable/assets/...

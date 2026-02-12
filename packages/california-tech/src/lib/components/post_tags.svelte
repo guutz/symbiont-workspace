@@ -1,13 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import tippy from '$lib/actions/tippy';
 
-  export let tags: [];
-  let formattedTags: { category: string; name: string; url: string }[];
-
-  onMount(async () => {
-    formattedTags = tags
-      ?.map((c: string | string[] | { string: string } | { string: string[] }) => {
+  let { tags = [] }: { tags?: Array<string | string[] | Record<string, string | string[]>> } = $props();
+  const formattedTags = $derived.by(() =>
+    tags
+      ?.map((c) => {
         if (typeof c === 'string') return { category: 'tags', name: c, url: `/?tags=${c}` };
         if (Array.isArray(c)) {
           return c.map((v) => {
@@ -22,8 +19,8 @@
         }
         return { category: key, name: value, url: `/?tags-${key}=${value}` };
       })
-      .flat();
-  });
+      .flat(),
+  );
 </script>
 
 {#if formattedTags}

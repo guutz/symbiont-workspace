@@ -1,6 +1,5 @@
 <script lang="ts">
-  export let name: string;
-  export let icon: string | undefined;
+  let { name, icon }: { name: string; icon?: string } = $props();
 </script>
 
 <div class="flex items-center justify-start cursor-pointer">

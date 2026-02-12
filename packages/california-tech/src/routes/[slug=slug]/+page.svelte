@@ -16,18 +16,19 @@
 	// Stores
 	import { tocCur } from '$stores/toc';
 	
-	export let data: PageData;
+	let { data }: { data: PageData } = $props();
 	
 	// Data is already in QWER format from the server
-	$: post = data.post;
+	const post = $derived(data.post);
 	
 	let observer: IntersectionObserver;
 	let postElement: HTMLElement;
 	
 	// TOC scroll tracking
-	$: if (postElement) {
+	$effect(() => {
+		if (!postElement) return;
 		if (observer) observer.disconnect();
-		
+
 		observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
@@ -43,7 +44,7 @@
 			},
 			{ rootMargin: '-64px 0px -64px 0px' },
 		);
-		
+
 		// Assign toc-heading attributes
 		const article = postElement.querySelector('article');
 		if (article?.children) {
@@ -57,7 +58,11 @@
 				observer.observe(child);
 			}
 		}
-	}
+
+		return () => {
+			if (observer) observer.disconnect();
+		};
+	});
 	
 	onMount(() => {
 		// Scroll to hash after mount

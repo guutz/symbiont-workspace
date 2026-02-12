@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TOC } from '$lib/types/toc';
   import TocContent from '$lib/components/toc_content.svelte';
-  export let toc: TOC.Heading[] | undefined;
+  let { toc }: { toc?: TOC.Heading[] } = $props();
   import { tocCur } from '$stores/toc';
   import { browser } from '$app/environment';
   import { strings } from '$lib/strings';
@@ -94,19 +94,22 @@
     document.removeEventListener('touchend', touchEndHandler);
   }
 
-  let box: Element;
-  let boxH: number;
-  let upMore = false;
-  let downMore = false;
+  let box = $state<Element | null>(null);
+  let boxH = $state(0);
+  let upMore = $state(false);
+  let downMore = $state(false);
 
-  $: if (browser && box) {
-    const top = 0;
-    const bot = box.scrollHeight - boxH;
-    upMore = box.scrollTop > top;
-    downMore = box.scrollTop < bot;
-  }
+  $effect(() => {
+    if (browser && box) {
+      const top = 0;
+      const bot = box.scrollHeight - boxH;
+      upMore = box.scrollTop > top;
+      downMore = box.scrollTop < bot;
+    }
+  });
 
   function handleScroll() {
+    if (!box) return;
     const top = 0;
     const bot = box.scrollHeight - boxH;
     upMore = box.scrollTop > top;
@@ -131,12 +134,12 @@
     }
   }
 
-  let scrollY: number;
+  let scrollY = $state(0);
   let lastY = 0;
-  let scrollingUp = false;
 
-  $: if (browser) {
-    scrollingUp = lastY - scrollY > 0;
+  $effect(() => {
+    if (!browser) return;
+    const scrollingUp = lastY - scrollY > 0;
     lastY = scrollY;
 
     const post_toc = document.getElementById('post-toc');
@@ -154,7 +157,7 @@
         post_toc.scrollTo({ top, behavior: 'smooth' });
       }
     }
-  }
+  });
 </script>
 
 <svelte:window bind:scrollY />
@@ -164,17 +167,20 @@
     <div
       role="button"
       tabindex="0"
-      on:mousedown={mouseDownHandler}
-      on:touchstart|preventDefault={touchStartHandler}
+      onmousedown={mouseDownHandler}
+      ontouchstart={(e) => {
+        e.preventDefault();
+        touchStartHandler(e);
+      }}
       class="flex-col">
       <span
         role="button"
         tabindex="0"
         class="text-2xl font-bold px4 py2 text-center cursor-pointer"
-        on:click={() => {
+        onclick={() => {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        on:keydown={(e) => {
+        onkeydown={(e) => {
           if (e.key === 'Enter') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
@@ -184,9 +190,9 @@
       <div
         role="button"
         tabindex="0"
-        on:click={handleUpMore}
-        on:touchend={handleUpMore}
-        on:keydown={(e) => {
+        onclick={handleUpMore}
+        ontouchend={handleUpMore}
+        onkeydown={(e) => {
           if (e.key === 'Enter') {
             handleUpMore();
           }
@@ -198,7 +204,7 @@
         <ul
           bind:this={box}
           bind:clientHeight={boxH}
-          on:scroll={handleScroll}
+          onscroll={handleScroll}
           id="post-toc"
           class="my2 text-base font-semibold flex flex-col max-h-60vh cursor-grab overflow-hidden">
           {#each toc as c}
@@ -209,9 +215,9 @@
       <div
         role="button"
         tabindex="0"
-        on:click={handleDownMore}
-        on:touchend={handleDownMore}
-        on:keydown={(e) => {
+        onclick={handleDownMore}
+        ontouchend={handleDownMore}
+        onkeydown={(e) => {
           if (e.key === 'Enter') {
             handleDownMore();
           }

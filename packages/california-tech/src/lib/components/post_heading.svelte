@@ -7,9 +7,9 @@
   import AuthorAvatar from '$lib/components/image_avatar.svelte';
     import { strings } from '$lib/strings';
 
-  export let data: Post.Post;
+  let { data }: { data: Post.Post } = $props();
   // Show the coverInPost by default
-  const showCoverInPost = data.coverInPost ?? true;
+  const showCoverInPost = $derived(data.coverInPost ?? true);
 </script>
 
 <div class="flex flex-col pt8 mx8">

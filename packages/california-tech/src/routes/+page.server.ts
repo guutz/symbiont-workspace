@@ -14,19 +14,25 @@ export const prerender = false;
 
 export async function load({ fetch, url, cookies }) {
   try {
-    const postsFromDb = await symbiont.getAllPages({ fetch, limit: 20 });
-    const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
-    // TODO: maybe don't send the whole content of all posts to the client on the homepage.
+    const query = url.searchParams.get('q')?.toLowerCase() || '';
+    const tag = url.searchParams.get('tag') || '';
 
+    // For initial page load: fetch enough for tag cloud + initial display
+    // Client will progressively load more for filtering
+    const INITIAL_LIMIT = query || tag ? 1000 : 30; // Full search if filtered, else fast initial load
+    const postsFromDb = await symbiont.getAllPages({ fetch, limit: INITIAL_LIMIT });
+    const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+
+    // Build tags from all posts for consistent tag cloud
     const tagMap = new Map<string, Set<string>>();
     for (const post of allPosts) {
       if (post.tags && Array.isArray(post.tags)) {
-        for (const tag of post.tags) {
-          if (typeof tag === 'string') {
+        for (const postTag of post.tags) {
+          if (typeof postTag === 'string') {
             if (!tagMap.has('tags')) tagMap.set('tags', new Set());
-            tagMap.get('tags')!.add(tag);
-          } else if (typeof tag === 'object' && tag !== null) {
-            Object.entries(tag).forEach(([category, value]) => {
+            tagMap.get('tags')!.add(postTag);
+          } else if (typeof postTag === 'object' && postTag !== null) {
+            Object.entries(postTag).forEach(([category, value]) => {
               if (!tagMap.has(category)) tagMap.set(category, new Set());
               if (Array.isArray(value)) {
                 value.forEach(v => tagMap.get(category)!.add(String(v)));
@@ -38,6 +44,7 @@ export async function load({ fetch, url, cookies }) {
         }
       }
     }
+    
     const allTags: Tags.Category[] = Array.from(tagMap.entries()).map(([categoryName, tagSet]) => ({
       name: categoryName,
       tags: Array.from(tagSet).map(tagName => ({ name: tagName, category: categoryName })),
@@ -47,36 +54,40 @@ export async function load({ fetch, url, cookies }) {
       return a.name.localeCompare(b.name);
     });
 
-    const query = url.searchParams.get('q')?.toLowerCase() || '';
-    const tag = url.searchParams.get('tag') || ''; // Preserve case!
-
-    let posts: Post.Post[] = allPosts;
+    // Server-side filtering
+    let filteredPosts = allPosts;
 
     if (tag) {
-      posts = posts.filter(post => (post.tags ?? []).some(postTag => {
-        if (typeof postTag === 'string') return postTag === tag; // Case-sensitive
-        if (typeof postTag === 'object' && postTag !== null) return Object.values(postTag).flat().some(t => String(t) === tag);
+      filteredPosts = filteredPosts.filter(post => (post.tags ?? []).some(postTag => {
+        if (typeof postTag === 'string') return postTag === tag;
+        if (typeof postTag === 'object' && postTag !== null) {
+          return Object.values(postTag).flat().some(t => String(t) === tag);
+        }
         return false;
       }));
     }
 
     if (query) {
-      posts = posts.filter(post =>
+      filteredPosts = filteredPosts.filter(post =>
         post.title.toLowerCase().includes(query) ||
-        (post.content ?? '').toLowerCase().includes(query)
+        (post.summary ?? '').toLowerCase().includes(query)
       );
     }
 
+    // Strip content/html from filtered results (keep summary for display)
+    const posts = filteredPosts.slice(0, 30).map(({ content, html, ...post }) => post);
+
     return {
-      allPosts, // <-- The full, unfiltered list for client-side enhancement
-      posts,    // <-- The initially filtered list for SSR
-      allTags,
+      posts,         // Initial posts for fast FCP/LCP
+      allTags,       // Tag cloud data
       query,
       tag,
+      hasMore: filteredPosts.length > 30, // Signal that more results exist
+      totalCount: filteredPosts.length,   // Total matching posts
       theme: cookies.get('theme') || 'light',
     };
   } catch (error) {
     console.error('[+page.server.ts] Error loading page data:', error);
-    return { allPosts: [], posts: [], allTags: [], query: '', tag: '', theme: 'light' };
+    return { posts: [], allTags: [], query: '', tag: '', hasMore: false, totalCount: 0, theme: 'light' };
   }
 }

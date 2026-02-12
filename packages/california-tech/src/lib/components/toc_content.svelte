@@ -2,10 +2,10 @@
   import { slide } from 'svelte/transition';
   import type { TOC } from '$lib/types/toc';
   import { tocCur } from '$stores/toc';
+  import Self from '$lib/components/toc_content.svelte';
 
-  export let content: TOC.Heading;
-  export let expanded = false;
-  export let depth = 1;
+  let { content, expanded = false, depth = 1 }: { content: TOC.Heading; expanded?: boolean; depth?: number } = $props();
+  let isExpanded = $state(expanded);
 
   function handleClick() {
     // Use the slug directly as a hash to navigate
@@ -34,10 +34,10 @@
   <div
     role="button"
     tabindex="0"
-    on:click={handleClick}
-    on:touchstart={touchStartHandler}
-    on:touchend={touchEndHandler}
-    on:keydown={(e) => {
+    onclick={handleClick}
+    ontouchstart={touchStartHandler}
+    ontouchend={touchEndHandler}
+    onkeydown={(e) => {
       if (e.key === 'Enter') {
         handleClick();
       }
@@ -53,15 +53,16 @@
       <span
         role="button"
         tabindex="0"
-        on:click|stopPropagation={() => {
-          expanded = !expanded;
+        onclick={(e) => {
+          e.stopPropagation();
+          isExpanded = !isExpanded;
         }}
-        on:keydown={(e) => {
+        onkeydown={(e) => {
           if (e.key === 'Enter') {
-            expanded = !expanded;
+            isExpanded = !isExpanded;
           }
         }}
-        class="cursor-pointer z10 !w-[1.25rem] !h-[1.25rem] inline-block transition-transform duration-300 ease-out shrink-0 {expanded
+        class="cursor-pointer z10 !w-[1.25rem] !h-[1.25rem] inline-block transition-transform duration-300 ease-out shrink-0 {isExpanded
           ? 'i-akar-icons-circle-chevron-up active:translate-y--1 hover:i-akar-icons-circle-chevron-up-fill'
           : 'i-akar-icons-circle-chevron-down active:translate-y-1 hover:i-akar-icons-circle-chevron-down-fill'}"></span>
     {:else}
@@ -75,10 +76,10 @@
     </span>
   </div>
   {#if content.child && content.child.length > 0}
-    {#if expanded}
+    {#if isExpanded}
       <ul transition:slide|global={{ duration: 300 }} class="flex flex-col">
         {#each content.child as c}
-          <svelte:self content={c} depth={depth + 1} expanded />
+          <Self content={c} depth={depth + 1} expanded />
         {/each}
       </ul>
     {/if}

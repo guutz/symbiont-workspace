@@ -8,8 +8,9 @@
   import type { Post } from '$lib/types/post';
   import { siteConfig } from '$config/site';
 
-  export let post: Post.Post;
-  let post_cover: Asset.Image | undefined | string = $assets.get(post.cover ?? '') || post.cover;
+  let { post }: { post: Post.Post } = $props();
+  const post_cover = $derived.by(() => $assets.get(post.cover ?? '') || post.cover);
+  const primaryAuthor = $derived(post.authors?.[0] ?? siteConfig.title);
 </script>
 
 <svelte:head>
@@ -31,7 +32,7 @@
   <meta property="og:url" content={new URL(post.slug, siteConfig.url).href} />
   <meta property="twitter:url" content={new URL(post.slug, siteConfig.url).href} />
 
-  <meta property="article:author" content={post.author ?? siteConfig.title} />
+  <meta property="article:author" content={primaryAuthor} />
   <meta property="article:published_time" content={post.published} />
   <meta property="article:modified_time" content={post.updated} />
 
@@ -63,7 +64,7 @@
       author: [
         {
           '@type': 'Person',
-          name: post.author ?? siteConfig.title
+          name: primaryAuthor
         },
       ],
     }) + '<'

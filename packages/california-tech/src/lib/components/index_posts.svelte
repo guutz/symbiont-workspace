@@ -5,7 +5,7 @@
 	import IndexPost from '$lib/components/index_post.svelte';
 	import type { Post } from '$lib/types/post';
 
-	let { posts, class: className }: { posts: Post.Post[]; class?: string } = $props();
+	let { posts = [], class: className }: { posts?: Post.Post[]; class?: string } = $props();
 </script>
 
 <main

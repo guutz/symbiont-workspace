@@ -3,12 +3,9 @@
   import Tag from '$lib/components/tag.svelte';
   import type { Tags } from '$lib/types/tags';
 
-  let className: string | undefined = undefined;
-  export { className as class };
-
-  export let expanded = false;
-
-  export let data: Tags.Category;
+  let { class: className, expanded = false, data }: { class?: string; expanded?: boolean; data: Tags.Category } =
+    $props();
+  let isExpanded = $state(expanded);
   const tags = data.tags?.sort((a, b) => {
     return String(a.name).localeCompare(String(b.name), 'zh-u-co-zhuyin');
   });
@@ -20,15 +17,15 @@
   tabindex="0"
   class="flex justify-between items-center border-b-1 border-black dark:border-white py2 cursor-pointer {className ??
     ''}"
-  on:click={() => {
-    expanded = !expanded;
+  onclick={() => {
+    isExpanded = !isExpanded;
   }}
-  on:touchstart={() => {
-    expanded = !expanded;
+  ontouchstart={() => {
+    isExpanded = !isExpanded;
   }}
-  on:keydown={(e) => {
+  onkeydown={(e) => {
     if (e.key === 'Enter') {
-      expanded = !expanded;
+      isExpanded = !isExpanded;
     }
   }}>
   {#if data.name !== 'tags'}
@@ -39,12 +36,12 @@
     <h3 class:expanded>#</h3>
   {/if}
   <div
-    class="{expanded
+    class="{isExpanded
       ? 'i-tabler-fold-down'
       : 'i-tabler-fold-up'} display-inline-block !w-[1.25rem] !h-[1.25rem] ml-auto"></div>
 </div>
 
-{#if expanded && tags}
+{#if isExpanded && tags}
   <div transition:slide|global={{ duration: 300 }} class="flex flex-row flex-wrap my-2">
     {#each tags as t}
       <Tag data={t} />

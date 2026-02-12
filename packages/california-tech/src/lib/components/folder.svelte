@@ -1,13 +1,14 @@
 <script lang="ts">
   import File from '$lib/components/file.svelte';
+  import Self from '$lib/components/folder.svelte';
   import type { Folder } from '$lib/types/folder';
 
-  export let expanded = true;
-  export let name: string;
-  export let files: Array<Folder.Item>;
+  let { expanded = true, name, files = [] }: { expanded?: boolean; name: string; files?: Array<Folder.Item> } =
+    $props();
+  let isExpanded = $state(expanded);
 
   function toggle() {
-    expanded = !expanded;
+    isExpanded = !isExpanded;
   }
 </script>
 
@@ -15,25 +16,25 @@
   role="button"
   tabindex="0"
   class="flex justify-start items-center cursor-pointer"
-  on:click={toggle}
-  on:keydown={(e) => {
+  onclick={toggle}
+  onkeydown={(e) => {
     if (e.key === 'Enter') {
       toggle();
     }
   }}>
   <div
-    class="{expanded ? 'i-fluent-emoji-flat-open-file-folder' : 'i-fluent-emoji-flat-file-folder'} !w8 !h8 shrink-0"></div>
+    class="{isExpanded ? 'i-fluent-emoji-flat-open-file-folder' : 'i-fluent-emoji-flat-file-folder'} !w8 !h8 shrink-0"></div>
   <div class="px2">
     {name}
   </div>
 </div>
 
-{#if expanded}
+{#if isExpanded}
   <ul>
     {#each files as file}
       <li>
         {#if file.files}
-          <svelte:self {...file} />
+          <Self name={file.name} files={file.files ?? []} />
         {:else}
           <File name={file.name} icon={file.icon} />
         {/if}

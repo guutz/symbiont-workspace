@@ -7,33 +7,46 @@
   import { assets } from '$generated/assets';
   import { UserConfig } from '$config/QWER.config';
   import { fade } from 'svelte/transition';
-  import { onMount, afterUpdate } from 'svelte';
+  import { onMount } from 'svelte';
   import mediumZoom from 'medium-zoom';
 
-  let imgElement: HTMLElement;
+  let imgElement = $state<HTMLElement | null>(null);
   // Reference to the container element for responsive adjustments
-  let containerElement: HTMLElement;
+  let containerElement = $state<HTMLElement | null>(null);
 
-  let className: string | undefined = undefined;
-  export { className as class };
+  import type { Snippet } from 'svelte';
 
-  export let captionClass: string | undefined = undefined;
+  let {
+    class: className,
+    captionClass = undefined,
+    src,
+    alt = src,
+    loading = 'lazy',
+    decoding = 'async',
+    width = undefined,
+    height = undefined,
+    children,
+  }: {
+    class?: string;
+    captionClass?: string;
+    src: string;
+    alt?: string;
+    loading?: 'eager' | 'lazy';
+    decoding?: 'async' | 'sync' | 'auto';
+    width?: string | number;
+    height?: string | number;
+    children?: Snippet;
+  } = $props();
 
-  export let src: string;
-  export let alt: string = src;
-  export let loading: 'eager' | 'lazy' = 'lazy';
-  export let decoding: 'async' | 'sync' | 'auto' = 'async';
-  export let width: string | number | undefined = undefined;
-  export let height: string | number | undefined = undefined;
-
-  let asset: Asset.Image | undefined = $assets.get(src);
-  const resolutions: Array<[string, any]> =
+  const asset = $derived($assets.get(src));
+  const resolutions = $derived.by(() =>
     UserConfig['ExtraResolutions'] &&
     Object.entries(UserConfig.ExtraResolutions)
       .filter((e) => asset && asset[e[0] as keyof Asset.Image])
       .sort((a, b) => {
         return +b[0] - +a[0];
-      });
+      }),
+  );
 
   const getSrcset = function (res: string, index: number) {
     if (!asset) return;
@@ -47,8 +60,8 @@
     }
   };
 
-  $: width = asset?.width;
-  $: height = asset?.height;
+  const derivedWidth = $derived(asset?.width ?? width);
+  const derivedHeight = $derived(asset?.height ?? height);
 
   // Function for responsive image size adjustment
   const updateImageSize = () => {
@@ -60,10 +73,12 @@
   };
 
   onMount(() => {
-    mediumZoom(imgElement, {
-      scrollOffset: 0,
-      background: 'rgba(25, 18, 25, .9)',
-    });
+    if (imgElement) {
+      mediumZoom(imgElement, {
+        scrollOffset: 0,
+        background: 'rgba(25, 18, 25, .9)',
+      });
+    }
 
     // Add window resize listener for responsive adjustments
     window.addEventListener('resize', updateImageSize);
@@ -75,8 +90,7 @@
     };
   });
 
-  // Adjust image size after each update to maintain responsiveness
-  afterUpdate(() => {
+  $effect(() => {
     updateImageSize();
   });
 </script>
@@ -123,13 +137,13 @@
         draggable="false"
         itemprop="image"
         class="z-50 m-auto md:rounded-2xl md:shadow-xl {className ?? 'w-full h-auto max-w-full object-contain'}"
-        style="aspect-ratio: {width} / {height};"
+        style="aspect-ratio: {derivedWidth} / {derivedHeight};"
         {decoding}
         {loading}
         src={asset.original}
         {alt}
-        {width}
-        {height} />
+        width={derivedWidth}
+        height={derivedHeight} />
     </picture>
   {:else}
     <img
@@ -137,15 +151,15 @@
       draggable="false"
       itemprop="image"
       class="z-50 m-auto md:rounded-2xl md:shadow-xl {className ?? 'w-full h-auto max-w-full object-contain'}"
-      style="aspect-ratio: {width} / {height};"
+        style="aspect-ratio: {derivedWidth} / {derivedHeight};"
       {decoding}
       {loading}
       {src}
       {alt}
-      {width}
-      {height} />
+      width={derivedWidth}
+      height={derivedHeight} />
   {/if}
   <figcaption class={captionClass ?? 'italic op70 text-center mt2'}>
-    <slot />
+    {@render children?.()}
   </figcaption>
 </figure>

@@ -8,20 +8,29 @@
   import { UserConfig } from '$config/QWER.config';
   import { fade } from 'svelte/transition';
 
-  export let pictureClass: string | undefined = undefined;
-  export let imgClass: string | undefined = undefined;
-
-  export let src: string;
-  export let alt: string = src;
-  export let loading: 'eager' | 'lazy' = 'eager';
-  export let decoding: 'async' | 'sync' | 'auto' = 'async';
-  export let width: string | number | undefined = undefined;
-  export let height: string | number | undefined = undefined;
+  let {
+    pictureClass = undefined,
+    imgClass = undefined,
+    src,
+    alt = src,
+    loading = 'eager',
+    decoding = 'async',
+    width = undefined,
+    height = undefined,
+  }: {
+    pictureClass?: string;
+    imgClass?: string;
+    src: string;
+    alt?: string;
+    loading?: 'eager' | 'lazy';
+    decoding?: 'async' | 'sync' | 'auto';
+    width?: string | number;
+    height?: string | number;
+  } = $props();
 
   let asset: Asset.Image | undefined = $assets.get(src);
-
-  $: width = asset?.width;
-  $: height = asset?.height;
+  const derivedWidth = $derived(asset?.width ?? width);
+  const derivedHeight = $derived(asset?.height ?? height);
 </script>
 
 {#if asset}
@@ -51,9 +60,18 @@
       {loading}
       src={asset.original}
       {alt}
-      {width}
-      {height} />
+      width={derivedWidth}
+      height={derivedHeight} />
   </picture>
 {:else}
-  <img draggable="false" itemprop="image" class={imgClass} {decoding} {loading} {src} {alt} {width} {height} />
+  <img
+    draggable="false"
+    itemprop="image"
+    class={imgClass}
+    {decoding}
+    {loading}
+    {src}
+    {alt}
+    width={derivedWidth}
+    height={derivedHeight} />
 {/if}

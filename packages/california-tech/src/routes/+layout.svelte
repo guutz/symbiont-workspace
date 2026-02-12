@@ -14,17 +14,25 @@
   import Header from '$lib/components/header.svelte';
   import Footer from '$lib/components/footer.svelte';
   import type { LayoutData } from './$types';
+  import type { Snippet } from 'svelte';
 
-  export let data: LayoutData;
+  let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
   import { navigating } from '$app/stores';
   import NProgress from 'nprogress';
   import '$lib/styles/nprogress.css';
   // Full list: https://github.com/rstacruz/nprogress#configuration
   NProgress.configure({ minimum: 0.2, easing: 'ease', speed: 600 });
-  $: $navigating ? NProgress.start() : NProgress.done();
+  $effect(() => {
+    if ($navigating) {
+      NProgress.start();
+    } else {
+      NProgress.done();
+    }
+  });
 
   import { browser } from '$app/environment';
+  import { afterNavigate } from '$app/navigation';
   import { siteConfig } from '$config/site';
   import { onMount } from 'svelte';
   // import { partytownSnippet } from '@qwik.dev/partytown/integration';
@@ -37,6 +45,13 @@
     if (browser) {
       document.documentElement.setAttribute('lang', siteConfig.lang);
     }
+  });
+
+  afterNavigate(({ to, from }) => {
+    if (!browser || !to) return;
+    if (to.url.hash) return;
+    if (from && to.url.pathname === from.url.pathname && to.url.search === from.url.search) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   });
 </script>
 
@@ -58,7 +73,7 @@
     in:fly|global={{ y: 100, duration: 300, delay: 300 }}
     out:fly|global={{ y: -100, duration: 300 }}
     class="min-h-75vh">
-    <slot />
+    {@render children()}
   </div>
 {/key}
 
