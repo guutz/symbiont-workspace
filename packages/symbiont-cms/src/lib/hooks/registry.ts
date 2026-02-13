@@ -9,7 +9,44 @@ import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.j
  * - Execute hooks in order with proper error handling
  * - Manage control flow (abort, skip)
  * 
- * @example
+ * Hook Data Flow:
+ * Hooks execute sequentially in priority order. Each hook receives the OUTPUT
+ * of the previous hook as its INPUT via ctx.data. This allows hooks to compose:
+ * 
+ * 1. Hook A (priority 30) receives initial data, returns modified data
+ * 2. Hook B (priority 40) receives Hook A's output, returns further modified data
+ * 3. Hook C (priority 50) receives Hook B's output, returns final result
+ * 
+ * Changes made by earlier hooks are preserved and passed through to later hooks.
+ * Each hook can:
+ * - Transform the data and return it (data flows to next hook)
+ * - Call ctx.skip() to pass data unchanged to next hook
+ * - Call ctx.abort() to stop all further processing
+ * 
+ * @example Basic hook composition
+ * // Hook 1: Extract base metadata (priority 30)
+ * {
+ *   name: 'meta:base',
+ *   event: 'metadata:custom',
+ *   priority: 30,
+ *   fn: async (ctx) => ({
+ *     layout: ctx.page.properties.Layout?.select?.name
+ *   })
+ * }
+ * 
+ * // Hook 2: Add SEO fields (priority 40)
+ * {
+ *   name: 'meta:seo',
+ *   event: 'metadata:custom',
+ *   priority: 40,
+ *   fn: async (ctx) => ({
+ *     ...ctx.data,  // ← Hook 1's output (has layout)
+ *     ogImage: ctx.page.properties.OGImage?.url
+ *   })
+ *   // Returns: { layout: 'article', ogImage: 'https://...' }
+ * }
+ * 
+ * @example Single hook usage
  * const registry = new HookRegistry(logger);
  * 
  * registry.register({

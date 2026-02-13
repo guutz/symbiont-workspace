@@ -147,6 +147,66 @@ Hooks can control execution flow:
 }
 ```
 
+### Data Flow Through Hooks
+
+**Key Concept:** Hooks execute sequentially in priority order, and each hook receives the OUTPUT of the previous hook as its INPUT via `ctx.data`.
+
+**This means:**
+- Changes made by earlier hooks are preserved and passed to later hooks
+- Later hooks can build upon or modify what earlier hooks did
+- Data flows through the chain: Hook A → Hook B → Hook C → Final Result
+
+**Example:**
+
+```typescript
+// Hook 1: Extract base metadata (priority 30)
+{
+  name: 'meta:base',
+  event: 'metadata:custom',
+  priority: 30,
+  fn: async (ctx) => {
+    // ctx.data = {} (initial/empty)
+    return {
+      layout: ctx.page.properties.Layout?.select?.name
+    };
+    // Returns: { layout: 'article' }
+  }
+}
+
+// Hook 2: Add SEO fields (priority 40)
+{
+  name: 'meta:seo',
+  event: 'metadata:custom',
+  priority: 40,
+  fn: async (ctx) => {
+    // ctx.data = { layout: 'article' } ← Output from Hook 1!
+    return {
+      ...ctx.data,  // Preserve Hook 1's data
+      ogImage: ctx.page.properties.OGImage?.url,
+      keywords: ctx.page.properties.Keywords?.multi_select?.map(k => k.name)
+    };
+    // Returns: { layout: 'article', ogImage: '...', keywords: [...] }
+  }
+}
+
+// Hook 3: Add computed fields (priority 50)
+{
+  name: 'meta:computed',
+  event: 'metadata:custom',
+  priority: 50,
+  fn: async (ctx) => {
+    // ctx.data = { layout: 'article', ogImage: '...', keywords: [...] }
+    return {
+      ...ctx.data,  // Preserve all previous data
+      wordCount: calculateWordCount(ctx.page)
+    };
+    // Final result: { layout: 'article', ogImage: '...', keywords: [...], wordCount: 1250 }
+  }
+}
+```
+
+**Important:** Each hook's return value becomes the `ctx.data` for the next hook. This is how hooks compose and build upon each other without overwriting previous changes.
+
 ---
 
 ## Migration Steps

@@ -14,7 +14,7 @@ import { defaultHooks } from '../../hooks/default-hooks.js';
  * NotionPageToDatabasePageTransformer - Business logic for transforming Notion pages into database page data
  * 
  * Responsibilities:
- * - Apply publishing rules (via hooks or legacy rules)
+ * - Apply publishing rules via hooks
  * - Extract metadata (title, tags, authors, custom metadata)
  * - Resolve slugs (handle conflicts, sync back to Notion)
  * - Orchestrate content fetching
@@ -25,7 +25,7 @@ import { defaultHooks } from '../../hooks/default-hooks.js';
  * Hook System:
  * - Registers default hooks + user hooks
  * - Executes hooks at appropriate lifecycle events
- * - Falls back to legacy rules if no hooks are defined
+ * - Data flows through hooks: each hook receives data from previous hook
  */
 export class NotionPageToDatabasePageTransformer {
 	private logger: ReturnType<typeof createLogger>;
@@ -376,7 +376,7 @@ export class NotionPageToDatabasePageTransformer {
 	 * 
 	 * Merges:
 	 * - System-managed fields (cover URL, etc.)
-	 * - Custom user-extracted metadata (via hooks or legacy metadataExtractor)
+	 * - Custom user-extracted metadata (via metadata:custom hook)
 	 * 
 	 * This makes it easy to add more system fields in the future
 	 * (e.g., processing status, image count, word count, etc.)
@@ -393,33 +393,19 @@ export class NotionPageToDatabasePageTransformer {
 			metadata.cover = systemFields.coverUrl;
 		}
 
-		// Try to get custom metadata via hooks
-		try {
-			const customMeta = await this.hookRegistry.execute<Record<string, any>, Record<string, any>>(
-				'metadata:custom',
-				{
-					page,
-					config: this.config,
-					data: metadata, // Pass system fields as initial data
-					logger: this.logger
-				}
-			);
-
-			// Merge hook result
-			Object.assign(metadata, customMeta);
-		} catch (error) {
-			this.logger.warn({
-				event: 'hook_fallback',
-				hookEvent: 'metadata:custom',
-				error: error instanceof Error ? error.message : String(error)
-			});
-
-			// Legacy fallback: use metadataExtractor
-			const legacyMeta = this.config.metadataExtractor?.(page);
-			if (legacyMeta) {
-				Object.assign(metadata, legacyMeta);
+		// Get custom metadata via hooks
+		const customMeta = await this.hookRegistry.execute<Record<string, any>, Record<string, any>>(
+			'metadata:custom',
+			{
+				page,
+				config: this.config,
+				data: metadata, // Pass system fields as initial data
+				logger: this.logger
 			}
-		}
+		);
+
+		// Merge hook result
+		Object.assign(metadata, customMeta);
 
 		// Return null if empty (cleaner than empty object in database)
 		return Object.keys(metadata).length > 0 ? metadata : null;
@@ -456,26 +442,13 @@ export class NotionPageToDatabasePageTransformer {
 	 * Uses slug:extract and slug:generate hooks
 	 */
 	private async resolveSlug(page: PageObjectResponse, title: string): Promise<string> {
-		// 1. Try to extract custom slug via hooks or legacy rule
-		let customSlug: string | null = null;
-
-		try {
-			customSlug = await this.hookRegistry.execute<null, string | null>('slug:extract', {
-				page,
-				config: this.config,
-				data: null,
-				logger: this.logger
-			});
-		} catch (error) {
-			this.logger.warn({
-				event: 'hook_fallback',
-				hookEvent: 'slug:extract',
-				error: error instanceof Error ? error.message : String(error)
-			});
-
-			// Legacy fallback
-			customSlug = this.config.slugRule?.(page) ?? null;
-		}
+		// 1. Extract custom slug via hooks
+		const customSlug = await this.hookRegistry.execute<null, string | null>('slug:extract', {
+			page,
+			config: this.config,
+			data: null,
+			logger: this.logger
+		});
 
 		// 2. Check if page already exists in DB
 		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
@@ -502,29 +475,16 @@ export class NotionPageToDatabasePageTransformer {
 				slugChanged = false;
 			}
 		} else {
-			// New page or existing page without slug - generate via hooks or legacy
-			let baseSlug: string;
-
-			try {
-				baseSlug = await this.hookRegistry.execute<{ title: string; customSlug: string | null }, string>(
-					'slug:generate',
-					{
-						page,
-						config: this.config,
-						data: { title, customSlug },
-						logger: this.logger
-					}
-				);
-			} catch (error) {
-				this.logger.warn({
-					event: 'hook_fallback',
-					hookEvent: 'slug:generate',
-					error: error instanceof Error ? error.message : String(error)
-				});
-
-				// Legacy fallback
-				baseSlug = customSlug || createSlug(title);
-			}
+			// New page or existing page without slug - generate via hooks
+			const baseSlug = await this.hookRegistry.execute<{ title: string; customSlug: string | null }, string>(
+				'slug:generate',
+				{
+					page,
+					config: this.config,
+					data: { title, customSlug },
+					logger: this.logger
+				}
+			);
 
 			slug = await this.ensureUniqueSlug(baseSlug);
 			slugChanged = true;
@@ -588,87 +548,41 @@ export class NotionPageToDatabasePageTransformer {
 	}
 
 	/**
-	 * Check if page should be excluded from sync (apply excludeRule or page:exclude hook)
+	 * Check if page should be excluded from sync (apply page:exclude hook)
 	 */
 	private async shouldExclude(page: PageObjectResponse): Promise<boolean> {
-		// Try hooks first
-		try {
-			const shouldExclude = await this.hookRegistry.execute<null, boolean>('page:exclude', {
-				page,
-				config: this.config,
-				data: null,
-				logger: this.logger
-			});
-			return shouldExclude;
-		} catch (error) {
-			// If hook execution fails, fall back to legacy rule
-			this.logger.warn({
-				event: 'hook_fallback',
-				hookEvent: 'page:exclude',
-				error: error instanceof Error ? error.message : String(error)
-			});
-		}
-
-		// Legacy fallback
-		if (this.config.excludeRule) {
-			return this.config.excludeRule(page);
-		}
-
-		return false;
+		const shouldExclude = await this.hookRegistry.execute<null, boolean>('page:exclude', {
+			page,
+			config: this.config,
+			data: null,
+			logger: this.logger
+		});
+		return shouldExclude;
 	}
 
 	/**
-	 * Check if page should be published (apply isPublicRule or publish:check hook)
+	 * Check if page should be published (apply publish:check hook)
 	 */
 	private async shouldPublish(page: PageObjectResponse): Promise<boolean> {
-		// Try hooks first
-		try {
-			const shouldPublish = await this.hookRegistry.execute<null, boolean>('publish:check', {
-				page,
-				config: this.config,
-				data: null,
-				logger: this.logger
-			});
-			return shouldPublish;
-		} catch (error) {
-			// If hook execution fails, fall back to legacy rule
-			this.logger.warn({
-				event: 'hook_fallback',
-				hookEvent: 'publish:check',
-				error: error instanceof Error ? error.message : String(error)
-			});
-		}
-
-		// Legacy fallback
-		return this.config.isPublicRule?.(page) ?? true;
+		const shouldPublish = await this.hookRegistry.execute<null, boolean>('publish:check', {
+			page,
+			config: this.config,
+			data: null,
+			logger: this.logger
+		});
+		return shouldPublish;
 	}
 
 	/**
-	 * Get publish date (apply publishDateRule or publish:date hook)
+	 * Get publish date (apply publish:date hook)
 	 */
 	private async getPublishDate(page: PageObjectResponse): Promise<string | null> {
-		// Try hooks first
-		try {
-			const publishDate = await this.hookRegistry.execute<null, string>('publish:date', {
-				page,
-				config: this.config,
-				data: null,
-				logger: this.logger
-			});
-			return publishDate;
-		} catch (error) {
-			// If hook execution fails, fall back to legacy rule
-			this.logger.warn({
-				event: 'hook_fallback',
-				hookEvent: 'publish:date',
-				error: error instanceof Error ? error.message : String(error)
-			});
-		}
-
-		// Legacy fallback
-		if (this.config.publishDateRule) {
-			return this.config.publishDateRule(page);
-		}
-		return page.last_edited_time;
+		const publishDate = await this.hookRegistry.execute<null, string>('publish:date', {
+			page,
+			config: this.config,
+			data: null,
+			logger: this.logger
+		});
+		return publishDate;
 	}
 }
