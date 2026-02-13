@@ -32,12 +32,20 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 - **`image-optimization-strategy.md`** – Plan for normalizing images into Supabase Storage with size hints
 - **`dynamic-redirects-strategy.md`** – Database-driven redirects, middleware patterns, and analytics follow-up
 
-## Future Designs
+## Future Designs & Architecture Proposals
 
 - **`symbiont-cli-design.md`** – Proposed CLI tool for config initialization, validation, and code generation
+- **`2026-02-13-hook-based-config-refactor.md`** – **⭐ NEW:** Comprehensive proposal for hook-based configuration system (WordPress-style extensibility)
 
 ## What Changed in This Refresh?
 
+- **Feb 13, 2026:** Hook-based config architecture proposal
+  - **Added comprehensive refactor memo** - 33KB design document for hook-based configuration
+  - **Created proof-of-concept code** - Working HookRegistry implementation with examples
+  - **Documented migration strategy** - 4-phase approach maintaining backward compatibility
+  - **Added before/after comparisons** - 6 detailed examples showing benefits
+  - **Includes complete type definitions** - Full TypeScript API for hooks system
+  - See `.docs/2026-02-13-hook-based-config-refactor.md` and `.docs/examples/`
 - **Feb 4, 2026:** notion-to-md v4 comprehensive analysis
   - **Completed comprehensive v4 evaluation** - Full architectural comparison
   - **Added notion-to-md-v4-comprehensive-analysis.md** - Feature-by-feature analysis vs. Symbiont
@@ -73,4 +81,4 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ---
 
-**Last refreshed:** February 4, 2026
+**Last refreshed:** February 13, 2026
