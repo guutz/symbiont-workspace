@@ -451,4 +451,148 @@ The pattern you use depends on your **return type** and **composition intent**.
 
 ---
 
+## Visual Flow Diagrams
+
+### Single-Value Pattern (Overwrite)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Event: 'publish:date'                                      │
+│ Initial ctx.data: null                                     │
+└────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Hook 1 (priority 40)  │
+        │ 'custom-date'         │
+        │                       │
+        │ Returns: '2026-01-01' │
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ ctx.data = '2026-01-01'│  ← Hook 1's output becomes ctx.data
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Hook 2 (priority 50)  │
+        │ 'default-date'        │
+        │                       │
+        │ Returns: '2026-02-13' │  ← Overwrites without checking ctx.data
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Final: '2026-02-13'   │  ← Last hook wins
+        └───────────────────────┘
+```
+
+### Skip Pattern (Fallback)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Event: 'publish:date'                                      │
+│ Initial ctx.data: null                                     │
+└────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Hook 1 (priority 40)  │
+        │ 'custom-date'         │
+        │                       │
+        │ No custom date found  │
+        │ Calls ctx.skip()      │  ← Skip this hook
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ ctx.data = null       │  ← Unchanged (skip doesn't update)
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Hook 2 (priority 50)  │
+        │ 'default-date'        │
+        │                       │
+        │ Returns: '2026-02-13' │  ← Runs because Hook 1 skipped
+        └───────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │ Final: '2026-02-13'   │
+        └───────────────────────┘
+```
+
+### Object Merge Pattern
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Event: 'metadata:custom'                                   │
+│ Initial ctx.data: {}                                       │
+└────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ Hook 1 (priority 30)              │
+        │ 'meta:layout'                     │
+        │                                   │
+        │ Returns:                          │
+        │ { layout: 'blog', featured: true }│
+        └───────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ ctx.data = {                      │
+        │   layout: 'blog',                 │
+        │   featured: true                  │
+        │ }                                 │
+        └───────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ Hook 2 (priority 40)              │
+        │ 'meta:seo'                        │
+        │                                   │
+        │ Returns:                          │
+        │ {                                 │
+        │   ...ctx.data,  ← Merge          │
+        │   ogImage: 'https://...'          │
+        │ }                                 │
+        └───────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ ctx.data = {                      │
+        │   layout: 'blog',     ← Preserved │
+        │   featured: true,     ← Preserved │
+        │   ogImage: 'https://...' ← New    │
+        │ }                                 │
+        └───────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ Hook 3 (priority 50)              │
+        │ 'meta:computed'                   │
+        │                                   │
+        │ Returns:                          │
+        │ {                                 │
+        │   ...ctx.data,  ← Merge          │
+        │   wordCount: 1234                 │
+        │ }                                 │
+        └───────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────────────────┐
+        │ Final: {                          │
+        │   layout: 'blog',     ← From H1   │
+        │   featured: true,     ← From H1   │
+        │   ogImage: '...',     ← From H2   │
+        │   wordCount: 1234     ← From H3   │
+        │ }                                 │
+        └───────────────────────────────────┘
+```
+
+---
+
 **Last Updated:** February 13, 2026
