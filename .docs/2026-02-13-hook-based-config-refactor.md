@@ -986,6 +986,137 @@ hooks: [
 
 ---
 
+## 🔗 Hook Composition & Multi-Hook Behavior
+
+### Understanding the Pipeline
+
+When multiple hooks are registered for the same event, they execute in **priority order** (lower priority runs first). Each hook receives the **output of the previous hook** as `ctx.data`.
+
+**Key insight:** The behavior depends on the hook's **return type**.
+
+### Pattern 1: Single-Value Types (Last Hook Wins)
+
+For hooks returning single values (Date, string, number), the **last non-skipped hook wins** by default.
+
+```typescript
+hooks: [
+    {
+        name: 'custom:date',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            const custom = ctx.page.properties.CustomDate?.date?.start;
+            if (!custom) {
+                return ctx.skip(); // ← Falls through to next hook
+            }
+            return new Date(custom);
+        }
+    },
+    {
+        name: 'default:date',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            return new Date(ctx.page.last_edited_time);
+        }
+    }
+]
+```
+
+**Behavior:**
+- If `CustomDate` exists: First hook returns date, second hook **overwrites** it
+- If `CustomDate` is empty: First hook skips, second hook uses default
+
+**To prevent overwrite:**
+```typescript
+fn: async (ctx) => {
+    // Check if previous hook already set a value
+    if (ctx.data) {
+        return ctx.data; // Keep previous value
+    }
+    return new Date(ctx.page.last_edited_time);
+}
+```
+
+### Pattern 2: Object Types (Explicit Merge)
+
+For hooks returning objects (metadata, custom properties), **explicitly merge** using the spread operator:
+
+```typescript
+hooks: [
+    {
+        name: 'meta:layout',
+        event: 'metadata:custom',
+        priority: 30,
+        fn: async (ctx) => ({
+            layout: 'blog',
+            featured: true
+        })
+    },
+    {
+        name: 'meta:seo',
+        event: 'metadata:custom',
+        priority: 40,
+        fn: async (ctx) => ({
+            ...ctx.data, // ← Preserve previous hooks' data
+            ogImage: 'https://...',
+            keywords: ['tag1']
+        })
+    }
+]
+```
+
+**Result:** `{ layout: 'blog', featured: true, ogImage: 'https://...', keywords: ['tag1'] }`
+
+**Without merging:** Second hook would return only `{ ogImage, keywords }` - losing layout and featured!
+
+### Control Flow Methods
+
+**`ctx.skip()`** - Skip current hook, pass `ctx.data` unchanged to next hook:
+```typescript
+fn: async (ctx) => {
+    if (!canHandle(ctx.page)) {
+        return ctx.skip(); // Next hook receives same data
+    }
+    return processPage(ctx.page);
+}
+```
+
+**`ctx.abort(reason)`** - Stop all processing immediately:
+```typescript
+fn: async (ctx) => {
+    if (isForbidden(ctx.page)) {
+        ctx.abort('Forbidden content detected');
+        return; // Throws error, stops all hooks
+    }
+    return processPage(ctx.page);
+}
+```
+
+### Decision Tree
+
+```
+Is your return type a single value?
+│
+├─ YES → Last hook wins (unless you check ctx.data)
+│   └─ Use skip() to fall through to next hook
+│
+└─ NO (returning object) → Explicitly merge
+    └─ Always use { ...ctx.data, newFields }
+```
+
+### Best Practices
+
+1. **Be explicit about merging:** Always use `...ctx.data` for object returns
+2. **Document return types:** Add comments describing expected return type
+3. **Use priority correctly:** Lower = earlier (custom logic), Higher = later (defaults/validation)
+4. **Name hooks clearly:** Use format `category:action:variant`
+5. **Test composition:** Verify behavior with multiple hooks
+
+**For complete details, see:** `.docs/2026-02-13-HOOK_COMPOSITION_GUIDE.md`
+
+---
+
 ## ⚖️ Tradeoffs & Considerations
 
 ### Pros
@@ -1285,9 +1416,19 @@ Based on feedback, these questions have been resolved:
 
 ## 📚 References
 
+**Related Documentation:**
+- **Hook Composition Guide:** `.docs/2026-02-13-HOOK_COMPOSITION_GUIDE.md` (Understanding multi-hook behavior)
+- **Hook Config Examples:** `.docs/examples/hook-config-comparison.md` (Before/after examples)
+- **Hook System POC:** `.docs/examples/hook-system-poc.ts` (Working implementation)
+- **Hook Architecture:** `.docs/examples/hook-architecture-diagrams.md` (Visual diagrams)
+- **Executive Summary:** `.docs/2026-02-13-hook-refactor-executive-summary.md` (TL;DR version)
+
+**Code References:**
 - Current DatabaseBlueprint: `packages/symbiont-cms/src/lib/types.ts`
 - Page Transformer: `packages/symbiont-cms/src/lib/server/notion/page-transformer.ts`
 - Sync Coordinator: `packages/symbiont-cms/src/lib/server/sync/notion-to-database-sync.ts`
+
+**External References:**
 - WordPress Plugin API: https://developer.wordpress.org/plugins/hooks/
 - SvelteKit Hooks: https://kit.svelte.dev/docs/hooks (similar pattern)
 

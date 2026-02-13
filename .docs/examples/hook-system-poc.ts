@@ -622,6 +622,221 @@ async function testControlFlow() {
     // Expected: "2026-02-13T00:00:00.000Z" (from default hook after skip)
 }
 
+// ============================================
+// Testing Hook Composition Patterns
+// ============================================
+
+async function testHookComposition() {
+    const logger: Logger = {
+        debug: (data) => console.log('[DEBUG]', data),
+        info: (data) => console.log('[INFO]', data),
+        warn: (data) => console.warn('[WARN]', data),
+        error: (data) => console.error('[ERROR]', data)
+    };
+    
+    console.log('\n--- Pattern 1: Single-Value (Last Wins) ---');
+    const registry1 = new HookRegistry(logger);
+    
+    // First hook sets a date
+    registry1.register({
+        name: 'custom-date',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('Custom date hook: Setting to Jan 1, 2026');
+            return '2026-01-01T00:00:00.000Z';
+        }
+    });
+    
+    // Second hook overwrites (no ctx.data check)
+    registry1.register({
+        name: 'default-date',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Default date hook: Overwriting with Feb 13, 2026');
+            return '2026-02-13T00:00:00.000Z';
+        }
+    });
+    
+    const mockPage = {
+        id: 'test-page',
+        last_edited_time: '2026-02-13T00:00:00.000Z',
+        properties: {}
+    } as any as PageObjectResponse;
+    
+    const result1 = await registry1.execute('publish:date', {
+        page: mockPage,
+        data: null
+    });
+    console.log('Result (last wins):', result1);
+    // Expected: "2026-02-13T00:00:00.000Z" (second hook overwrites)
+    
+    console.log('\n--- Pattern 2: Single-Value with Skip ---');
+    const registry2 = new HookRegistry(logger);
+    
+    // First hook skips if no custom data
+    registry2.register({
+        name: 'custom-date-conditional',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            const custom = ctx.page.properties.CustomDate;
+            if (!custom) {
+                console.log('Custom date hook: No custom date, skipping');
+                ctx.skip();
+                return null;
+            }
+            return custom;
+        }
+    });
+    
+    // Second hook only runs if first skipped
+    registry2.register({
+        name: 'default-date-fallback',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Default date hook: Using fallback date');
+            return '2026-02-13T00:00:00.000Z';
+        }
+    });
+    
+    const result2 = await registry2.execute('publish:date', {
+        page: mockPage,
+        data: null
+    });
+    console.log('Result (after skip):', result2);
+    // Expected: "2026-02-13T00:00:00.000Z" (first skipped, second runs)
+    
+    console.log('\n--- Pattern 3: Object Merge ---');
+    const registry3 = new HookRegistry(logger);
+    
+    // First hook returns partial metadata
+    registry3.register({
+        name: 'meta-layout',
+        event: 'metadata:custom',
+        priority: 30,
+        fn: async (ctx) => {
+            console.log('Layout hook: Setting layout and featured');
+            return {
+                layout: 'blog',
+                featured: true
+            };
+        }
+    });
+    
+    // Second hook merges with previous data
+    registry3.register({
+        name: 'meta-seo',
+        event: 'metadata:custom',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('SEO hook: Adding SEO fields, merging with ctx.data');
+            return {
+                ...ctx.data, // ← Preserve previous metadata
+                ogImage: 'https://example.com/og.jpg',
+                keywords: ['tech', 'blog']
+            };
+        }
+    });
+    
+    // Third hook adds computed fields
+    registry3.register({
+        name: 'meta-computed',
+        event: 'metadata:custom',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Computed hook: Adding word count, merging with ctx.data');
+            return {
+                ...ctx.data, // ← Preserve previous metadata
+                wordCount: 1234,
+                readingTime: 7
+            };
+        }
+    });
+    
+    const result3 = await registry3.execute('metadata:custom', {
+        page: mockPage,
+        data: {}
+    });
+    console.log('Result (merged):', JSON.stringify(result3, null, 2));
+    // Expected: { layout: 'blog', featured: true, ogImage: '...', keywords: [...], wordCount: 1234, readingTime: 7 }
+    
+    console.log('\n--- Pattern 4: Object WITHOUT Merge (Common Pitfall) ---');
+    const registry4 = new HookRegistry(logger);
+    
+    registry4.register({
+        name: 'meta-layout-wrong',
+        event: 'metadata:custom',
+        priority: 30,
+        fn: async (ctx) => {
+            console.log('Layout hook: Setting layout and featured');
+            return {
+                layout: 'blog',
+                featured: true
+            };
+        }
+    });
+    
+    // Second hook DOESN'T merge (WRONG)
+    registry4.register({
+        name: 'meta-seo-wrong',
+        event: 'metadata:custom',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('SEO hook: ❌ NOT merging, will lose previous data');
+            return {
+                // Missing ...ctx.data!
+                ogImage: 'https://example.com/og.jpg'
+            };
+        }
+    });
+    
+    const result4 = await registry4.execute('metadata:custom', {
+        page: mockPage,
+        data: {}
+    });
+    console.log('Result (NOT merged - data lost!):', JSON.stringify(result4, null, 2));
+    // Expected: { ogImage: '...' } ← Lost layout and featured!
+    
+    console.log('\n--- Pattern 5: Conditional Overwrite ---');
+    const registry5 = new HookRegistry(logger);
+    
+    // First hook returns a value
+    registry5.register({
+        name: 'value-setter',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('Setter hook: Setting date');
+            return '2026-01-01T00:00:00.000Z';
+        }
+    });
+    
+    // Second hook checks ctx.data before overwriting
+    registry5.register({
+        name: 'value-checker',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            if (ctx.data) {
+                console.log('Checker hook: Previous value exists, keeping it:', ctx.data);
+                return ctx.data; // ← Keep previous value
+            }
+            console.log('Checker hook: No previous value, setting default');
+            return '2026-02-13T00:00:00.000Z';
+        }
+    });
+    
+    const result5 = await registry5.execute('publish:date', {
+        page: mockPage,
+        data: null
+    });
+    console.log('Result (conditional):', result5);
+    // Expected: "2026-01-01T00:00:00.000Z" (first hook's value preserved)
+}
+
 // Run examples if this file is executed directly
 if (require.main === module) {
     console.log('=== Example Usage ===');
@@ -632,4 +847,7 @@ if (require.main === module) {
     
     console.log('\n=== Testing Control Flow ===');
     testControlFlow().catch(console.error);
+    
+    console.log('\n=== Testing Hook Composition Patterns ===');
+    testHookComposition().catch(console.error);
 }

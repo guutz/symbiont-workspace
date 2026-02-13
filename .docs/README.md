@@ -36,9 +36,10 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## Future Designs & Architecture Proposals
 
-- **`2025-12-15-symbiont-cli-design.md`** – Proposed CLI tool for config initialization, validation, and code generation
 - **`2026-02-13-hook-based-config-refactor.md`** – **⭐ NEW:** Comprehensive proposal for hook-based configuration system (WordPress-style extensibility)
+- **`2026-02-13-HOOK_COMPOSITION_GUIDE.md`** – **⭐ NEW:** Detailed guide on multi-hook behavior, composition patterns, and best practices
 - **`2026-02-13-hook-refactor-executive-summary.md`** – **⭐ Quick summary:** Hook refactor proposal (start here)
+- **`2025-12-15-symbiont-cli-design.md`** – Proposed CLI tool for config initialization, validation, and code generation
 
 ## Historical / Completed
 
@@ -51,6 +52,13 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
+- **Feb 13, 2026:** Hook composition behavior clarification
+  - **Added HOOK_COMPOSITION_GUIDE.md** - Comprehensive guide explaining multi-hook behavior patterns
+  - **Clarified overwrite vs merge semantics** - Single-value types (last wins) vs object types (explicit merge)
+  - **Documented control flow** - skip() vs abort() behavior
+  - **Added best practices** - Decision trees, common pitfalls, and examples
+  - **Updated hook refactor memo** - Added composition section with key insights
+  - See `.docs/2026-02-13-HOOK_COMPOSITION_GUIDE.md`
 - **Feb 13, 2026:** File naming standardization + "The Loop" documentation
   - **Renamed all docs** - Now use YYYY-MM-DD prefix for consistency
   - **Added "The Loop" section** - Documented how to query pages/posts in Svelte files
