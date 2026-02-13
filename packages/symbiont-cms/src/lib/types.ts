@@ -1,5 +1,6 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { Database } from './database.types.js';
+import type { Hook } from './hooks/types.js';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -122,29 +123,56 @@ export interface DatabaseBlueprint {
     dataSourceId: string;
 
     // ============================================
-    // PUBLISHING RULES
+    // HOOK SYSTEM (NEW)
     // ============================================
 
-    /** Boolean gate: determines IF a page should be excluded from sync entirely */
+    /**
+     * Hook-based configuration for page transformation.
+     * Hooks provide a composable way to customize page processing.
+     * 
+     * @example
+     * hooks: [
+     *   {
+     *     name: 'custom:publish-date',
+     *     event: 'publish:date',
+     *     priority: 40,
+     *     fn: async (ctx) => ctx.page.properties.Date?.date?.start
+     *   }
+     * ]
+     */
+    hooks?: Hook[];
+
+    // ============================================
+    // PUBLISHING RULES (DEPRECATED - Use hooks)
+    // ============================================
+
+    /**
+     * Boolean gate: determines IF a page should be excluded from sync entirely
+     * @deprecated Use hooks with event 'page:exclude' instead
+     */
     excludeRule?: (page: PageObjectResponse) => boolean;
-    // Default: () => false (don't exclude anything)
-    // Return true to exclude the page from being synced to the database
 
-    /** Boolean gate: determines IF a page should be published */
+    /**
+     * Boolean gate: determines IF a page should be published
+     * @deprecated Use hooks with event 'publish:check' instead
+     */
     isPublicRule?: (page: PageObjectResponse) => boolean;
-    // Default: () => true
 
-    /** Date extraction: determines WHEN a page should be published */
+    /**
+     * Date extraction: determines WHEN a page should be published
+     * @deprecated Use hooks with event 'publish:date' instead
+     */
     publishDateRule?: (page: PageObjectResponse) => string | null;
-    // Default: page.last_edited_time
 
     // ============================================
     // SLUG CONFIGURATION
     // ============================================
 
-    /** Extract custom slug from Notion (return null for auto-generation) */
+    /**
+     * Extract custom slug from Notion (return null for auto-generation)
+     * @deprecated Use hooks with event 'slug:extract' instead
+     */
     slugRule?: (page: PageObjectResponse) => string | null;
-    // Default: null (auto-generate from title)
 
     /** Notion property name to sync generated slugs back to */
     slugSyncProperty?: string | null;
@@ -178,6 +206,8 @@ export interface DatabaseBlueprint {
      * Extract arbitrary metadata to store in JSONB field
      * Use this for cover images, layout config, custom fields, etc.
      * 
+     * @deprecated Use hooks with event 'metadata:custom' instead
+     * 
      * @example
      * metadataExtractor: (page) => ({
      *   coverImage: page.properties['Cover']?.files?.[0]?.file?.url,
@@ -186,7 +216,6 @@ export interface DatabaseBlueprint {
      * })
      */
     metadataExtractor?: (page: PageObjectResponse) => Record<string, any>;
-    // Default: null (no extra metadata)
 
     /**
      * Determines sync direction for content
