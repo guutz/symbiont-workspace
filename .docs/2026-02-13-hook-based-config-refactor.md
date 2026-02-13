@@ -439,6 +439,343 @@ databases: [{
 
 ---
 
+## 🔄 Symbiont's Version of "The Loop"
+
+### Query API in Svelte Files
+
+Inspired by WordPress's "The Loop" concept, Symbiont provides a simple, consistent way to query and display pages/posts in your Svelte components. **The hooks system doesn't change this** - it only affects how pages are transformed during sync from Notion to the database.
+
+### Current Client API (Unchanged by Hooks)
+
+The `SymbiontClient` provides two primary query methods:
+
+```typescript
+interface SymbiontClient {
+    /** Fetch a single page by slug */
+    getPageBySlug(slug: string, options?: GetPageOptions): Promise<WebsitePage | null>;
+    
+    /** Fetch all pages for a database */
+    getAllPages(options?: GetAllPagesOptions): Promise<WebsitePage[]>;
+    
+    /** Direct access to Supabase client for advanced queries */
+    supabase: SupabaseClient<Database>;
+}
+
+interface GetPageOptions {
+    fetch?: typeof globalThis.fetch;  // For SSR
+    alias?: string;                    // Database to query
+}
+
+interface GetAllPagesOptions {
+    fetch?: typeof globalThis.fetch;
+    limit?: number;
+    offset?: number;
+    alias?: string;
+}
+```
+
+### Usage Patterns in SvelteKit
+
+**Pattern 1: Single Page (Blog Post, Article)**
+
+```typescript
+// src/routes/blog/[slug]/+page.server.ts
+import { symbiont } from '$lib/symbiont';
+
+export async function load({ params, fetch }) {
+    const page = await symbiont.getPageBySlug(params.slug, { fetch });
+    
+    if (!page) {
+        throw error(404, 'Page not found');
+    }
+    
+    return { page };
+}
+```
+
+```svelte
+<!-- src/routes/blog/[slug]/+page.svelte -->
+<script lang="ts">
+    export let data;
+    const { page } = data;
+</script>
+
+<article>
+    <h1>{page.title}</h1>
+    <time>{page.publish_at}</time>
+    {@html page.html}
+</article>
+```
+
+**Pattern 2: Page List (Homepage, Archive)**
+
+```typescript
+// src/routes/+page.server.ts
+import { symbiont } from '$lib/symbiont';
+
+export async function load({ fetch, url }) {
+    const query = url.searchParams.get('q') || '';
+    const tag = url.searchParams.get('tag') || '';
+    
+    // Fetch pages (sorted by publish_at DESC by default)
+    const allPages = await symbiont.getAllPages({ 
+        fetch, 
+        limit: 100 
+    });
+    
+    // Filter in-memory (or use Supabase client for DB filtering)
+    let pages = allPages;
+    
+    if (tag) {
+        pages = pages.filter(p => p.tags?.includes(tag));
+    }
+    
+    if (query) {
+        pages = pages.filter(p => 
+            p.title.toLowerCase().includes(query) ||
+            p.summary?.toLowerCase().includes(query)
+        );
+    }
+    
+    return { 
+        pages: pages.slice(0, 30),
+        hasMore: pages.length > 30 
+    };
+}
+```
+
+```svelte
+<!-- src/routes/+page.svelte -->
+<script lang="ts">
+    export let data;
+    const { pages } = data;
+</script>
+
+{#each pages as page}
+    <article>
+        <h2><a href="/blog/{page.slug}">{page.title}</a></h2>
+        <time>{page.publish_at}</time>
+        <p>{page.summary}</p>
+    </article>
+{/each}
+```
+
+**Pattern 3: Advanced Queries (Using Supabase Client)**
+
+For complex filtering, sorting, or searching, use the Supabase client directly:
+
+```typescript
+// src/routes/search/+page.server.ts
+import { symbiont } from '$lib/symbiont';
+
+export async function load({ fetch, url }) {
+    const query = url.searchParams.get('q') || '';
+    
+    // Direct Supabase query for advanced filtering
+    const { data: pages } = await symbiont.supabase
+        .from('pages')
+        .select('*')
+        .eq('datasource_alias', 'blog')
+        .not('publish_at', 'is', null)  // Only published
+        .gte('publish_at', new Date().toISOString())  // Future posts
+        .or(`title.ilike.%${query}%,summary.ilike.%${query}%`)  // Full-text search
+        .order('publish_at', { ascending: false })
+        .limit(50);
+    
+    return { pages: pages || [] };
+}
+```
+
+**Pattern 4: Client-Side Filtering (SPA-like Experience)**
+
+California Tech example showing progressive enhancement:
+
+```typescript
+// src/routes/+page.server.ts - Initial SSR load
+export async function load({ fetch }) {
+    // Fast initial load: just 30 posts
+    const pages = await symbiont.getAllPages({ fetch, limit: 30 });
+    
+    return { 
+        pages,              // Initial posts for fast FCP
+        initialOnly: true   // Flag that full data not loaded
+    };
+}
+```
+
+```svelte
+<!-- src/routes/+page.svelte - Client-side enhancement -->
+<script lang="ts">
+    import { onMount } from 'svelte';
+    export let data;
+    
+    let allPages = data.pages;
+    let filtered = allPages;
+    let searchQuery = '';
+    
+    onMount(async () => {
+        if (data.initialOnly) {
+            // Fetch full dataset in background
+            const res = await fetch('/api/pages/preview');
+            const previews = await res.json();
+            allPages = previews;
+            filtered = filterPages(allPages, searchQuery);
+        }
+    });
+    
+    function filterPages(pages, query) {
+        if (!query) return pages;
+        return pages.filter(p => 
+            p.title.toLowerCase().includes(query.toLowerCase())
+        );
+    }
+    
+    $: filtered = filterPages(allPages, searchQuery);
+</script>
+
+<input bind:value={searchQuery} placeholder="Search..." />
+
+{#each filtered as page}
+    <article>
+        <h2><a href="/blog/{page.slug}">{page.title}</a></h2>
+    </article>
+{/each}
+```
+
+### How Hooks Affect "The Loop"
+
+**Key Point:** Hooks run during **sync** (Notion → Database), not during **query** (Database → Svelte).
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   SYNC TIME (Hooks Run)                 │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Notion Page                                            │
+│      ↓                                                  │
+│  Hook: 'publish:date' (extract date)                    │
+│      ↓                                                  │
+│  Hook: 'slug:extract' (get slug)                        │
+│      ↓                                                  │
+│  Hook: 'metadata:custom' (extract metadata)             │
+│      ↓                                                  │
+│  Database Row (with transformed data)                   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│              QUERY TIME (No Hooks, Just SQL)            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  symbiont.getAllPages()                                 │
+│      ↓                                                  │
+│  SELECT * FROM pages WHERE ...                          │
+│      ↓                                                  │
+│  Array<WebsitePage> (already transformed)               │
+│      ↓                                                  │
+│  Svelte Component (display)                             │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**What this means:**
+
+1. **Hooks customize sync behavior** - e.g., California Tech's date parsing hook extracts publish dates from the "Issue" property during sync
+2. **Query API stays the same** - `getAllPages()` and `getPageBySlug()` work exactly as before
+3. **Pages are pre-transformed** - By the time you query them, hooks have already run, so you get clean, consistent data
+
+### Future: Query Hooks (If Needed)
+
+While hooks currently only run at sync time, we could add **query-time hooks** in the future:
+
+```typescript
+// Hypothetical future feature
+databases: [{
+    alias: 'blog',
+    hooks: [
+        // Sync-time hooks (existing)
+        { name: 'sync:publish-date', event: 'publish:date', ... },
+        
+        // Query-time hooks (future)
+        { 
+            name: 'query:enrich-author', 
+            event: 'query:post-process',  // Runs after DB query
+            priority: 50,
+            fn: async (ctx) => {
+                // Enrich each page with live data
+                ctx.data.pages = await Promise.all(
+                    ctx.data.pages.map(async (page) => ({
+                        ...page,
+                        authorBio: await fetchAuthorBio(page.authors[0])
+                    }))
+                );
+                return ctx.data;
+            }
+        }
+    ]
+}]
+```
+
+**However**, this is not part of the current design. For now, if you need to enrich query results:
+
+```typescript
+// Just do it in your load function
+export async function load({ fetch }) {
+    const pages = await symbiont.getAllPages({ fetch });
+    
+    // Enrich with live data
+    const enriched = await Promise.all(
+        pages.map(async (page) => ({
+            ...page,
+            authorBio: await fetchAuthorBio(page.authors[0])
+        }))
+    );
+    
+    return { pages: enriched };
+}
+```
+
+### Summary: "The Loop" in Symbiont
+
+**WordPress "The Loop":**
+```php
+<?php while (have_posts()) : the_post(); ?>
+    <h2><?php the_title(); ?></h2>
+    <?php the_content(); ?>
+<?php endwhile; ?>
+```
+
+**Symbiont "The Loop":**
+```typescript
+// +page.server.ts
+export async function load({ fetch }) {
+    const pages = await symbiont.getAllPages({ fetch });
+    return { pages };
+}
+```
+
+```svelte
+<!-- +page.svelte -->
+{#each pages as page}
+    <h2>{page.title}</h2>
+    {@html page.html}
+{/each}
+```
+
+**Key Differences:**
+- WordPress: Hooks run at query time, can modify rendered output
+- Symbiont: Hooks run at sync time, query returns pre-transformed data
+- WordPress: Global state (`the_post()`, `the_title()`)
+- Symbiont: Explicit data flow (TypeScript, props)
+
+**Why this design?**
+- **Performance**: Transform once during sync, not on every page view
+- **Simplicity**: Queries are just SQL, no runtime transforms
+- **Type Safety**: Pre-transformed data has known TypeScript types
+- **Caching**: Static data can be cached aggressively (ISR, CDN)
+
+---
+
 ## 🏗️ Implementation Strategy
 
 ### Single-Phase Implementation (Breaking Change)

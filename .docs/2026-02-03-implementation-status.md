@@ -201,7 +201,7 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ### ✅ UI Helper Components (Shipped - NEW!)
 
-> **Architecture:** Symbiont uses a [4-file hybrid rendering strategy](HYBRID_STRATEGY.md) where markdown is always rendered server-side and returned as HTML. Users render `{@html data.html}` directly with optional helper components.
+> **Architecture:** Symbiont uses a [4-file hybrid rendering strategy](2025-10-09-hybrid-strategy.md) where markdown is always rendered server-side and returned as HTML. Users render `{@html data.html}` directly with optional helper components.
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
@@ -344,7 +344,7 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 
 ### 💭 Rendering Strategies (Conceptual)
 
-**Design:** `.docs/HYBRID_STRATEGY.md` (current implementation documented)
+**Design:** `.docs/2025-10-09-hybrid-strategy.md` (current implementation documented)
 
 - ✅ Hybrid SSR + Client Navigation (implemented)
 - 📋 Configurable SSR/Client rendering modes
@@ -494,9 +494,9 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 ## 📚 Related Documentation
 
 **For developers:**
-- `.docs/symbiont-cms.md` - Complete API reference and architecture guide
+- `.docs/2025-10-01-symbiont-cms-reference.md` - Complete API reference and architecture guide
 - `.docs/INTEGRATION_GUIDE.md` - How to integrate Symbiont into your app
-- `.docs/HYBRID_STRATEGY.md` - Why we use 4-file SSR + client navigation
+- `.docs/2025-10-09-hybrid-strategy.md` - Why we use 4-file SSR + client navigation
 - `.docs/REFACTOR_COMPLETE.md` - November 2025 architecture refactor details
 - `.docs/SCHEMA_UPDATE.md` - Database schema migration details
 
@@ -507,7 +507,7 @@ This document provides an honest assessment of the Symbiont CMS implementation s
 - `.docs/zero-rebuild-cms-vision.md` - Long-term product vision
 
 **For quick starts:**
-- `.docs/QUICKSTART.md` - Get running in 5 minutes
+- `.docs/2025-10-01-quickstart.md` - Get running in 5 minutes
 - `.docs/publishing-rules.md` - Configure Notion sync behavior
 - `.docs/TYPE_COMPATIBILITY.md` - Integrate with existing types
 

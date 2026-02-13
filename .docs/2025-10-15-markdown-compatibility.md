@@ -431,7 +431,7 @@ md.use(sup);
 
 ## Related Documentation
 
-- **[Symbiont CMS Complete Guide](symbiont-cms.md)** - Full system documentation
+- **[Symbiont CMS Complete Guide](2025-10-01-symbiont-cms-reference.md)** - Full system documentation
 - **[Image Optimization Strategy](image-optimization-strategy.md)** - Image handling & zoom
 - **[notion-to-md GitHub](https://github.com/souvikinator/notion-to-md)** - Notion markdown converter
 - **[markdown-it Plugins](https://mdit-plugins.github.io/)** - Available plugins
