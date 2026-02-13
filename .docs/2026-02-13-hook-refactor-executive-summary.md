@@ -4,6 +4,8 @@
 **Status:** Proposal / RFC  
 **Related Documents:**
 - Main Memo: `.docs/2026-02-13-hook-based-config-refactor.md`
+- **Composition Guide:** `.docs/2026-02-13-HOOK_COMPOSITION_GUIDE.md` (Understanding multi-hook behavior)
+- **Quick Reference:** `.docs/examples/hook-composition-quick-ref.md` (Decision matrix & patterns)
 - Proof of Concept: `.docs/examples/hook-system-poc.ts`
 - Comparisons: `.docs/examples/hook-config-comparison.md`
 - Diagrams: `.docs/examples/hook-architecture-diagrams.md`
