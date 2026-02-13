@@ -20,6 +20,11 @@ This memo proposes a refactor of Symbiont CMS's configuration system from a prop
 - **Current:** Opinionated config with narrow escape hatches
 - **Proposed:** Opinionated defaults with clear, composable extension points
 
+**Migration Note:**
+- This is a breaking change for the workspace (only california-tech and guutz-blog use this)
+- No backward compatibility layer needed - we'll migrate both packages directly
+- Simpler implementation without legacy code maintenance
+
 ---
 
 ## 📍 Current State Analysis
@@ -115,21 +120,24 @@ Introduce a **hook registry** that allows:
 
 ### Hook Lifecycle Events
 
-Based on the current `NotionPageToDatabasePageTransformer`, we can identify these lifecycle events:
+Based on the current `NotionPageToDatabasePageTransformer`, we can identify these lifecycle events.
+
+**Note on naming:** Event names like `'publish:date'` or `'slug:extract'` are **built-in hook event types** that Symbiont defines. When you create a hook, you specify which event it responds to. The hook's `name` field (e.g., `'caltech:publish-date'`) is user-defined and helps identify your specific hook.
 
 ```typescript
 // Lifecycle events in page transformation pipeline
+// These are the EVENT TYPES you hook into (built-in, not user-defined)
 type HookEvent = 
     // Early validation
     | 'page:exclude'          // Should page be excluded from sync?
     | 'page:validate'         // Is page data valid?
     
-    // Metadata extraction
+    // Metadata extraction (built-in events)
     | 'metadata:title'        // Extract/transform title
     | 'metadata:tags'         // Extract/transform tags
     | 'metadata:authors'      // Extract/transform authors  
     | 'metadata:summary'      // Extract/transform summary
-    | 'metadata:custom'       // Extract custom metadata
+    | 'metadata:custom'       // Extract custom metadata (user-defined data)
     
     // Publishing logic
     | 'publish:check'         // Should page be published?
@@ -155,6 +163,18 @@ type HookEvent =
     | 'sync:content'          // Sync content back to Notion
     | 'sync:images'           // Sync image URLs back to Notion
 ;
+```
+
+**Example to clarify naming:**
+```typescript
+// Event type: 'publish:date' (built-in, from HookEvent type)
+// Hook name: 'caltech:publish-date' (user-defined, descriptive label)
+{
+    name: 'caltech:publish-date',  // YOUR name for this hook
+    event: 'publish:date',          // Built-in event type it responds to
+    priority: 40,
+    fn: async (ctx) => { ... }
+}
 ```
 
 ### Hook Function Signature
@@ -183,10 +203,16 @@ type Hook<TInput = any, TOutput = any> = {
 
 ### Default Hooks (Shipped with Symbiont)
 
-Symbiont would ship with default hooks that implement current behavior:
+Symbiont ships with default hooks that implement current behavior. **These are automatically registered and well-documented** - users don't need to dig into source code to understand them.
+
+**Default hooks will be documented in:**
+1. Main API documentation with JSDoc comments
+2. TypeScript IntelliSense (hover to see what each hook does)
+3. Reference documentation listing all default hooks and their behavior
 
 ```typescript
 // Built-in defaults (in symbiont-cms package)
+// These are DOCUMENTED and exported for reference
 const defaultHooks: Hook[] = [
     {
         name: 'symbiont:publish:check:default',
@@ -212,18 +238,22 @@ const defaultHooks: Hook[] = [
         priority: 50,
         fn: async (ctx) => getTitleProperty(ctx.page)
     },
-    // ... more defaults
+    // ... more defaults (all documented in API reference)
 ];
+
+// Exported for documentation and reference
+export { defaultHooks };
 ```
 
-These hooks would be registered automatically but could be:
-- **Overridden** by user hooks at the same priority
-- **Augmented** by user hooks at different priorities
-- **Disabled** explicitly if needed
+These hooks are:
+- **Automatically registered** when you create a client
+- **Well-documented** in API docs and TypeScript hover tooltips
+- **Overridable** by user hooks at the same or different priorities
+- **Listed in reference docs** so you never have to dig into source
 
 ### User Configuration
 
-Users register hooks in their config:
+Users register hooks in their config. For common cases, syntactic sugar properties may still be available:
 
 ```typescript
 export const symbiont = createSymbiontClient({
@@ -236,7 +266,7 @@ export const symbiont = createSymbiontClient({
         hooks: [
             {
                 name: 'caltech:publish:date:issue-based',
-                event: 'publish:date',
+                event: 'publish:date',  // Built-in event type
                 priority: 40,  // Run before default
                 fn: async (ctx) => {
                     const issue = ctx.page.properties.Issue?.select?.name;
@@ -250,7 +280,7 @@ export const symbiont = createSymbiontClient({
             },
             {
                 name: 'caltech:slug:custom-property',
-                event: 'slug:extract',
+                event: 'slug:extract',  // Built-in event type
                 priority: 40,
                 fn: async (ctx) => {
                     const slug = ctx.page.properties['Website Slug']?.rich_text?.[0]?.plain_text;
@@ -259,7 +289,7 @@ export const symbiont = createSymbiontClient({
             },
             {
                 name: 'caltech:metadata:layout',
-                event: 'metadata:custom',
+                event: 'metadata:custom',  // Built-in event type
                 priority: 50,
                 fn: async (ctx) => {
                     return {
@@ -271,11 +301,12 @@ export const symbiont = createSymbiontClient({
             }
         ],
         
-        // Simplified property mappings (still supported)
-        tagsProperty: 'Tags',
-        authorsProperty: 'Authors',
-        summaryProperty: 'Summary',
-        coverProperty: 'Cover'
+        // Option: Keep simple property mappings as syntactic sugar
+        // These would internally generate hooks at appropriate priorities
+        tagsProperty: 'Tags',          // Could generate metadata:tags hook
+        authorsProperty: 'Authors',    // Could generate metadata:authors hook
+        summaryProperty: 'Summary',    // Could generate metadata:summary hook
+        coverProperty: 'Cover'         // Could generate cover:extract hook
     }]
 });
 ```
@@ -410,54 +441,49 @@ databases: [{
 
 ## 🏗️ Implementation Strategy
 
-### Phase 1: Hook Infrastructure (Non-Breaking)
+### Single-Phase Implementation (Breaking Change)
 
-**Goal:** Add hook system alongside existing config
+**Goal:** Replace current config system with hooks
 
-1. Create `HookRegistry` class
-2. Define hook types and lifecycle events
-3. Implement default hooks that mirror current behavior
-4. Update `NotionPageToDatabasePageTransformer` to use hooks internally
-5. Add `hooks: Hook[]` property to `DatabaseBlueprint` (optional)
+Since only california-tech and guutz-blog use Symbiont (both in this workspace), we can do a clean breaking change without backward compatibility.
 
-**Result:** Both old and new systems work simultaneously
+**Steps:**
 
-### Phase 2: Documentation & Examples (Non-Breaking)
+1. **Week 1-2:** Core hook infrastructure
+   - Create `HookRegistry` class
+   - Define hook types and lifecycle events
+   - Implement default hooks for all current behavior
 
-**Goal:** Show developers the new way
+2. **Week 3-4:** Update page transformer
+   - Modify `NotionPageToDatabasePageTransformer` to use hooks
+   - Remove old rule-based logic
+   - Ensure all default hooks cover existing functionality
 
-1. Add hook examples to documentation
-2. Create migration guide for common patterns
-3. Update California Tech and Guutz Blog to use hooks (as examples)
-4. Add hook debugging/logging utilities
+3. **Week 5:** Update type definitions
+   - Remove old rule properties from `DatabaseBlueprint`
+   - Add `hooks: Hook[]` property
+   - Update all TypeScript types
 
-**Result:** Developers can start using hooks
+4. **Week 6-7:** Migrate workspace packages
+   - Update california-tech to use hooks
+   - Update guutz-blog to use hooks
+   - Extract complex logic (like date parsing) to testable utilities
 
-### Phase 3: Deprecation Warnings (Semi-Breaking)
+5. **Week 8:** Documentation and testing
+   - Write comprehensive API documentation
+   - Document all default hooks with examples
+   - Add unit tests for hook system
+   - Integration tests for both packages
 
-**Goal:** Signal the change
-
-1. Add deprecation warnings for old-style rules
-2. Auto-convert old rules to hooks internally
-3. Update all internal tests to use hooks
-
-**Result:** Old code still works but warns
-
-### Phase 4: Breaking Change (v2.0.0)
-
-**Goal:** Clean up API
-
-1. Remove old rule properties
-2. Remove auto-conversion layer
-3. Hooks are the only way
-
-**Result:** Clean, consistent API
+**Result:** Clean hook-based API, no legacy code to maintain
 
 ---
 
 ## 🔄 Migration Path
 
 ### Converting Current Rules to Hooks
+
+Since this is a breaking change for the workspace, we'll migrate both packages directly.
 
 **Before (Current):**
 ```typescript
@@ -500,37 +526,7 @@ databases: [{
 }
 ```
 
-### Compatibility Layer (Phase 1-3)
-
-During transition, provide auto-conversion:
-
-```typescript
-function convertLegacyRulesToHooks(blueprint: DatabaseBlueprint): Hook[] {
-    const hooks: Hook[] = [];
-    
-    if (blueprint.publishDateRule) {
-        hooks.push({
-            name: '__legacy__:publish-date',
-            event: 'publish:date',
-            priority: 40,  // Override default
-            fn: async (ctx) => blueprint.publishDateRule!(ctx.page)
-        });
-    }
-    
-    if (blueprint.slugRule) {
-        hooks.push({
-            name: '__legacy__:slug',
-            event: 'slug:extract',
-            priority: 40,
-            fn: async (ctx) => blueprint.slugRule!(ctx.page)
-        });
-    }
-    
-    // ... etc
-    
-    return hooks;
-}
-```
+**No compatibility layer needed** - we migrate both packages at once.
 
 ---
 
@@ -624,7 +620,7 @@ hooks: [
 
 ### 4. External API Integration
 
-**Fetch data from external sources:**
+**Access to database queries:**
 ```typescript
 hooks: [
     {
@@ -634,10 +630,11 @@ hooks: [
         fn: async (ctx) => {
             const authors = ctx.data;  // Array of author names from Notion
             
-            // Enrich with external data
+            // Option A: Include query helper in context
+            // ctx.db could be a safe query proxy (not raw Supabase client)
             const enriched = await Promise.all(
                 authors.map(async (name) => {
-                    const bio = await fetchAuthorBio(name);
+                    const bio = await ctx.db.query('author_bios', { name });
                     return { name, bio, avatar: bio.avatarUrl };
                 })
             );
@@ -647,6 +644,8 @@ hooks: [
     }
 ]
 ```
+
+**Note:** Direct Supabase client access is not recommended to avoid circular dependencies and N+1 query issues. A query proxy or helper could be provided if needed.
 
 ---
 
@@ -706,7 +705,8 @@ hooks: [
 
 ### 1. Hook Registration Style
 
-**Option A: Array in Config (Proposed)**
+**Decision: Option A (Array in Config)**
+
 ```typescript
 databases: [{
     hooks: [
@@ -714,66 +714,91 @@ databases: [{
     ]
 }]
 ```
-**Pros:** Simple, all in one place  
-**Cons:** Can't register hooks dynamically
 
-**Option B: Imperative Registration**
-```typescript
-const client = createSymbiontClient({ ... });
-client.hooks.register('publish:date', { name: 'x', priority: 50, fn: ... });
-```
-**Pros:** Dynamic registration, plugin system possible  
-**Cons:** Hooks not visible in config, harder to type-check
-
-**Recommendation:** Start with Option A, add Option B later if needed
+**Rationale:**
+- Simple, all in one place
+- Works great with imports: `hooks: [...myPluginHooks, customHook]`
+- Type-safe and visible in config
+- Imperative registration can be added later if needed
 
 ### 2. Hook vs. Property Config Split
 
-**Option A: Hooks for Everything (Pure)**
-- All customization through hooks
-- Remove property-based config entirely
+**Decision: Option C (Properties Generate Hooks)**
 
-**Option B: Hybrid (Proposed)**
-- Keep property mappings for simple cases (tagsProperty)
-- Use hooks for complex transformations
-- Gradually migrate properties to hooks
+Properties like `tagsProperty`, `authorsProperty` are syntactic sugar that internally generate hooks at appropriate priorities. Users can use either style or both together.
 
-**Option C: Properties Generate Hooks**
-- Properties are syntactic sugar that generate hooks internally
-- Users can use either style
+```typescript
+databases: [{
+    // Syntactic sugar (generates hooks internally)
+    tagsProperty: 'Tags',          // → metadata:tags hook at priority 50
+    authorsProperty: 'Authors',    // → metadata:authors hook at priority 50
+    
+    // Explicit hooks for complex cases
+    hooks: [
+        { name: 'custom:date', event: 'publish:date', priority: 40, fn: ... }
+    ]
+}]
+```
 
-**Recommendation:** Option B (Hybrid) for Phase 1, move toward Option A in v2.0
+**Rationale:**
+- Best of both worlds: simple for common cases, powerful for complex cases
+- Clear how properties translate to hooks (documented)
+- Can gradually move toward pure hooks if desired
 
 ### 3. Default Hook Behavior
 
-**Option A: Always Run Unless Disabled**
-- Defaults always execute
-- Users add higher priority hooks to override
+**Decision: Option A/C (Always Run Unless Disabled)**
 
-**Option B: Optional Defaults**
-- Defaults only run if no user hooks for that event
-- Simpler execution model
+Defaults always execute at priority 50. Users add hooks at different priorities to run before/after or override defaults.
 
-**Option C: Explicit Disable Required**
-- Defaults run unless explicitly disabled
-- Clear intent, more config
-
-**Recommendation:** Option A (Always Run) - most flexible
+**Rationale:**
+- Most flexible approach
+- Clear execution order
+- No magic "check if user defined this" logic
 
 ### 4. Error Handling in Hooks
 
-**Option A: Fail Fast (Proposed)**
-- Hook error stops page processing
-- Page marked as failed in sync results
+**Decision: Option A (Fail Fast)**
 
-**Option B: Continue on Error**
-- Log error but continue to next hook
-- Page processed with partial data
+Hook error stops page processing. Page marked as failed in sync results.
 
-**Option C: Configurable**
-- Hook can specify `continueOnError: true/false`
+**Rationale:**
+- Safe default behavior
+- Clear failure modes
+- Can add `continueOnError` flag later if needed
 
-**Recommendation:** Option A (Fail Fast) for safety, add Option C later
+### 5. Parallelization Strategy
+
+**Decision: Parallelize at page level, not hook level**
+
+All hooks for a single page run sequentially (data flows through), but multiple pages can be processed in parallel.
+
+**Rationale:**
+- Hooks need to compose (output → input)
+- Sequential execution is simpler to reason about
+- Page-level parallelization provides sufficient performance
+
+### 6. Markdown Configuration
+
+**Decision: Markdown uses hooks (with optional syntactic sugar)**
+
+Markdown processing becomes hooks on `'content:transform'` event, but common cases can have syntactic sugar properties that generate hooks.
+
+```typescript
+databases: [{
+    // Option 1: Syntactic sugar (generates hooks)
+    markdown: {
+        toc: { enabled: true },
+        math: { enabled: true }
+    },
+    
+    // Option 2: Explicit hooks for custom transforms
+    hooks: [
+        { name: 'custom:syntax-highlight', event: 'content:transform', 
+          priority: 45, fn: ... }
+    ]
+}]
+```
 
 ---
 
@@ -781,12 +806,12 @@ client.hooks.register('publish:date', { name: 'x', priority: 50, fn: ... });
 
 How to measure if this refactor is successful:
 
-1. **Adoption Rate:** % of new projects using hooks vs. old rules
-2. **Code Complexity:** Lines of config code in user projects (should decrease)
-3. **Issue Reports:** Reduction in "how do I customize X?" issues
-4. **Community Contributions:** Number of shared hooks/plugins
-5. **Migration Smoothness:** Number of breaking issues during migration
-6. **Performance:** Hook execution overhead (target: <5ms per page)
+1. **Code Complexity:** Lines of config code in workspace packages (should decrease significantly)
+2. **Testability:** Percentage of business logic covered by unit tests (should increase)
+3. **Maintainability:** Time to add new customizations (should decrease)
+4. **Documentation Clarity:** Can developers find default hook behavior without reading source? (yes/no)
+5. **Performance:** Hook execution overhead (target: <5ms per page)
+6. **Migration Success:** Both packages successfully using hooks with no regressions
 
 ---
 
@@ -871,57 +896,53 @@ if (process.env.NODE_ENV === 'development') {
 
 ---
 
-## 📝 Open Questions
+## 📝 Resolved Questions
+
+Based on feedback, these questions have been resolved:
 
 1. **Should hooks be able to call other hooks?**
-   - Pro: More composition options
-   - Con: Complexity, circular dependency risk
+   - **Decision:** No, not needed. Hooks compose through data flow.
 
 2. **Should there be "action" hooks (side effects only) vs. "filter" hooks (transformations)?**
-   - WordPress distinguishes these
-   - Could simplify reasoning about hook behavior
+   - **Decision:** Not for now. All hooks are filter hooks (transformations). Can revisit if use cases emerge.
 
 3. **How to handle async dependencies between hooks?**
-   - Some hooks might need to wait for external API calls
-   - Need to manage parallel execution carefully
+   - **Decision:** All hooks are async and run sequentially per page. Parallelization happens at page level.
 
 4. **Should hook context include access to Supabase client?**
-   - Enables hooks to query database
-   - Could lead to N+1 query problems
+   - **Decision:** No direct Supabase access (avoid circular dependencies). Could provide query proxy if needed.
 
 5. **How to version hooks?**
-   - If hook signatures change, how do we handle compatibility?
-   - Semver for hooks? Plugin API versioning?
+   - **Decision:** Not needed while in development. Can address later if plugin ecosystem emerges.
 
 6. **Should markdown config become hooks or stay separate?**
-   - Markdown is common enough that dedicated config might be clearer
-   - But hooks would be more consistent
+   - **Decision:** Markdown uses hooks with optional syntactic sugar for common cases.
 
 ---
 
-## 🎯 Recommendation
+## 🎯 Updated Recommendation
 
-**Proceed with Phase 1 implementation:**
+**Proceed with single-phase breaking change:**
 
-1. Build hook infrastructure as non-breaking addition
-2. Convert internal logic to use hooks
-3. Maintain backward compatibility with current API
-4. Document hook patterns thoroughly
-5. Migrate california-tech and guutz-blog as examples
+1. Build complete hook infrastructure
+2. Remove old rule-based config
+3. Migrate california-tech and guutz-blog
+4. Document all default hooks thoroughly
+5. Add syntactic sugar properties that generate hooks
 
 **Timeline:**
 - **Week 1-2:** Core hook registry and types
-- **Week 3-4:** Convert page transformer to use hooks internally
-- **Week 5:** Documentation and migration guides
-- **Week 6-7:** Migrate example projects
-- **Week 8+:** Community feedback and iteration
+- **Week 3-4:** Update page transformer
+- **Week 5:** Update type definitions
+- **Week 6-7:** Migrate both workspace packages
+- **Week 8:** Documentation and testing
 
 **Success Criteria:**
-- Both old and new APIs work
-- No performance regression
-- Documentation is clear
-- Example migrations are trivial
-- Developer feedback is positive
+- Clean hook-based API
+- No legacy code to maintain
+- Clear documentation of all default hooks
+- Both packages successfully migrated
+- Complex logic extracted to testable utilities
 
 ---
 

@@ -14,11 +14,11 @@
 
 **Problem:** Config system is opinionated but inflexible. Complex logic (30+ lines) must live inline in config files. Cannot test, reuse, or compose transformations.
 
-**Solution:** WordPress-style hook system with named hooks, priority ordering, and composability. Default hooks ship with Symbiont (no boilerplate). User hooks can augment or override defaults.
+**Solution:** Hook system with named hooks, priority ordering, and composability. Default hooks ship with Symbiont (clearly documented). User hooks can augment or override defaults.
 
-**Migration:** 4-phase strategy maintains backward compatibility until v2.0.0.
+**Migration:** Single-phase breaking change. Only california-tech and guutz-blog use this, both in workspace.
 
-**Timeline:** 8+ weeks for Phase 1 (non-breaking addition).
+**Timeline:** 8 weeks total for implementation and migration.
 
 ---
 
@@ -174,12 +174,12 @@ Priority 60: Post-processing
 Priority 99: Validation/debugging
 ```
 
-### 3. Default Hooks (No Boilerplate)
+### 3. Default Hooks (Well-Documented)
 
-Symbiont ships with default hooks for common cases:
+Symbiont ships with default hooks for common cases. **These are thoroughly documented** so users never need to dig into source code.
 
 ```typescript
-// Built into symbiont-cms package
+// Built into symbiont-cms package and DOCUMENTED
 const defaultHooks = [
     { name: 'symbiont:publish:check:default', event: 'publish:check', 
       priority: 50, fn: async (ctx) => true },
@@ -189,6 +189,11 @@ const defaultHooks = [
       priority: 50, fn: async (ctx) => createSlug(ctx.data.title) }
 ];
 ```
+
+Documentation includes:
+- API reference with all default hooks listed
+- TypeScript IntelliSense tooltips
+- Example overrides for common customizations
 
 Users only define hooks when they need custom behavior.
 
@@ -221,76 +226,74 @@ hooks: [
 
 ## Hook Lifecycle Events
 
-20+ events covering the entire transformation pipeline:
+20+ events covering the entire transformation pipeline.
+
+**Important:** Event names like `'publish:date'` are **built-in event types** defined by Symbiont. Your hook's `name` field (e.g., `'caltech:publish-date'`) is user-defined.
 
 ```typescript
-// Early validation
+// Early validation (built-in event types)
 'page:exclude'          // Should page be excluded from sync?
 'page:validate'         // Is page data valid?
 
-// Metadata extraction
+// Metadata extraction (built-in event types)
 'metadata:title'        // Extract/transform title
 'metadata:tags'         // Extract/transform tags
 'metadata:authors'      // Extract/transform authors
 'metadata:summary'      // Extract/transform summary
-'metadata:custom'       // Extract custom metadata
+'metadata:custom'       // Extract custom metadata (your data structure)
 
-// Publishing logic
+// Publishing logic (built-in event types)
 'publish:check'         // Should page be published?
 'publish:date'          // Determine publish date
 
-// Slug handling
+// Slug handling (built-in event types)
 'slug:extract'          // Extract custom slug from Notion
 'slug:generate'         // Generate slug from title
 'slug:validate'         // Validate slug uniqueness
 'slug:transform'        // Transform slug (sanitization)
 
-// Content processing
+// Content processing (built-in event types)
 'content:fetch'         // Fetch page content
 'content:transform'     // Transform markdown content
 'content:images'        // Process inline images
 
-// Cover image
+// Cover image (built-in event types)
 'cover:extract'         // Extract cover image
 'cover:process'         // Upload/process cover image
 
-// Sync back to Notion
+// Sync back to Notion (built-in event types)
 'sync:slug'             // Sync slug back to Notion
 'sync:content'          // Sync content back to Notion
 'sync:images'           // Sync image URLs back to Notion
+```
+
+**Example:**
+```typescript
+{
+    name: 'my-custom-date-hook',  // Your name (user-defined)
+    event: 'publish:date',         // Built-in event type
+    priority: 40,
+    fn: async (ctx) => { ... }
+}
 ```
 
 ---
 
 ## Migration Strategy
 
-### Phase 1: Non-Breaking Addition (8+ weeks)
+### Single-Phase Breaking Change (8 weeks)
 
-- Add `HookRegistry` class
-- Implement default hooks
-- Update `NotionPageToDatabasePageTransformer` to use hooks internally
-- Add `hooks: Hook[]` property to `DatabaseBlueprint` (optional)
-- **Result:** Both old and new systems work simultaneously
+Since only california-tech and guutz-blog use Symbiont (both in this workspace), we can do a clean breaking change without backward compatibility.
 
-### Phase 2: Documentation & Examples (2-3 weeks)
+**Steps:**
 
-- Add hook examples to documentation
-- Create migration guide
-- Update California Tech and Guutz Blog (as examples)
-- **Result:** Developers can start using hooks
+1. **Week 1-2:** Core hook registry and types
+2. **Week 3-4:** Update page transformer
+3. **Week 5:** Update type definitions (remove old rules)
+4. **Week 6-7:** Migrate both packages directly
+5. **Week 8:** Documentation and testing
 
-### Phase 3: Deprecation Warnings (3-4 weeks)
-
-- Add deprecation warnings for old-style rules
-- Auto-convert old rules to hooks internally
-- Update all tests to use hooks
-- **Result:** Old code works but warns
-
-### Phase 4: Breaking Change (v2.0.0)
-
-- Remove old rule properties
-- Remove auto-conversion layer
-- **Result:** Hooks are the only way
+**No backward compatibility needed** - simpler implementation, no legacy code maintenance.
 
 ---
 
@@ -308,31 +311,10 @@ hooks: [
 
 ### Cons ❌
 
-1. **More Boilerplate (for complex cases):** Hook objects are more verbose than inline functions
-2. **Learning Curve:** Developers need to understand hook lifecycle and priorities
-3. **Execution Model Complexity:** Priority system adds mental overhead
-4. **Breaking Change:** Eventually requires migration
-5. **Debugging Difficulty:** Stack traces might be harder to follow
-6. **Performance:** Hook registry adds indirection (likely negligible)
-
----
-
-## When to Use Hooks vs. Current Approach
-
-### Use Current (Rules) When:
-- ✅ Simple, one-line transformations
-- ✅ Single database with basic needs
-- ✅ Prototyping quickly
-- ✅ Learning Symbiont
-
-### Use Proposed (Hooks) When:
-- ✅ Complex multi-step transformations
-- ✅ Need to compose behavior from multiple sources
-- ✅ Building reusable logic
-- ✅ Multiple databases with shared logic
-- ✅ Need fine control over execution order
-- ✅ Want better debugging/observability
-- ✅ Building plugins or extensions
+1. **More Verbose:** Hook objects require more structure than inline functions
+2. **Learning Curve:** Need to understand hook lifecycle and priorities
+3. **Execution Model:** Priority system requires thinking about order
+4. **Breaking Change:** Requires migration (but only 2 packages)
 
 ---
 
@@ -373,28 +355,34 @@ A UI tool to build hook configurations without writing code.
 
 ---
 
-## Decision: Proceed?
+## ✅ Recommendation
 
-**Recommendation:** ✅ Proceed with Phase 1 implementation
+**Proceed with single-phase implementation**
 
 **Rationale:**
-- Solves real pain points (California Tech example)
-- Non-breaking addition (low risk)
+- Solves real pain points (California Tech's 30-line date parser)
+- Only 2 packages to migrate (both in workspace)
+- Simpler implementation without backward compatibility
 - Enables future extensibility (plugins, sharing)
-- Aligns with industry patterns (WordPress, SvelteKit)
 - Strong TypeScript typing throughout
 
-**Next Step:** Review memo and POC, discuss decision points, then start Phase 1 implementation.
+**Next Step:** Start implementation with 8-week timeline.
 
 ---
 
-## Questions for Discussion
+## Resolved Questions
 
-1. **Hook registration style:** Array in config vs. imperative registration?
-2. **Default hook behavior:** Always run vs. optional vs. explicit disable?
-3. **Error handling:** Fail fast vs. continue on error?
-4. **Markdown config:** Convert to hooks or keep separate?
-5. **Plugin API:** Include in Phase 1 or defer to later?
+Based on feedback, decisions have been made:
+
+1. **Hook registration:** Array in config ✅
+2. **Property config:** Syntactic sugar generates hooks ✅
+3. **Default hooks:** Always run unless overridden ✅
+4. **Error handling:** Fail fast ✅
+5. **Markdown:** Uses hooks with optional sugar ✅
+6. **Parallelization:** At page level, not hook level ✅
+7. **Database access:** No direct Supabase client ✅
+8. **Hooks calling hooks:** Not needed ✅
+9. **Hook versioning:** Not needed yet ✅
 
 ---
 
