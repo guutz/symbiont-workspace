@@ -1177,7 +1177,7 @@ npm install /path/to/symbiont-cms-x.x.x.tgz
 ## Related Documentation
 
 ### Implementation Guides
-- **[Quick Start](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Quick Start](2025-10-01-quickstart.md)** - Get up and running in 5 minutes
 - **[Integration Guide](INTEGRATION_GUIDE.md)** - QWER + Symbiont integration
 - **[Type Compatibility](TYPE_COMPATIBILITY.md)** - Type system details
 

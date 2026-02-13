@@ -676,7 +676,7 @@ GROUP BY device_type;
 
 ## Related Documentation
 
-- **[Symbiont CMS Complete Guide](symbiont-cms.md)** 📦 - Full system documentation
+- **[Symbiont CMS Complete Guide](2025-10-01-symbiont-cms-reference.md)** 📦 - Full system documentation
 - **[Zero-Rebuild CMS Vision](zero-rebuild-cms-vision.md)** 🎯 - The complete architecture overview
 - **[Dynamic File Management](dynamic-file-management.md)** - File/asset handling strategy
 - **[Image Optimization Strategy](image-optimization-strategy.md)** - Specific image handling

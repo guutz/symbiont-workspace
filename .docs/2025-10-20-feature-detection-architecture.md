@@ -10,7 +10,7 @@
 > 
 > **Current Reality:** We chose to keep things simple (no feature flags, no column) because asset weight is acceptable. This design stays on the shelf unless we need to slim client payloads later.
 > 
-> This document describes the **recommended architecture** for feature detection when you're ready to implement it. See `.docs/IMPLEMENTATION_STATUS.md` for current status.
+> This document describes the **recommended architecture** for feature detection when you're ready to implement it. See `.docs/2026-02-03-implementation-status.md` for current status.
 
 ## Design Decision
 
