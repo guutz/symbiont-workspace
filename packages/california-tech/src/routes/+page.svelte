@@ -1,7 +1,6 @@
 <!-- packages/california-tech/src/routes/+page.svelte -->
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { browser } from '$app/environment';
 	import { fly } from 'svelte/transition';
 	import { onMount } from 'svelte';
@@ -16,8 +15,8 @@
 	let isLoadingPreviews = $state(false);
 
 	// Always derive from URL (single source of truth)
-	const query = $derived($page.url.searchParams.get('q') || '');
-	const activeTag = $derived($page.url.searchParams.get('tag') || '');
+	const query = $derived(page.url.searchParams.get('q') || '');
+	const activeTag = $derived(page.url.searchParams.get('tag') || '');
 
 	// Client-side filtered posts (uses previews if available, otherwise server data)
 	const displayedPosts = $derived.by(() => {
