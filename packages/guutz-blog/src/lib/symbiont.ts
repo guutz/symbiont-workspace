@@ -1,10 +1,13 @@
-import { createSymbiontClient, type PageObjectResponse } from 'symbiont-cms';
+import { createSymbiontClient } from 'symbiont-cms';
+import { guutzHooks } from './hooks/guutz-hooks.js';
 
 /**
  * Symbiont CMS client for guutz-blog
  * 
  * This is the central configuration for the CMS.
  * Import and use this client anywhere in your app (client or server).
+ * 
+ * Migrated to hook-based configuration for better composability and testability.
  * 
  * TODO: Update Supabase credentials with actual values from your Supabase project
  * Get from: Supabase Dashboard → Project Settings → API
@@ -32,23 +35,8 @@ export const symbiont = createSymbiontClient({
 			alias: 'guutz-blog',
 			dataSourceId: '24a96d70-9f22-8066-897b-000b3b946090',
 
-			// Server-only function to determine if a page is published
-			isPublicRule: (page: PageObjectResponse) => {
-				// @ts-ignore - Notion types are complex, this is safe at runtime
-				const tags = page.properties.Tags;
-				// @ts-ignore - multi_select exists on Tags property
-				return tags?.multi_select?.some((tag: any) => tag.name === 'LIVE') ?? false;
-			},
-
-			slugRule: (page: PageObjectResponse) => {
-				// @ts-ignore - Notion types are complex, this is safe at runtime
-				const slugProperty = page.properties.Slug?.rich_text;
-				if (slugProperty && slugProperty.length > 0) {
-					return slugProperty[0]?.plain_text?.trim() || null;
-				}
-				
-				return null; // Auto-generate from title
-			}
+			// Hook-based configuration (new)
+			hooks: guutzHooks
 		}
 	]
 });

@@ -1,5 +1,6 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { Database } from './database.types.js';
+import type { Hook } from './hooks/types.js';
 
 // Re-export the PageObjectResponse type for easier access
 export type { PageObjectResponse };
@@ -122,33 +123,31 @@ export interface DatabaseBlueprint {
     dataSourceId: string;
 
     // ============================================
-    // PUBLISHING RULES
+    // HOOK SYSTEM
     // ============================================
 
-    /** Boolean gate: determines IF a page should be excluded from sync entirely */
-    excludeRule?: (page: PageObjectResponse) => boolean;
-    // Default: () => false (don't exclude anything)
-    // Return true to exclude the page from being synced to the database
-
-    /** Boolean gate: determines IF a page should be published */
-    isPublicRule?: (page: PageObjectResponse) => boolean;
-    // Default: () => true
-
-    /** Date extraction: determines WHEN a page should be published */
-    publishDateRule?: (page: PageObjectResponse) => string | null;
-    // Default: page.last_edited_time
+    /**
+     * Hook-based configuration for page transformation.
+     * Hooks provide a composable way to customize page processing.
+     * 
+     * @example
+     * hooks: [
+     *   {
+     *     name: 'custom:publish-date',
+     *     event: 'publish:date',
+     *     priority: 40,
+     *     fn: async (ctx) => ctx.page.properties.Date?.date?.start
+     *   }
+     * ]
+     */
+    hooks?: Hook[];
 
     // ============================================
     // SLUG CONFIGURATION
     // ============================================
 
-    /** Extract custom slug from Notion (return null for auto-generation) */
-    slugRule?: (page: PageObjectResponse) => string | null;
-    // Default: null (auto-generate from title)
-
     /** Notion property name to sync generated slugs back to */
     slugSyncProperty?: string | null;
-    // Default: null (don't sync back)
 
     // ============================================
     // METADATA - Optional property mappings
@@ -156,37 +155,19 @@ export interface DatabaseBlueprint {
 
     /** Tags property name (must be multi_select) */
     tagsProperty?: string | null;
-    // Default: null (no tags)
 
     /** Authors property name (people or multi_select) */
     authorsProperty?: string | null;
-    // Default: null (no authors)
 
     /** Summary property name (text or rich_text) */
     summaryProperty?: string | null;
-    // Default: null (no summary)
 
     /** Cover image property name (files property) */
     coverProperty?: string | null;
-    // Default: null (no cover image)
 
     // ============================================
     // FLEXIBLE METADATA - Pass-through to JSONB
     // ============================================
-
-    /**
-     * Extract arbitrary metadata to store in JSONB field
-     * Use this for cover images, layout config, custom fields, etc.
-     * 
-     * @example
-     * metadataExtractor: (page) => ({
-     *   coverImage: page.properties['Cover']?.files?.[0]?.file?.url,
-     *   homepageWeight: page.properties['Weight']?.number,
-     *   featured: page.properties['Featured']?.checkbox
-     * })
-     */
-    metadataExtractor?: (page: PageObjectResponse) => Record<string, any>;
-    // Default: null (no extra metadata)
 
     /**
      * Determines sync direction for content

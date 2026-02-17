@@ -26,6 +26,17 @@ export type {
 	PageObjectResponse
 } from './types.js';
 
+// Hook system types
+export type {
+	Hook,
+	HookEvent,
+	HookContext,
+	HookFunction
+} from './hooks/types.js';
+
+// Default hooks for reference
+export { defaultHooks } from './hooks/default-hooks.js';
+
 // Public environment utilities (client-safe)
 export { requirePublicEnvVar } from './client/utils/env.js';
 

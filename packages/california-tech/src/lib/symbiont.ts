@@ -1,10 +1,13 @@
-import { createSymbiontClient, type PageObjectResponse } from 'symbiont-cms';
+import { createSymbiontClient } from 'symbiont-cms';
+import { calTechHooks } from './hooks/caltech-hooks.js';
 
 /**
  * Symbiont CMS client for California Tech
  * 
  * This is the central configuration for the CMS.
  * Import and use this client anywhere in your app (client or server).
+ * 
+ * Migrated to hook-based configuration for better composability and testability.
  */
 export const symbiont = createSymbiontClient({
 	supabase: {
@@ -25,71 +28,15 @@ export const symbiont = createSymbiontClient({
 			alias: 'tech-article-staging',
 			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
 
-			// Conceivably once we get the web editor working, we might want to be able to edit Print Only articles
-			// from the web interface -- but for now, just exclude them from the sync entirely.
-			// Also this currently doesn't remove existing Print Only articles from the database,
-			// so that would be an issue if an article was synced automatically before the tag was added.
-			excludeRule: (page: PageObjectResponse) => {
-				const tags = page.properties.Tags; // @ts-ignore
-				return tags?.multi_select?.some((tag: any) => 
-					tag.name === 'Print Only' || tag.name === 'Advertisement'
-				) ?? false;
-			},
+			// Hook-based configuration (new)
+			hooks: calTechHooks,
 
-			isPublicRule: (page: PageObjectResponse) => {
-				const status = page.properties.Status;
-				const tags = page.properties.Tags;
-				return ( // @ts-ignore
-					status?.status?.name === 'Published' && // @ts-ignore
-					!tags?.multi_select?.some((tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement')
-				);
-			},
-
-			publishDateRule: (page: PageObjectResponse) => {
-				// @ts-ignore
-				const issueProperty = page.properties.Issue?.select?.name;
-
-				if (!issueProperty) {
-					// @ts-ignore
-					const websiteDate = page.properties['Website Publish Date']?.date?.start;
-					if (websiteDate) {
-						const date = new Date(websiteDate);
-						if (!isNaN(date.getTime())) {
-							return date.toISOString();
-						} else {
-							console.warn(`Invalid date format in Website Publish Date property: "${websiteDate}"`);
-							return null;
-						}
-					}
-				}
-
-				try {
-					const dateString = `${issueProperty} 07:00:00 GMT-0700`;
-					const date = new Date(dateString);
-
-					if (isNaN(date.getTime())) {
-						console.warn(`Invalid date format in Issue property: "${issueProperty}"`);
-						return null;
-					}
-
-					return date.toISOString();
-				} catch (error) {
-					console.error(`Error parsing Issue property "${issueProperty}":`, error);
-					return null;
-				}
-			},
-
+			// Property mappings (unchanged)
 			slugSyncProperty: 'Website Slug',
 			tagsProperty: 'Tags',
 			authorsProperty: 'Authors',
 			coverProperty: 'Cover Photo',
-			summaryProperty: 'Website Summary',
-
-			slugRule: (page: PageObjectResponse) => {
-				// @ts-ignore
-				const slugProperty = page.properties['Website Slug']?.rich_text;
-				return slugProperty?.[0]?.plain_text?.trim() || null;
-			}
+			summaryProperty: 'Website Summary'
 		}
 	]
 });
