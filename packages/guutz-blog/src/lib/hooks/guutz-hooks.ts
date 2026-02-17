@@ -3,6 +3,11 @@ import type { Hook } from 'symbiont-cms';
 /**
  * guutz-blog custom hooks for Symbiont CMS.
  * 
+ * **Extractor Pattern:**
+ * - Hooks read from `ctx.page` and return values or `null`
+ * - No `ctx.data`, no `ctx.skip()` - registry handles composition
+ * - Return `null` to let next hook run (for primitives like booleans)
+ * 
  * These hooks customize page processing for the guutz-blog:
  * - Only publish pages with "LIVE" tag
  * - Extract custom slug from Slug property
@@ -14,7 +19,7 @@ import type { Hook } from 'symbiont-cms';
  * 
  * Priority: 40 (before default)
  */
-export const publishCheckHook: Hook<null, boolean> = {
+export const publishCheckHook: Hook<boolean> = {
 	name: 'guutz:publish:check:live-tag',
 	event: 'publish:check',
 	priority: 40,
@@ -40,11 +45,14 @@ export const publishCheckHook: Hook<null, boolean> = {
 
 /**
  * Extract custom slug from Slug property.
- * If not present, fall back to auto-generation from title.
+ * 
+ * **Extractor Pattern:**
+ * - Returns custom slug if found
+ * - Returns `null` if not present (falls through to auto-generation)
  * 
  * Priority: 40 (before default)
  */
-export const slugExtractHook: Hook<null, string | null> = {
+export const slugExtractHook: Hook<string | null> = {
 	name: 'guutz:slug:extract',
 	event: 'slug:extract',
 	priority: 40,
@@ -66,7 +74,7 @@ export const slugExtractHook: Hook<null, string | null> = {
 			return customSlug;
 		}
 		
-		// No custom slug - fall through to auto-generation
+		// No custom slug - return null to fall through to auto-generation
 		return null;
 	}
 };
