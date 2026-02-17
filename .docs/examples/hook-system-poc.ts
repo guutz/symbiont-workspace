@@ -1,8 +1,13 @@
 /**
  * Proof of Concept: Hook System for Symbiont CMS
  * 
- * This file demonstrates what the hook-based architecture would look like in practice.
- * It's not meant to be production code, but rather a concrete example for discussion.
+ * SIMPLIFIED MODEL (Feb 14, 2026):
+ * - Hooks are pure extractors that read from ctx.page
+ * - Return your value, or null if you have nothing to contribute
+ * - No ctx.data, no ctx.skip() - registry handles composition automatically
+ * - Primitives: first non-null wins (stop early)
+ * - Objects: merge all non-null results
+ * - Booleans: AND all results
  */
 
 import type { PageObjectResponse } from '@notionhq/client';
@@ -31,31 +36,28 @@ export type HookEvent =
     | 'cover:extract'
     | 'cover:process';
 
-export interface HookContext<T = any> {
+export interface HookContext {
     page: PageObjectResponse;
-    data: T;
     logger: Logger;
     
     // Control flow
     aborted: boolean;
     abortReason?: string;
-    skipped: boolean;
     
     // Methods
     abort: (reason: string) => void;
-    skip: () => void;
 }
 
-export type HookFunction<TInput = any, TOutput = any> = (
-    context: HookContext<TInput>
-) => Promise<TOutput> | TOutput;
+export type HookFunction<TOutput = any> = (
+    context: HookContext
+) => Promise<TOutput | null> | TOutput | null;
 
-export interface Hook<TInput = any, TOutput = any> {
+export interface Hook<TOutput = any> {
     name: string;
     event: HookEvent;
     priority: number;  // Lower runs first (default: 50)
     continueOnError?: boolean;
-    fn: HookFunction<TInput, TOutput>;
+    fn: HookFunction<TOutput>;
 }
 
 interface Logger {
@@ -126,14 +128,16 @@ export class HookRegistry {
     
     /**
      * Execute all hooks for a given event
+     * 
+     * Composition rules:
+     * - Primitives (string, number, Date, boolean): First non-null wins
+     * - Objects: Merge all non-null results
+     * - Arrays: Concatenate all non-null results
      */
-    async execute<TInput, TOutput = TInput>(
+    async execute<TOutput = any>(
         event: HookEvent,
-        initialContext: {
-            page: PageObjectResponse;
-            data: TInput;
-        }
-    ): Promise<TOutput> {
+        page: PageObjectResponse
+    ): Promise<TOutput | null> {
         const hooks = this.hooks.get(event) || [];
         
         if (hooks.length === 0) {
@@ -141,7 +145,7 @@ export class HookRegistry {
                 event: 'no_hooks_registered',
                 hookEvent: event
             });
-            return initialContext.data as unknown as TOutput;
+            return null;
         }
         
         this.logger.debug({
@@ -152,20 +156,18 @@ export class HookRegistry {
         });
         
         // Create mutable context
-        const context: HookContext<any> = {
-            page: initialContext.page,
-            data: initialContext.data,
+        const context: HookContext = {
+            page: page,
             logger: this.logger,
             aborted: false,
-            skipped: false,
             abort: (reason: string) => {
                 context.aborted = true;
                 context.abortReason = reason;
-            },
-            skip: () => {
-                context.skipped = true;
             }
         };
+        
+        let result: any = null;
+        let resultType: 'primitive' | 'object' | 'array' | null = null;
         
         // Execute hooks in priority order
         for (const hook of hooks) {
@@ -189,24 +191,51 @@ export class HookRegistry {
                 
                 const output = await hook.fn(context);
                 
-                // Handle skip
-                if (context.skipped) {
+                // Skip null results
+                if (output === null || output === undefined) {
                     this.logger.debug({
-                        event: 'hook_skipped',
+                        event: 'hook_returned_null',
                         hookName: hook.name
                     });
-                    context.skipped = false;  // Reset for next hook
                     continue;
                 }
                 
-                // Update context data for next hook
-                context.data = output;
+                // Determine result type on first non-null output
+                if (resultType === null) {
+                    if (Array.isArray(output)) {
+                        resultType = 'array';
+                    } else if (typeof output === 'object') {
+                        resultType = 'object';
+                    } else {
+                        resultType = 'primitive';
+                    }
+                }
                 
-                this.logger.debug({
-                    event: 'hook_executed',
-                    hookName: hook.name,
-                    hookEvent: event
-                });
+                // Compose based on type
+                if (resultType === 'primitive') {
+                    // First non-null wins, stop processing
+                    result = output;
+                    this.logger.debug({
+                        event: 'hook_executed_first_wins',
+                        hookName: hook.name,
+                        stoppingEarly: true
+                    });
+                    break;
+                } else if (resultType === 'object') {
+                    // Merge objects
+                    result = { ...result, ...output };
+                    this.logger.debug({
+                        event: 'hook_executed_merged',
+                        hookName: hook.name
+                    });
+                } else if (resultType === 'array') {
+                    // Concatenate arrays
+                    result = result === null ? output : [...result, ...output];
+                    this.logger.debug({
+                        event: 'hook_executed_concatenated',
+                        hookName: hook.name
+                    });
+                }
                 
             } catch (error: any) {
                 this.logger.error({
@@ -223,7 +252,7 @@ export class HookRegistry {
             }
         }
         
-        return context.data as TOutput;
+        return result;
     }
     
     /**
@@ -270,7 +299,7 @@ export function createDefaultHooks(): Hook[] {
             fn: async (ctx) => ctx.page.last_edited_time
         },
         
-        // Slug: No custom slug by default
+        // Slug: No custom slug by default (returns null)
         {
             name: 'symbiont:slug:extract:default',
             event: 'slug:extract',
@@ -285,7 +314,10 @@ export function createDefaultHooks(): Hook[] {
             priority: 50,
             fn: async (ctx) => {
                 // Simple slug generation (in real code, use createSlug utility)
-                const title = ctx.data.title || 'untitled';
+                // Note: In practice, title would come from another hook's result
+                // or be extracted directly from ctx.page here
+                const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
+                const title = titleProp?.title?.[0]?.plain_text || 'untitled';
                 return title
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, '-')
@@ -298,7 +330,7 @@ export function createDefaultHooks(): Hook[] {
             name: 'symbiont:metadata:custom:default',
             event: 'metadata:custom',
             priority: 50,
-            fn: async (ctx) => ctx.data || {}
+            fn: async (ctx) => ({})
         }
     ];
 }
@@ -335,9 +367,8 @@ export function createCalTechHooks(): Hook[] {
                     return new Date(websiteDate).toISOString();
                 }
                 
-                // Fall back to default hook
-                ctx.skip();
-                return ctx.data;
+                // Return null to fall through to default hook
+                return null;
             }
         },
         
@@ -359,7 +390,6 @@ export function createCalTechHooks(): Hook[] {
             event: 'metadata:custom',
             priority: 50,
             fn: async (ctx) => ({
-                ...ctx.data,
                 layout: ctx.page.properties.Layout?.select?.name || 'standard',
                 featured: ctx.page.properties.Featured?.checkbox || false,
                 issueNumber: ctx.page.properties.Issue?.select?.name
@@ -386,35 +416,35 @@ export function createDebugHooks(): Hook[] {
                     propertyNames: Object.keys(ctx.page.properties),
                     properties: ctx.page.properties
                 });
-                return ctx.data;  // Pass through unchanged
+                // Return empty object, will be merged with later hooks
+                return {};
             }
         },
         
-        // Validate URLs in metadata
+        // Validate that URLs in page properties are valid
         {
-            name: 'debug:validate-urls',
+            name: 'debug:validate-page-urls',
             event: 'metadata:custom',
-            priority: 99,  // Run last
+            priority: 99,  // Run last to see accumulated metadata
             fn: async (ctx) => {
-                const data = ctx.data as Record<string, any>;
-                
-                // Check for invalid URLs
-                for (const [key, value] of Object.entries(data)) {
-                    if (typeof value === 'string' && value.startsWith('http')) {
+                // Check properties for URL fields
+                for (const [key, prop] of Object.entries(ctx.page.properties)) {
+                    if (prop.type === 'url' && prop.url) {
                         try {
-                            new URL(value);
+                            new URL(prop.url);
                         } catch {
                             ctx.logger.warn({
                                 event: 'invalid_url_detected',
                                 pageId: ctx.page.id,
                                 field: key,
-                                url: value
+                                url: prop.url
                             });
                         }
                     }
                 }
                 
-                return data;
+                // Return empty - this is just validation
+                return {};
             }
         }
     ];
@@ -470,37 +500,25 @@ async function exampleUsage() {
     } as any as PageObjectResponse;
     
     // Execute publish:date hooks
-    const publishDate = await registry.execute<null, string>('publish:date', {
-        page: mockPage,
-        data: null
-    });
+    const publishDate = await registry.execute<string>('publish:date', mockPage);
     
     console.log('Publish Date:', publishDate);
     // Expected: "2024-10-21T00:00:00.000Z" (from Issue property)
     
     // Execute slug:extract hooks
-    const extractedSlug = await registry.execute<null, string | null>('slug:extract', {
-        page: mockPage,
-        data: null
-    });
+    const extractedSlug = await registry.execute<string>('slug:extract', mockPage);
     
     console.log('Extracted Slug:', extractedSlug);
     // Expected: "my-custom-article-slug"
     
     // Execute slug:generate hooks (if no extracted slug)
     if (!extractedSlug) {
-        const generatedSlug = await registry.execute<{ title: string }, string>('slug:generate', {
-            page: mockPage,
-            data: { title: 'My Article Title' }
-        });
+        const generatedSlug = await registry.execute<string>('slug:generate', mockPage);
         console.log('Generated Slug:', generatedSlug);
     }
     
     // Execute metadata:custom hooks
-    const metadata = await registry.execute<Record<string, any>, Record<string, any>>('metadata:custom', {
-        page: mockPage,
-        data: {}
-    });
+    const metadata = await registry.execute<Record<string, any>>('metadata:custom', mockPage);
     
     console.log('Custom Metadata:', metadata);
     // Expected: { layout: 'feature', featured: true, issueNumber: 'October 21, 2024' }
@@ -527,7 +545,7 @@ async function testHookPriorities() {
         priority: 10,
         fn: async (ctx) => {
             console.log('Running priority 10');
-            return { ...ctx.data, step1: 'priority-10' };
+            return { step1: 'priority-10' };
         }
     });
     
@@ -537,7 +555,7 @@ async function testHookPriorities() {
         priority: 50,
         fn: async (ctx) => {
             console.log('Running priority 50');
-            return { ...ctx.data, step2: 'priority-50' };
+            return { step2: 'priority-50' };
         }
     });
     
@@ -547,7 +565,7 @@ async function testHookPriorities() {
         priority: 30,
         fn: async (ctx) => {
             console.log('Running priority 30');
-            return { ...ctx.data, step3: 'priority-30' };
+            return { step3: 'priority-30' };
         }
     });
     
@@ -557,14 +575,11 @@ async function testHookPriorities() {
         properties: {}
     } as any as PageObjectResponse;
     
-    const result = await registry.execute('metadata:custom', {
-        page: mockPage,
-        data: {}
-    });
+    const result = await registry.execute('metadata:custom', mockPage);
     
     console.log('Result:', result);
     // Expected: { step1: 'priority-10', step3: 'priority-30', step2: 'priority-50' }
-    // Execution order: 10 → 30 → 50
+    // Execution order: 10 → 30 → 50 (all merged together)
 }
 
 // ============================================
@@ -581,16 +596,15 @@ async function testControlFlow() {
     
     const registry = new HookRegistry(logger);
     
-    // Hook that skips
+    // Hook that returns null if no custom date
     registry.register({
-        name: 'skip-if-no-data',
+        name: 'custom-date-if-available',
         event: 'publish:date',
         priority: 40,
         fn: async (ctx) => {
             if (!ctx.page.properties.CustomDate) {
-                console.log('No custom date, skipping to next hook');
-                ctx.skip();
-                return null;
+                console.log('No custom date, returning null');
+                return null;  // Falls through to next hook
             }
             return ctx.page.properties.CustomDate.date.start;
         }
@@ -613,13 +627,173 @@ async function testControlFlow() {
         properties: {}
     } as any as PageObjectResponse;
     
-    const result = await registry.execute('publish:date', {
-        page: mockPage,
-        data: null
-    });
+    const result = await registry.execute('publish:date', mockPage);
     
     console.log('Publish Date:', result);
-    // Expected: "2026-02-13T00:00:00.000Z" (from default hook after skip)
+    // Expected: "2026-02-13T00:00:00.000Z" (from default hook, since custom returned null)
+}
+
+// ============================================
+// Testing Hook Composition Patterns
+// ============================================
+
+async function testHookComposition() {
+    const logger: Logger = {
+        debug: (data) => console.log('[DEBUG]', data),
+        info: (data) => console.log('[INFO]', data),
+        warn: (data) => console.warn('[WARN]', data),
+        error: (data) => console.error('[ERROR]', data)
+    };
+    
+    console.log('\n--- Pattern 1: Single-Value (First Non-Null Wins) ---');
+    const registry1 = new HookRegistry(logger);
+    
+    // First hook sets a date
+    registry1.register({
+        name: 'custom-date',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('Custom date hook: Setting to Jan 1, 2026');
+            return '2026-01-01T00:00:00.000Z';
+        }
+    });
+    
+    // Second hook would set different date, but won't run
+    registry1.register({
+        name: 'default-date',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Default date hook: This should NOT run!');
+            return '2026-02-13T00:00:00.000Z';
+        }
+    });
+    
+    const mockPage = {
+        id: 'test-page',
+        last_edited_time: '2026-02-13T00:00:00.000Z',
+        properties: {}
+    } as any as PageObjectResponse;
+    
+    const result1 = await registry1.execute('publish:date', mockPage
+    );
+    console.log('Result (first wins):', result1);
+    // Expected: "2026-01-01T00:00:00.000Z" (first non-null, second never runs!)
+    
+    console.log('\n--- Pattern 2: Single-Value with Null Fallback ---');
+    const registry2 = new HookRegistry(logger);
+    
+    // First hook returns null if no custom data
+    registry2.register({
+        name: 'custom-date-conditional',
+        event: 'publish:date',
+        priority: 40,
+        fn: async (ctx) => {
+            const custom = ctx.page.properties.CustomDate;
+            if (!custom) {
+                console.log('Custom date hook: No custom date, returning null');
+                return null;  // Falls through to next hook
+            }
+            return custom.date.start;
+        }
+    });
+    
+    // Second hook runs because first returned null
+    registry2.register({
+        name: 'default-date-fallback',
+        event: 'publish:date',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Default date hook: Using fallback date');
+            return '2026-02-13T00:00:00.000Z';
+        }
+    });
+    
+    const result2 = await registry2.execute('publish:date', mockPage);
+    console.log('Result (after null):', result2);
+    // Expected: "2026-02-13T00:00:00.000Z" (first returned null, second runs)
+    
+    console.log('\n--- Pattern 3: Object Auto-Merge ---');
+    const registry3 = new HookRegistry(logger);
+    
+    // First hook returns partial metadata
+    registry3.register({
+        name: 'meta-layout',
+        event: 'metadata:custom',
+        priority: 30,
+        fn: async (ctx) => {
+            console.log('Layout hook: Setting layout and featured');
+            return {
+                layout: 'blog',
+                featured: true
+            };
+        }
+    });
+    
+    // Second hook returns more metadata - auto-merged!
+    registry3.register({
+        name: 'meta-seo',
+        event: 'metadata:custom',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('SEO hook: Adding SEO fields (auto-merged by registry)');
+            return {
+                // No ...ctx.data needed! Registry merges automatically
+                ogImage: 'https://example.com/og.jpg',
+                keywords: ['tech', 'blog']
+            };
+        }
+    });
+    
+    // Third hook adds computed fields - also auto-merged!
+    registry3.register({
+        name: 'meta-computed',
+        event: 'metadata:custom',
+        priority: 50,
+        fn: async (ctx) => {
+            console.log('Computed hook: Adding word count (auto-merged by registry)');
+            return {
+                // No ...ctx.data needed!
+                wordCount: 1234,
+                readingTime: 7
+            };
+        }
+    });
+    
+    const result3 = await registry3.execute('metadata:custom', mockPage);
+    console.log('Result (auto-merged):', JSON.stringify(result3, null, 2));
+    // Expected: { layout: 'blog', featured: true, ogImage: '...', keywords: [...], wordCount: 1234, readingTime: 7 }
+    // All merged automatically by registry!
+    
+    console.log('\n--- Pattern 4: Null Filtering ---');
+    const registry4 = new HookRegistry(logger);
+    
+    registry4.register({
+        name: 'meta-sometimes-empty',
+        event: 'metadata:custom',
+        priority: 30,
+        fn: async (ctx) => {
+            console.log('Sometimes empty hook: Returning null');
+            return null;  // This hook contributes nothing
+        }
+    });
+    
+    registry4.register({
+        name: 'meta-actual-data',
+        event: 'metadata:custom',
+        priority: 40,
+        fn: async (ctx) => {
+            console.log('Actual data hook: Returning data');
+            return {
+                layout: 'blog'
+            };
+        }
+    });
+    
+    const result4 = await registry4.execute('metadata:custom', mockPage);
+    console.log('Result (nulls ignored):', JSON.stringify(result4, null, 2));
+    // Expected: { layout: 'blog' } ← First hook's null was ignored
 }
 
 // Run examples if this file is executed directly
@@ -632,4 +806,7 @@ if (require.main === module) {
     
     console.log('\n=== Testing Control Flow ===');
     testControlFlow().catch(console.error);
+    
+    console.log('\n=== Testing Hook Composition Patterns ===');
+    testHookComposition().catch(console.error);
 }

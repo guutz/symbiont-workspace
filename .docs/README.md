@@ -36,9 +36,9 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## Future Designs & Architecture Proposals
 
+- **`2026-02-14-HOOK_SYSTEM_GUIDE.md`** – **✨ Current:** Consolidated hook system design (simplified extractor model)
+- **`IMPLEMENTATION_PROMPT_HOOK_SYSTEM.md`** – **🤖 Agent Prompt:** Complete implementation guide for AI agents
 - **`2025-12-15-symbiont-cli-design.md`** – Proposed CLI tool for config initialization, validation, and code generation
-- **`2026-02-13-hook-based-config-refactor.md`** – **⭐ NEW:** Comprehensive proposal for hook-based configuration system (WordPress-style extensibility)
-- **`2026-02-13-hook-refactor-executive-summary.md`** – **⭐ Quick summary:** Hook refactor proposal (start here)
 
 ## Historical / Completed
 
@@ -51,6 +51,22 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
 
 ## What Changed in This Refresh?
 
+- **Feb 14, 2026:** Hook system simplification and consolidation
+  - **Simplified hook model** - Removed ctx.data and ctx.skip(), hooks now return value or null
+  - **Hooks are extractors, not transformers** - All hooks read from ctx.page independently
+  - **Automatic composition** - Registry handles merging based on return type (primitives: first wins, objects: auto-merge)
+  - **Created 2026-02-14-HOOK_SYSTEM_GUIDE.md** - Single consolidated guide replacing 6 separate documents
+  - **Created IMPLEMENTATION_PROMPT_HOOK_SYSTEM.md** - Complete 8-week implementation guide for AI agents
+  - **Updated hook-system-poc.ts** - Working implementation of simplified model
+  - **Deleted old hook docs** - Removed 6 superseded documents (composition guide, refactor memo, etc.)
+  - See `.docs/2026-02-14-HOOK_SYSTEM_GUIDE.md` and `.docs/examples/hook-system-poc.ts`
+- **Feb 13, 2026:** Hook composition behavior clarification
+  - **Added HOOK_COMPOSITION_GUIDE.md** - Comprehensive guide explaining multi-hook behavior patterns
+  - **Clarified overwrite vs merge semantics** - Single-value types (last wins) vs object types (explicit merge)
+  - **Documented control flow** - skip() vs abort() behavior
+  - **Added best practices** - Decision trees, common pitfalls, and examples
+  - **Updated hook refactor memo** - Added composition section with key insights
+  - See `.docs/2026-02-13-HOOK_COMPOSITION_GUIDE.md`
 - **Feb 13, 2026:** File naming standardization + "The Loop" documentation
   - **Renamed all docs** - Now use YYYY-MM-DD prefix for consistency
   - **Added "The Loop" section** - Documented how to query pages/posts in Svelte files
