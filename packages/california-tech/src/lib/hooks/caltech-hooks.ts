@@ -75,6 +75,7 @@ export const publishCheckHook: Hook<boolean> = {
 			ctx.logger.debug({
 				event: 'publish_check_failed',
 				pageId: ctx.page.id,
+				// @ts-ignore - Notion types are complex
 				status: status?.status?.name,
 				hasPrintOnlyTag
 			});
