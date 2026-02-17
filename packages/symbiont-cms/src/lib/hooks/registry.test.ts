@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { HookRegistry } from './registry.js';
 import type { Hook } from './types.js';
 
-describe('HookRegistry', () => {
+describe('HookRegistry (Extractor Pattern)', () => {
 	let registry: HookRegistry;
 	let mockLogger: any;
 
@@ -73,9 +73,9 @@ describe('HookRegistry', () => {
 		});
 	});
 
-	describe('execution', () => {
-		it('should execute a single hook', async () => {
-			const hook: Hook<null, string> = {
+	describe('execution - primitives (first non-null wins)', () => {
+		it('should execute a single hook returning primitive', async () => {
+			const hook: Hook<string> = {
 				name: 'test:hook',
 				event: 'publish:date',
 				priority: 50,
@@ -87,83 +87,132 @@ describe('HookRegistry', () => {
 			const result = await registry.execute('publish:date', {
 				page: {} as any,
 				config: {} as any,
-				data: null,
 				logger: mockLogger
 			});
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 		});
 
-		it('should execute hooks in priority order', async () => {
+		it('should stop at first non-null for primitives', async () => {
 			const executionOrder: string[] = [];
 
-			const hooks: Hook[] = [
-				{
-					name: 'hook3',
-					event: 'metadata:custom',
-					priority: 70,
-					fn: async (ctx) => {
-						executionOrder.push('hook3');
-						return ctx.data;
-					}
-				},
+			const hooks: Hook<string>[] = [
 				{
 					name: 'hook1',
-					event: 'metadata:custom',
+					event: 'publish:date',
 					priority: 30,
-					fn: async (ctx) => {
+					fn: async () => {
 						executionOrder.push('hook1');
-						return ctx.data;
+						return '2024-01-01T00:00:00Z'; // First non-null
 					}
 				},
 				{
 					name: 'hook2',
-					event: 'metadata:custom',
+					event: 'publish:date',
 					priority: 50,
-					fn: async (ctx) => {
-						executionOrder.push('hook2');
-						return ctx.data;
+					fn: async () => {
+						executionOrder.push('hook2'); // Should NOT execute
+						return '2024-02-01T00:00:00Z';
 					}
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			await registry.execute('metadata:custom', {
+			const result = await registry.execute('publish:date', {
 				page: {} as any,
 				config: {} as any,
-				data: {},
 				logger: mockLogger
 			});
 
-			expect(executionOrder).toEqual(['hook1', 'hook2', 'hook3']);
+			expect(result).toBe('2024-01-01T00:00:00Z');
+			expect(executionOrder).toEqual(['hook1']); // Only first hook ran
 		});
 
-		it('should pass data from one hook to the next', async () => {
-			const hooks: Hook<Record<string, any>, Record<string, any>>[] = [
+		it('should continue to next hook if first returns null', async () => {
+			const executionOrder: string[] = [];
+
+			const hooks: Hook<string | null>[] = [
+				{
+					name: 'hook1',
+					event: 'publish:date',
+					priority: 30,
+					fn: async () => {
+						executionOrder.push('hook1');
+						return null; // Falls through
+					}
+				},
+				{
+					name: 'hook2',
+					event: 'publish:date',
+					priority: 50,
+					fn: async () => {
+						executionOrder.push('hook2');
+						return '2024-01-01T00:00:00Z'; // Second hook wins
+					}
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('publish:date', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toBe('2024-01-01T00:00:00Z');
+			expect(executionOrder).toEqual(['hook1', 'hook2']); // Both ran
+		});
+
+		it('should return null if all hooks return null', async () => {
+			const hooks: Hook<string | null>[] = [
+				{
+					name: 'hook1',
+					event: 'publish:date',
+					priority: 30,
+					fn: async () => null
+				},
+				{
+					name: 'hook2',
+					event: 'publish:date',
+					priority: 50,
+					fn: async () => null
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('publish:date', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe('execution - objects (auto-merge)', () => {
+		it('should merge all non-null objects', async () => {
+			const hooks: Hook<Record<string, any>>[] = [
 				{
 					name: 'hook1',
 					event: 'metadata:custom',
 					priority: 30,
-					fn: async () => ({ field1: 'value1' })
+					fn: async () => ({ field1: 'value1' }) // No spreading needed!
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:custom',
 					priority: 40,
-					fn: async (ctx) => ({
-						...ctx.data,
-						field2: 'value2'
-					})
+					fn: async () => ({ field2: 'value2' }) // No ctx.data!
 				},
 				{
 					name: 'hook3',
 					event: 'metadata:custom',
 					priority: 50,
-					fn: async (ctx) => ({
-						...ctx.data,
-						field3: 'value3'
-					})
+					fn: async () => ({ field3: 'value3' })
 				}
 			];
 
@@ -172,7 +221,6 @@ describe('HookRegistry', () => {
 			const result = await registry.execute('metadata:custom', {
 				page: {} as any,
 				config: {} as any,
-				data: {},
 				logger: mockLogger
 			});
 
@@ -183,15 +231,141 @@ describe('HookRegistry', () => {
 			});
 		});
 
-		it('should return initial data if no hooks registered', async () => {
-			const result = await registry.execute('publish:check', {
+		it('should skip null returns when merging objects', async () => {
+			const hooks: Hook<Record<string, any> | null>[] = [
+				{
+					name: 'hook1',
+					event: 'metadata:custom',
+					priority: 30,
+					fn: async () => ({ field1: 'value1' })
+				},
+				{
+					name: 'hook2',
+					event: 'metadata:custom',
+					priority: 40,
+					fn: async () => null // Skipped
+				},
+				{
+					name: 'hook3',
+					event: 'metadata:custom',
+					priority: 50,
+					fn: async () => ({ field3: 'value3' })
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('metadata:custom', {
 				page: {} as any,
 				config: {} as any,
-				data: true,
 				logger: mockLogger
 			});
 
-			expect(result).toBe(true);
+			expect(result).toEqual({
+				field1: 'value1',
+				field3: 'value3'
+			});
+		});
+
+		it('should override fields with same name (later wins)', async () => {
+			const hooks: Hook<Record<string, any>>[] = [
+				{
+					name: 'hook1',
+					event: 'metadata:custom',
+					priority: 30,
+					fn: async () => ({ field: 'first' })
+				},
+				{
+					name: 'hook2',
+					event: 'metadata:custom',
+					priority: 50,
+					fn: async () => ({ field: 'second' }) // Overwrites
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('metadata:custom', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toEqual({ field: 'second' });
+		});
+	});
+
+	describe('execution - arrays (auto-concatenate)', () => {
+		it('should concatenate all non-null arrays', async () => {
+			const hooks: Hook<string[]>[] = [
+				{
+					name: 'hook1',
+					event: 'metadata:tags',
+					priority: 30,
+					fn: async () => ['tag1', 'tag2']
+				},
+				{
+					name: 'hook2',
+					event: 'metadata:tags',
+					priority: 50,
+					fn: async () => ['tag3', 'tag4']
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('metadata:tags', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toEqual(['tag1', 'tag2', 'tag3', 'tag4']);
+		});
+
+		it('should skip null returns when concatenating arrays', async () => {
+			const hooks: Hook<string[] | null>[] = [
+				{
+					name: 'hook1',
+					event: 'metadata:tags',
+					priority: 30,
+					fn: async () => ['tag1']
+				},
+				{
+					name: 'hook2',
+					event: 'metadata:tags',
+					priority: 40,
+					fn: async () => null // Skipped
+				},
+				{
+					name: 'hook3',
+					event: 'metadata:tags',
+					priority: 50,
+					fn: async () => ['tag2']
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('metadata:tags', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toEqual(['tag1', 'tag2']);
+		});
+	});
+
+	describe('control flow', () => {
+		it('should return null if no hooks registered', async () => {
+			const result = await registry.execute('publish:check', {
+				page: {} as any,
+				config: {} as any,
+				logger: mockLogger
+			});
+
+			expect(result).toBeNull();
 		});
 
 		it('should throw error if hook throws', async () => {
@@ -210,47 +384,42 @@ describe('HookRegistry', () => {
 				registry.execute('publish:check', {
 					page: {} as any,
 					config: {} as any,
-					data: null,
 					logger: mockLogger
 				})
 			).rejects.toThrow('Hook failed');
 		});
-	});
 
-	describe('control flow', () => {
-		it('should skip to next hook when ctx.skip() is called', async () => {
-			const hooks: Hook<null, string>[] = [
+		it('should continue if hook throws and continueOnError is true', async () => {
+			const hooks: Hook[] = [
 				{
-					name: 'hook1',
-					event: 'publish:date',
+					name: 'failing:hook',
+					event: 'publish:check',
 					priority: 30,
-					fn: async (ctx) => {
-						ctx.skip(); // Skip this hook
-						return 'skipped-date';
+					continueOnError: true,
+					fn: async () => {
+						throw new Error('Hook failed');
 					}
 				},
 				{
-					name: 'hook2',
-					event: 'publish:date',
+					name: 'success:hook',
+					event: 'publish:check',
 					priority: 50,
-					fn: async () => '2024-01-01T00:00:00Z'
+					fn: async () => true
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {
+			const result = await registry.execute('publish:check', {
 				page: {} as any,
 				config: {} as any,
-				data: null,
 				logger: mockLogger
 			});
 
-			// Should use hook2's result, not hook1's
-			expect(result).toBe('2024-01-01T00:00:00Z');
+			expect(result).toBe(true); // Second hook ran
 		});
 
-		it('should abort execution when ctx.abort() is called', async () => {
+		it('should abort on ctx.abort()', async () => {
 			const executionOrder: string[] = [];
 
 			const hooks: Hook[] = [
@@ -260,8 +429,8 @@ describe('HookRegistry', () => {
 					priority: 30,
 					fn: async (ctx) => {
 						executionOrder.push('hook1');
-						ctx.abort('Aborted by hook1');
-						return false;
+						ctx.abort('Page is invalid');
+						return true;
 					}
 				},
 				{
@@ -269,7 +438,7 @@ describe('HookRegistry', () => {
 					event: 'publish:check',
 					priority: 50,
 					fn: async () => {
-						executionOrder.push('hook2');
+						executionOrder.push('hook2'); // Should NOT run
 						return true;
 					}
 				}
@@ -281,22 +450,19 @@ describe('HookRegistry', () => {
 				registry.execute('publish:check', {
 					page: {} as any,
 					config: {} as any,
-					data: null,
 					logger: mockLogger
 				})
-			).rejects.toThrow('Hook aborted: Aborted by hook1');
+			).rejects.toThrow('Page is invalid');
 
-			// Only hook1 should have executed
-			expect(executionOrder).toEqual(['hook1']);
+			expect(executionOrder).toEqual(['hook1']); // Only first hook ran
 		});
 	});
 
 	describe('utility methods', () => {
-		it('should unregister a hook by name', () => {
+		it('should unregister hook by name', () => {
 			const hook: Hook = {
 				name: 'test:hook',
 				event: 'publish:check',
-				priority: 50,
 				fn: async () => true
 			};
 
@@ -307,38 +473,33 @@ describe('HookRegistry', () => {
 			expect(registry.getHooks('publish:check')).toHaveLength(0);
 		});
 
-		it('should get all hooks across all events', () => {
-			registry.registerMany([
-				{ name: 'hook1', event: 'publish:check', priority: 50, fn: async () => true },
-				{ name: 'hook2', event: 'publish:date', priority: 50, fn: async () => '' }
-			]);
+		it('should clear all hooks', () => {
+			const hooks: Hook[] = [
+				{ name: 'hook1', event: 'publish:check', fn: async () => true },
+				{ name: 'hook2', event: 'publish:date', fn: async () => '2024-01-01' }
+			];
+
+			registry.registerMany(hooks);
+			expect(registry.getHookCount('publish:check')).toBe(1);
+			expect(registry.getHookCount('publish:date')).toBe(1);
+
+			registry.clear();
+			expect(registry.getHookCount('publish:check')).toBe(0);
+			expect(registry.getHookCount('publish:date')).toBe(0);
+		});
+
+		it('should get all hooks', () => {
+			const hooks: Hook[] = [
+				{ name: 'hook1', event: 'publish:check', fn: async () => true },
+				{ name: 'hook2', event: 'publish:date', fn: async () => '2024-01-01' }
+			];
+
+			registry.registerMany(hooks);
 
 			const allHooks = registry.getAllHooks();
 			expect(allHooks.size).toBe(2);
 			expect(allHooks.get('publish:check')).toHaveLength(1);
 			expect(allHooks.get('publish:date')).toHaveLength(1);
-		});
-
-		it('should count hooks for an event', () => {
-			registry.registerMany([
-				{ name: 'hook1', event: 'publish:check', priority: 50, fn: async () => true },
-				{ name: 'hook2', event: 'publish:check', priority: 40, fn: async () => true }
-			]);
-
-			expect(registry.getHookCount('publish:check')).toBe(2);
-			expect(registry.getHookCount('publish:date')).toBe(0);
-		});
-
-		it('should clear all hooks', () => {
-			registry.registerMany([
-				{ name: 'hook1', event: 'publish:check', priority: 50, fn: async () => true },
-				{ name: 'hook2', event: 'publish:date', priority: 50, fn: async () => '' }
-			]);
-
-			registry.clear();
-
-			expect(registry.getHookCount('publish:check')).toBe(0);
-			expect(registry.getHookCount('publish:date')).toBe(0);
 		});
 	});
 });
