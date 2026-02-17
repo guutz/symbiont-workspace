@@ -393,19 +393,20 @@ export class NotionPageToDatabasePageTransformer {
 			metadata.cover = systemFields.coverUrl;
 		}
 
-		// Get custom metadata via hooks
-		const customMeta = await this.hookRegistry.execute<Record<string, any>, Record<string, any>>(
+		// Get custom metadata via hooks (auto-merged by registry)
+		const customMeta = await this.hookRegistry.execute<Record<string, any>>(
 			'metadata:custom',
 			{
 				page,
 				config: this.config,
-				data: metadata, // Pass system fields as initial data
 				logger: this.logger
 			}
 		);
 
-		// Merge hook result
-		Object.assign(metadata, customMeta);
+		// Merge hook result with system fields
+		if (customMeta) {
+			Object.assign(metadata, customMeta);
+		}
 
 		// Return null if empty (cleaner than empty object in database)
 		return Object.keys(metadata).length > 0 ? metadata : null;
@@ -443,10 +444,9 @@ export class NotionPageToDatabasePageTransformer {
 	 */
 	private async resolveSlug(page: PageObjectResponse, title: string): Promise<string> {
 		// 1. Extract custom slug via hooks
-		const customSlug = await this.hookRegistry.execute<null, string | null>('slug:extract', {
+		const customSlug = await this.hookRegistry.execute<string | null>('slug:extract', {
 			page,
 			config: this.config,
-			data: null,
 			logger: this.logger
 		});
 
@@ -476,22 +476,25 @@ export class NotionPageToDatabasePageTransformer {
 			}
 		} else {
 			// New page or existing page without slug - generate via hooks
-			const baseSlug = await this.hookRegistry.execute<{ title: string; customSlug: string | null }, string>(
+			// In the new extractor pattern, slug:generate extracts title directly from page
+			const baseSlug = await this.hookRegistry.execute<string>(
 				'slug:generate',
 				{
 					page,
 					config: this.config,
-					data: { title, customSlug },
 					logger: this.logger
 				}
 			);
 
-			slug = await this.ensureUniqueSlug(baseSlug);
+			// If custom slug was extracted, use it instead of generated
+			const finalBaseSlug = customSlug || baseSlug;
+			slug = await this.ensureUniqueSlug(finalBaseSlug);
 			slugChanged = true;
 			this.logger.info({
 				event: 'slug_generated',
 				pageId: page.id,
-				slug
+				slug,
+				customSlug: !!customSlug
 			});
 		}
 
@@ -551,36 +554,33 @@ export class NotionPageToDatabasePageTransformer {
 	 * Check if page should be excluded from sync (apply page:exclude hook)
 	 */
 	private async shouldExclude(page: PageObjectResponse): Promise<boolean> {
-		const shouldExclude = await this.hookRegistry.execute<null, boolean>('page:exclude', {
+		const shouldExclude = await this.hookRegistry.execute<boolean>('page:exclude', {
 			page,
 			config: this.config,
-			data: null,
 			logger: this.logger
 		});
-		return shouldExclude;
+		return shouldExclude || false; // Default to false if no hooks return a value
 	}
 
 	/**
 	 * Check if page should be published (apply publish:check hook)
 	 */
 	private async shouldPublish(page: PageObjectResponse): Promise<boolean> {
-		const shouldPublish = await this.hookRegistry.execute<null, boolean>('publish:check', {
+		const shouldPublish = await this.hookRegistry.execute<boolean>('publish:check', {
 			page,
 			config: this.config,
-			data: null,
 			logger: this.logger
 		});
-		return shouldPublish;
+		return shouldPublish || false; // Default to false if no hooks return a value
 	}
 
 	/**
 	 * Get publish date (apply publish:date hook)
 	 */
 	private async getPublishDate(page: PageObjectResponse): Promise<string | null> {
-		const publishDate = await this.hookRegistry.execute<null, string>('publish:date', {
+		const publishDate = await this.hookRegistry.execute<string>('publish:date', {
 			page,
 			config: this.config,
-			data: null,
 			logger: this.logger
 		});
 		return publishDate;

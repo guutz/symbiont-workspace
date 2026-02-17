@@ -3,64 +3,65 @@ import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.j
 /**
  * HookRegistry manages registration and execution of hooks.
  * 
- * **NEW APPROACH (Extractor Pattern):**
+ * Responsibilities:
+ * - Register hooks for specific events
+ * - Sort hooks by priority
+ * - Execute hooks in order with proper error handling
+ * - Manage control flow (abort, skip)
  * 
- * Hooks are independent extractors that read from `ctx.page` and return values.
- * They do NOT transform data flowing through them (no `ctx.data`, no `ctx.skip()`).
+ * Hook Data Flow:
+ * Hooks execute sequentially in priority order. Each hook receives the OUTPUT
+ * of the previous hook as its INPUT via ctx.data. This allows hooks to compose:
  * 
- * The registry automatically composes results based on return type:
- * - **Primitives** (string, number, Date, boolean): First non-null wins (stops early)
- * - **Objects**: Merge all non-null results
- * - **Arrays**: Concatenate all non-null results
+ * 1. Hook A (priority 30) receives initial data, returns modified data
+ * 2. Hook B (priority 40) receives Hook A's output, returns further modified data
+ * 3. Hook C (priority 50) receives Hook B's output, returns final result
+ * 
+ * Changes made by earlier hooks are preserved and passed through to later hooks.
+ * Each hook can:
+ * - Transform the data and return it (data flows to next hook)
+ * - Call ctx.skip() to pass data unchanged to next hook
+ * - Call ctx.abort() to stop all further processing
  * 
  * @example Basic hook composition
- * ```typescript
- * // Hook 1: Try custom date extraction (priority 40)
+ * // Hook 1: Extract base metadata (priority 30)
  * {
- *   name: 'custom-date',
- *   event: 'publish:date',
- *   priority: 40,
- *   fn: async (ctx) => {
- *     const date = ctx.page.properties.CustomDate?.date?.start;
- *     return date || null; // Falls through to next hook if null
- *   }
- * }
- * 
- * // Hook 2: Default fallback (priority 50)
- * {
- *   name: 'default-date',
- *   event: 'publish:date',
- *   priority: 50,
- *   fn: async (ctx) => ctx.page.last_edited_time
- * }
- * // Result: Custom date if available, otherwise last_edited_time
- * ```
- * 
- * @example Object auto-merge
- * ```typescript
- * // Hook 1: Layout metadata
- * {
- *   name: 'meta:layout',
+ *   name: 'meta:base',
  *   event: 'metadata:custom',
  *   priority: 30,
  *   fn: async (ctx) => ({
- *     layout: ctx.page.properties.Layout?.select?.name,
- *     featured: ctx.page.properties.Featured?.checkbox
+ *     layout: ctx.page.properties.Layout?.select?.name
  *   })
  * }
  * 
- * // Hook 2: SEO metadata (auto-merged by registry)
+ * // Hook 2: Add SEO fields (priority 40)
  * {
  *   name: 'meta:seo',
  *   event: 'metadata:custom',
  *   priority: 40,
  *   fn: async (ctx) => ({
- *     // No spreading needed! Registry merges automatically
+ *     ...ctx.data,  // ← Hook 1's output (has layout)
  *     ogImage: ctx.page.properties.OGImage?.url
  *   })
+ *   // Returns: { layout: 'article', ogImage: 'https://...' }
  * }
- * // Result: { layout, featured, ogImage } - all merged!
- * ```
+ * 
+ * @example Single hook usage
+ * const registry = new HookRegistry(logger);
+ * 
+ * registry.register({
+ *   name: 'custom:publish-date',
+ *   event: 'publish:date',
+ *   priority: 40,
+ *   fn: async (ctx) => ctx.page.properties.Date?.date?.start
+ * });
+ * 
+ * const publishDate = await registry.execute('publish:date', {
+ *   page,
+ *   config,
+ *   data: null,
+ *   logger
+ * });
  */
 export class HookRegistry {
 	private hooks: Map<HookEvent, Hook[]> = new Map();
@@ -146,21 +147,18 @@ export class HookRegistry {
 
 	/**
 	 * Execute all hooks for a given event.
-	 * 
-	 * Hooks run in priority order. The registry automatically composes results:
-	 * - **Primitives**: First non-null wins (stops early)
-	 * - **Objects**: Merge all non-null results
-	 * - **Arrays**: Concatenate all non-null results
+	 * Hooks run sequentially in priority order.
+	 * Data flows from one hook to the next.
 	 * 
 	 * @param event - The hook event to execute
-	 * @param context - Context object (without abort method)
-	 * @returns Composed result from all hooks
+	 * @param context - Context object (without control flow methods)
+	 * @returns Final transformed data after all hooks
 	 * @throws Error if a hook aborts or throws an error (unless continueOnError is true)
 	 */
-	async execute<TOutput = any>(
+	async execute<TInput, TOutput>(
 		event: HookEvent,
-		context: Omit<HookContext, 'abort' | 'aborted' | 'abortReason'>
-	): Promise<TOutput | null> {
+		context: Omit<HookContext<TInput>, 'abort' | 'skip'>
+	): Promise<TOutput> {
 		const hooks = this.hooks.get(event) || [];
 
 		if (hooks.length === 0) {
@@ -168,55 +166,51 @@ export class HookRegistry {
 				event: 'no_hooks_registered',
 				hookEvent: event
 			});
-			return null;
+			return context.data as unknown as TOutput;
 		}
 
-		this.logger.debug({
-			event: 'executing_hooks',
-			hookEvent: event,
-			hookCount: hooks.length,
-			hookNames: hooks.map((h) => h.name)
-		});
-
-		// Track abort state
+		let result = context.data;
 		const state: HookExecutionState = {
-			aborted: false
+			aborted: false,
+			skipped: false
 		};
 
-		// Create abort function
+		// Create control flow functions
 		const abort = (reason: string) => {
 			state.aborted = true;
 			state.abortReason = reason;
 		};
 
-		// Compose result based on type
-		let result: any = null;
-		let resultType: 'primitive' | 'object' | 'array' | null = null;
+		const skip = () => {
+			state.skipped = true;
+		};
 
-		// Execute hooks in priority order
 		for (const hook of hooks) {
 			// Check if we were aborted by a previous hook
 			if (state.aborted) {
 				this.logger.warn({
 					event: 'hook_execution_aborted',
 					hookEvent: event,
-					hookName: hook.name,
-					reason: state.abortReason
+					abortReason: state.abortReason,
+					skippedHook: hook.name
 				});
-				throw new Error(`Hook execution aborted: ${state.abortReason}`);
+				break;
 			}
 
 			try {
-				// Build complete context
-				const fullContext: HookContext = {
+				// Reset skip flag for each hook
+				state.skipped = false;
+
+				// Build complete context with current data
+				const fullContext: HookContext<typeof result> = {
 					...context,
-					aborted: state.aborted,
-					abortReason: state.abortReason,
-					abort
+					data: result,
+					abort,
+					skip
 				};
 
 				this.logger.debug({
-					event: 'executing_hook',
+					event: 'hook_executing',
 					hookName: hook.name,
 					hookEvent: event,
 					priority: hook.priority
@@ -230,58 +224,30 @@ export class HookRegistry {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				// Skip null/undefined results
-				if (output === null || output === undefined) {
+				// Check if hook called skip
+				if (state.skipped) {
 					this.logger.debug({
-						event: 'hook_returned_null',
-						hookName: hook.name
-					});
-					continue;
-				}
-
-				// Determine result type on first non-null output
-				if (resultType === null) {
-					if (Array.isArray(output)) {
-						resultType = 'array';
-					} else if (typeof output === 'object' && output !== null) {
-						resultType = 'object';
-					} else {
-						resultType = 'primitive';
-					}
-				}
-
-				// Compose based on type
-				if (resultType === 'primitive') {
-					// First non-null wins, stop processing
-					result = output;
-					this.logger.debug({
-						event: 'hook_executed_first_wins',
+						event: 'hook_skipped',
 						hookName: hook.name,
-						stoppingEarly: true
+						hookEvent: event
 					});
-					break;
-				} else if (resultType === 'object') {
-					// Merge objects
-					result = { ...result, ...output };
-					this.logger.debug({
-						event: 'hook_executed_merged',
-						hookName: hook.name
-					});
-				} else if (resultType === 'array') {
-					// Concatenate arrays
-					result = result === null ? output : [...result, ...output];
-					this.logger.debug({
-						event: 'hook_executed_concatenated',
-						hookName: hook.name
-					});
+					continue; // Don't update result, move to next hook
 				}
+
+				// Update result for next hook
+				result = output;
+
+				this.logger.debug({
+					event: 'hook_executed',
+					hookName: hook.name,
+					hookEvent: event
+				});
 			} catch (error) {
 				this.logger.error({
 					event: 'hook_execution_failed',
 					hookName: hook.name,
 					hookEvent: event,
 					error: error instanceof Error ? error.message : String(error),
-					stack: error instanceof Error ? error.stack : undefined,
 					continueOnError: hook.continueOnError
 				});
 
@@ -299,7 +265,7 @@ export class HookRegistry {
 			}
 		}
 
-		return result;
+		return result as unknown as TOutput;
 	}
 
 	/**

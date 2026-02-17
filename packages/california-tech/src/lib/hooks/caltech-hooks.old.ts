@@ -4,12 +4,6 @@ import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-par
 /**
  * California Tech custom hooks for Symbiont CMS.
  * 
- * **Extractor Pattern:**
- * - Hooks read from `ctx.page` and return values or `null`
- * - No `ctx.data`, no `ctx.skip()` - registry handles composition
- * - Return `null` to let next hook run (for primitives like dates)
- * - Objects are auto-merged by registry
- * 
  * These hooks customize page processing for the California Tech newspaper:
  * - Exclude Print Only and Advertisement articles
  * - Only publish articles with Status = "Published"
@@ -23,7 +17,7 @@ import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-par
  * 
  * Priority: 40 (before default)
  */
-export const excludePrintOnlyHook: Hook<boolean> = {
+export const excludePrintOnlyHook: Hook<null, boolean> = {
 	name: 'caltech:exclude:print-only',
 	event: 'page:exclude',
 	priority: 40,
@@ -49,11 +43,11 @@ export const excludePrintOnlyHook: Hook<boolean> = {
 /**
  * Check if page should be published based on Status property.
  * Only pages with Status = "Published" are public.
- * Also excludes Print Only and Advertisement articles.
+ * Also excludes Print Only and Advertisement articles (redundant with excludeRule).
  * 
  * Priority: 40 (before default)
  */
-export const publishCheckHook: Hook<boolean> = {
+export const publishCheckHook: Hook<null, boolean> = {
 	name: 'caltech:publish:check',
 	event: 'publish:check',
 	priority: 40,
@@ -87,18 +81,14 @@ export const publishCheckHook: Hook<boolean> = {
 /**
  * Parse publish date from Issue property or Website Publish Date.
  * 
- * **Extractor Pattern:**
- * - Returns parsed date if found
- * - Returns `null` if no custom date (falls through to default hook)
- * 
  * Priority order:
  * 1. Issue property (e.g., "January 20, 2023") - parsed with PST timezone
  * 2. Website Publish Date property
- * 3. Return null → falls through to default (last_edited_time)
+ * 3. Skip to default (last_edited_time)
  * 
  * Priority: 40 (before default)
  */
-export const publishDateHook: Hook<string | null> = {
+export const publishDateHook: Hook<null, string | null> = {
 	name: 'caltech:publish:date:issue-based',
 	event: 'publish:date',
 	priority: 40,
@@ -135,25 +125,23 @@ export const publishDateHook: Hook<string | null> = {
 			}
 		}
 
-		// Return null to fall through to default hook (last_edited_time)
+		// Fall back to default (last_edited_time) by skipping
 		ctx.logger.debug({
 			event: 'publish_date_fallback_to_default',
 			pageId: ctx.page.id
 		});
-		return null;
+		ctx.skip();
+		return null; // Won't be used since we skipped
 	}
 };
 
 /**
  * Extract custom slug from Website Slug property.
- * 
- * **Extractor Pattern:**
- * - Returns custom slug if found
- * - Returns `null` if not present (falls through to auto-generation)
+ * If not present, fall back to auto-generation from title.
  * 
  * Priority: 40 (before default)
  */
-export const slugExtractHook: Hook<string | null> = {
+export const slugExtractHook: Hook<null, string | null> = {
 	name: 'caltech:slug:extract',
 	event: 'slug:extract',
 	priority: 40,
