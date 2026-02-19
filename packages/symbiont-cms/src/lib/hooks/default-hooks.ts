@@ -317,6 +317,250 @@ export const defaultPageExcludeHook: Hook<boolean> = {
 };
 
 /**
+ * Default hook for extracting cover image URL from Notion.
+ * Checks the configured cover property for file/external URLs.
+ * 
+ * Priority: 50 (default)
+ * 
+ * Returns: URL string or null if no cover found
+ */
+export const defaultCoverExtractHook: Hook<string | null> = {
+	name: 'symbiont:cover:extract:default',
+	event: 'cover:extract',
+	priority: 50,
+	fn: async (ctx) => {
+		// No cover property configured
+		if (!ctx.config.coverProperty) {
+			return null;
+		}
+
+		const coverProp = ctx.page.properties[ctx.config.coverProperty];
+		
+		// No cover image in property
+		if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
+			return null;
+		}
+
+		const file = coverProp.files[0];
+		
+		// Handle Notion-hosted files
+		if (file.type === 'file') {
+			return file.file?.url || null;
+		}
+		
+		// Handle external files
+		if (file.type === 'external') {
+			return file.external?.url || null;
+		}
+
+		return null;
+	}
+};
+
+/**
+ * Default hook for fetching page content from Notion.
+ * Returns content as markdown string.
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: This hook returns a Promise that the transformer
+ * needs to await. The actual Notion API call is made here since
+ * content fetching is the core operation.
+ */
+export const defaultContentFetchHook: Hook<string> = {
+	name: 'symbiont:content:fetch:default',
+	event: 'content:fetch',
+	priority: 50,
+	fn: async (ctx) => {
+		// This requires access to NotionClient, which we don't have in hooks yet
+		// For now, return null and let transformer handle it
+		// TODO: Add NotionClient to hook context
+		return null;
+	}
+};
+
+/**
+ * Default hook for transforming content.
+ * By default, returns content as-is (no transformation).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: Content is fetched elsewhere and not available in ctx.
+ * This is a placeholder for when we refactor content flow.
+ */
+export const defaultContentTransformHook: Hook<string | null> = {
+	name: 'symbiont:content:transform:default',
+	event: 'content:transform',
+	priority: 50,
+	fn: async (ctx) => {
+		// Content transformation - for now, no-op
+		// Users can add custom hooks to transform content
+		return null;
+	}
+};
+
+/**
+ * Default hook for processing inline images in content.
+ * By default, no processing (returns null).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: This is a placeholder. Image processing logic
+ * remains in transformer until we decide on the pattern.
+ */
+export const defaultContentImagesHook: Hook<null> = {
+	name: 'symbiont:content:images:default',
+	event: 'content:images',
+	priority: 50,
+	fn: async (ctx) => {
+		// Image processing - placeholder
+		return null;
+	}
+};
+
+/**
+ * Default hook for processing cover image.
+ * By default, no processing (returns null).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: Cover processing (upload/transform) remains in
+ * transformer until we finalize the pattern for image handling.
+ */
+export const defaultCoverProcessHook: Hook<null> = {
+	name: 'symbiont:cover:process:default',
+	event: 'cover:process',
+	priority: 50,
+	fn: async (ctx) => {
+		// Cover processing - placeholder
+		return null;
+	}
+};
+
+/**
+ * Default hook for validating page data.
+ * By default, all pages are considered valid (returns true).
+ * 
+ * Priority: 50 (default)
+ * 
+ * @example Validate required fields
+ * ```typescript
+ * {
+ *   name: 'custom:validate',
+ *   event: 'page:validate',
+ *   priority: 40,
+ *   fn: async (ctx) => {
+ *     const title = ctx.page.properties.Title;
+ *     if (!title) {
+ *       ctx.abort('Missing required title');
+ *       return false;
+ *     }
+ *     return true;
+ *   }
+ * }
+ * ```
+ */
+export const defaultPageValidateHook: Hook<boolean> = {
+	name: 'symbiont:page:validate:default',
+	event: 'page:validate',
+	priority: 50,
+	fn: async (ctx) => {
+		// By default, all pages are valid
+		return true;
+	}
+};
+
+/**
+ * Default hook for validating slug uniqueness.
+ * By default, returns true (no validation).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: Slug validation is currently handled in transformer's
+ * ensureUniqueSlug() method. This hook is a placeholder for when we
+ * migrate that logic.
+ */
+export const defaultSlugValidateHook: Hook<boolean> = {
+	name: 'symbiont:slug:validate:default',
+	event: 'slug:validate',
+	priority: 50,
+	fn: async (ctx) => {
+		// Slug validation - placeholder
+		return true;
+	}
+};
+
+/**
+ * Default hook for transforming/sanitizing slugs.
+ * By default, returns null (no transformation).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: Slug transformation is currently handled by createSlug()
+ * utility. This hook is for additional custom transforms.
+ */
+export const defaultSlugTransformHook: Hook<string | null> = {
+	name: 'symbiont:slug:transform:default',
+	event: 'slug:transform',
+	priority: 50,
+	fn: async (ctx) => {
+		// No additional transformation
+		return null;
+	}
+};
+
+/**
+ * Default hook for syncing slug back to Notion.
+ * By default, returns null (no sync).
+ * 
+ * Priority: 50 (default)
+ * 
+ * **DESIGN NOTE**: Slug sync is currently handled in transformer.
+ * This hook is a placeholder for when we migrate sync logic.
+ */
+export const defaultSyncSlugHook: Hook<null> = {
+	name: 'symbiont:sync:slug:default',
+	event: 'sync:slug',
+	priority: 50,
+	fn: async (ctx) => {
+		// Sync logic - placeholder
+		return null;
+	}
+};
+
+/**
+ * Default hook for syncing content back to Notion.
+ * By default, returns null (no sync).
+ * 
+ * Priority: 50 (default)
+ */
+export const defaultSyncContentHook: Hook<null> = {
+	name: 'symbiont:sync:content:default',
+	event: 'sync:content',
+	priority: 50,
+	fn: async (ctx) => {
+		// Sync logic - placeholder
+		return null;
+	}
+};
+
+/**
+ * Default hook for syncing image URLs back to Notion.
+ * By default, returns null (no sync).
+ * 
+ * Priority: 50 (default)
+ */
+export const defaultSyncImagesHook: Hook<null> = {
+	name: 'symbiont:sync:images:default',
+	event: 'sync:images',
+	priority: 50,
+	fn: async (ctx) => {
+		// Sync logic - placeholder
+		return null;
+	}
+};
+
+/**
  * All default hooks in one array for easy registration.
  * These are automatically registered when creating a Symbiont client.
  */
@@ -330,5 +574,16 @@ export const defaultHooks: Hook[] = [
 	defaultAuthorsExtractHook,
 	defaultSummaryExtractHook,
 	defaultCustomMetadataHook,
-	defaultPageExcludeHook
+	defaultPageExcludeHook,
+	defaultCoverExtractHook,
+	defaultContentFetchHook,
+	defaultContentTransformHook,
+	defaultContentImagesHook,
+	defaultCoverProcessHook,
+	defaultPageValidateHook,
+	defaultSlugValidateHook,
+	defaultSlugTransformHook,
+	defaultSyncSlugHook,
+	defaultSyncContentHook,
+	defaultSyncImagesHook
 ];

@@ -140,95 +140,55 @@ export class NotionPageToDatabasePageTransformer {
 	 * Falls back to extracting first image from content if no cover is set
 	 */
 	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
-		if (!this.config.coverProperty) {
-			return null;
-		}
-
 		try {
-			const coverProp = page.properties[this.config.coverProperty];
-			
-			// No cover image in property - try to find one in content
-			if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
+			// Use hook to extract cover URL (Phase 2 migration - partial)
+			const coverUrl = await this.hookRegistry.execute<string | null>('cover:extract', {
+				page,
+				config: this.config,
+				logger: this.logger
+			});
+
+			// No cover found
+			if (!coverUrl) {
+				// Try to extract from content as fallback
 				return await this.extractCoverFromContent(page);
 			}
 
-			const file = coverProp.files[0];
-			
-			// Handle Notion-hosted files (need re-upload)
-			if (file.type === 'file') {
-				const originalUrl = file.file?.url;
-				if (!originalUrl) return null;
-
-				// Upload to Supabase if needed
-				if (needsUploadToSupabase(originalUrl)) {
-					const result = await uploadImageToSupabase(originalUrl, {
-						supabaseUrl: this.supabaseUrl,
-						serviceRoleKey: this.serviceRoleKey,
-						pageId: page.id
-					});
-					
-					this.logger.info({
-						event: 'cover_image_uploaded',
-						pageId: page.id,
-						originalUrl,
-						newUrl: result.newUrl,
-						filename: result.filename
-					});
-
-					// Sync permanent URL back to Notion
-					await this.notionClient.updateFileProperty(
-						page.id,
-						this.config.coverProperty,
-						result.newUrl
-					);
-
-					return result.newUrl;
-				}
-
-				return originalUrl; // Already on Supabase
-			}
-			
-			// Handle external files
-			if (file.type === 'external') {
-				const externalUrl = file.external?.url;
-				if (!externalUrl) return null;
-
-				// Check if external URL needs to be uploaded
-				if (needsUploadToSupabase(externalUrl)) {
-					const result = await uploadImageToSupabase(externalUrl, {
-						supabaseUrl: this.supabaseUrl,
-						serviceRoleKey: this.serviceRoleKey,
-						pageId: page.id
-					});
-					
-					this.logger.info({
-						event: 'cover_image_external_uploaded',
-						pageId: page.id,
-						originalUrl: externalUrl,
-						newUrl: result.newUrl,
-						filename: result.filename
-					});
-
-					// Sync permanent URL back to Notion
-					await this.notionClient.updateFileProperty(
-						page.id,
-						this.config.coverProperty,
-						result.newUrl
-					);
-
-					return result.newUrl;
-				}
-
-				// Already a permanent URL
-				this.logger.info({
-					event: 'cover_image_external',
-					pageId: page.id,
-					coverUrl: externalUrl
+			// Upload to Supabase if needed
+			if (needsUploadToSupabase(coverUrl)) {
+				const result = await uploadImageToSupabase(coverUrl, {
+					supabaseUrl: this.supabaseUrl,
+					serviceRoleKey: this.serviceRoleKey,
+					pageId: page.id
 				});
-				return externalUrl;
+				
+				this.logger.info({
+					event: 'cover_image_uploaded',
+					pageId: page.id,
+					originalUrl: coverUrl,
+					newUrl: result.newUrl,
+					filename: result.filename
+				});
+
+				// Sync permanent URL back to Notion
+				if (this.config.coverProperty) {
+					await this.notionClient.updateFileProperty(
+						page.id,
+						this.config.coverProperty,
+						result.newUrl
+					);
+				}
+
+				return result.newUrl;
 			}
 
-			return null;
+			// Already a permanent URL
+			this.logger.info({
+				event: 'cover_image_external',
+				pageId: page.id,
+				coverUrl
+			});
+			return coverUrl;
 		} catch (error: any) {
 			this.logger.warn({
 				event: 'cover_image_upload_failed',
