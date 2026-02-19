@@ -122,8 +122,8 @@ private async extractCoreMetadata(page: PageObjectResponse) {
 - [ ] Test image uploads with Supabase
 
 **Benefits**:
-- Users can override image upload destination (S3, Cloudflare R2, etc.)
-- Users can customize content fetching (maybe use a custom Notion client)
+- Users can override image upload destination (S3, Cloudflare R2, etc.) ## I'M NOT SURE THIS IS A PRIORITY USE CASE, THIS IS GOING TO INVOLVE A DISCUSSION OF TO WHAT EXTENT SYMBIONT IS MARRIED TO SUPABASE. I'M NOT OPPOSED TO IT, BUT IT'S A MUCH BIGGER CHANGE THAN JUST ADDING HOOKS, SO I'D SUGGEST DEFERRING THIS TO A LATER PHASE
+- Users can customize content fetching (maybe use a custom Notion client) ## NOT SURE WHAT YOU'RE GETTING AT HERE OR WHY THIS WOULD BE NECESSARY
 - Users can add custom markdown transformations
 
 ### Phase 3: Sync-back to Notion (Medium Priority)
@@ -165,7 +165,7 @@ private async extractCoreMetadata(page: PageObjectResponse) {
 The hook registry composes results based on return type:
 
 1. **Primitives** (string, number, Date): First non-null wins, stops processing
-2. **Booleans**: AND all results together (for validation)
+2. **Booleans**: AND all results together (for validation) ## PLEASE VERIFY IF THIS IS THE CASE, OR IF IT'S FIRST NON-NULL WINS. WE NEED TO BE CONSISTENT AND CLEAR ABOUT THIS IN DOCUMENTATION AND IMPLEMENTATION.
 3. **Objects**: Deep merge all non-null results
 4. **Arrays**: Concatenate all non-null results
 
@@ -180,7 +180,7 @@ This is already implemented in `HookRegistry.execute()`.
 2. **Image processing is complex**
    - Multiple steps: extract URL → upload → sync back
    - Need to break into multiple hooks for proper composition
-   - Consider: Should `cover:process` and `content:images` return URLs, or side-effect upload?
+   - Consider: Should `cover:process` and `content:images` return URLs, or side-effect upload? ## THIS DEFINITELY REQUIRES MORE DISCUSSION. I THOUGHT THE CURRENT HOOKS IMPLEMENTATION DID AWAY WITH SIDE EFFECTS AND COMPOSITION. RETURNING VALUES IS CLEANER, BUT REQUIRES THE TRANSFORMER TO HANDLE UPLOADS. PERFORMING UPLOADS IN HOOKS (INCLUDE SUPABASE/NOTION/ETC CLIENTS IN CONTEXT??) GIVES MORE CONTROL BUT MAKES TESTING HARDER.
 
 3. **Sync-back is conditional**
    - Currently checks `if (this.config.slugSyncProperty)`
@@ -195,59 +195,19 @@ This is already implemented in `HookRegistry.execute()`.
 
 ---
 
-## Testing Strategy
-
-For each phase:
-
-1. **Unit tests**: Test individual hooks in isolation
-2. **Integration tests**: Test hook composition (multiple hooks for same event)
-3. **Regression tests**: Ensure California Tech site still works
-4. **Performance**: Measure hook execution overhead
-
----
-
-## Breaking Changes
-
-**Good news**: Most of this can be done without breaking changes!
-
-- Default hooks provide same behavior as current hardcoded logic
-- Existing user hooks (California Tech) already work
-- Config format stays the same
-
-**Potential breaking change**:
-- If we make `extractCoreMetadata()` use hooks, custom hooks that override metadata extraction might behave differently
-- Mitigation: Keep priority system (custom hooks at 40, defaults at 50)
-
----
-
 ## Questions to Resolve
 
 1. **Should content/image hooks return URLs or perform side effects?**
    - Option A: Return URLs (cleaner, testable)
    - Option B: Perform uploads (more control, harder to test)
-   - **Recommendation**: Return URLs, have transformer handle uploads
 
 2. **Should `page:validate` throw errors or return boolean?**
    - Option A: Return boolean (consistent with `page:exclude`)
    - Option B: Throw errors (more expressive, can include validation messages)
-   - **Recommendation**: Return boolean, use `ctx.abort()` for errors
 
 3. **Should we deprecate unused events?**
    - `slug:validate` - maybe not needed if we have `page:validate`
    - `slug:transform` - utility function is fine
-   - **Recommendation**: Keep them for now, users might want them
-
----
-
-## Priority Recommendation
-
-**Do now**: Phase 1 (metadata extraction) - Quick win, enables custom extractors
-
-**Do next**: Phase 2 (content/images) - Biggest value, most user requests
-
-**Do later**: Phase 3 (sync-back) - Nice to have, not urgent
-
-**Do eventually**: Phase 4 (validation) - Polish, can wait
 
 ---
 
@@ -255,6 +215,5 @@ For each phase:
 
 - [ ] All 21 hook events have default implementations
 - [ ] All hardcoded logic moved to hooks
-- [ ] California Tech site still works (no regressions)
 - [ ] Documentation updated with examples
-- [ ] Test coverage > 80% for hook system
+- [ ] Test coverage > 80% for hook system (lower priority for content/image hooks due to complexity)
