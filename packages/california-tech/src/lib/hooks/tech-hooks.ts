@@ -176,8 +176,146 @@ export const slugExtractHook: Hook<string | null> = {
 };
 
 /**
- * All California Tech hooks in one array.
- * Export this and register it in your symbiont.ts config.
+ * Archive issue hooks for tech-archives database.
+ * Handles date-based slugs and resolver URLs.
+ */
+export const archiveIssueHooks: Hook[] = [
+	{
+		name: 'archives:date',
+		event: 'slug:extract',
+		priority: 40,
+		fn: async (ctx) => {
+			// Slug from date property (e.g. "2024-10-21")
+			const dateSlug = (ctx.page.properties.date as any)?.date?.start;
+			if (dateSlug) {
+				// parse ISO 8601 and return YYYY-MM-DD slug
+				const date = new Date(dateSlug);
+				return date.toISOString().split('T')[0];
+			}
+		}
+	},
+	{
+		name: 'archives:metadata:resolver',
+		event: 'metadata:custom',
+		priority: 40,
+		fn: async (ctx) => {
+			// Extract resolver URL for Caltech archives
+			const resolverUrl = (ctx.page.properties.resolver_url as any)?.url;
+			
+			return {
+				resolver_url: resolverUrl || null
+			};
+		}
+	}
+];
+
+/**
+ * Website pages hooks for tech-website-pages database.
+ * Handles static pages, redirects, and page status (Live/Draft/Not shown).
+ */
+export const websitePagesHooks: Hook[] = [
+	// Exclude "Draft" pages - don't sync at all, keeps previous live version
+	{
+		name: 'pages:exclude:draft',
+		event: 'page:exclude',
+		priority: 40,
+		fn: async (ctx) => {
+			const status = (ctx.page.properties.Status as any)?.select?.name;
+			const shouldExclude = status === 'Draft';
+			
+			if (shouldExclude) {
+				ctx.logger.info({
+					event: 'page_excluded',
+					pageId: ctx.page.id,
+					title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
+					reason: 'Status is Draft - not syncing'
+				});
+			}
+			
+			return shouldExclude;
+		}
+	},
+	
+	// "Not shown" pages: sync to DB but set published_at to null
+	{
+		name: 'pages:publish:not-shown',
+		event: 'publish:check',
+		priority: 40,
+		fn: async (ctx) => {
+			const status = (ctx.page.properties.Status as any)?.select?.name;
+			
+			if (status === 'Not shown') {
+				ctx.logger.info({
+					event: 'page_unpublished',
+					pageId: ctx.page.id,
+					title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
+					reason: 'Status is Not shown - setting published_at to null'
+				});
+				return false; // published_at will be null
+			}
+			
+			// Live pages are published
+			return status === 'Live';
+		}
+	},
+	
+	// Validate that Redirect pages have either a redirect link or file
+	{
+		name: 'pages:validate:redirects',
+		event: 'page:validate',
+		priority: 40,
+		fn: async (ctx) => {
+			const type = (ctx.page.properties.Type as any)?.select?.name;
+			
+			if (type === 'Redirect') {
+				const redirectLink = (ctx.page.properties['Redirect Link'] as any)?.url;
+				const file = (ctx.page.properties.File as any)?.files?.[0];
+				
+				if (!redirectLink && !file) {
+					ctx.logger.warn({
+						event: 'validation_warning',
+						pageId: ctx.page.id,
+						title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
+						issue: 'Redirect type page has no Redirect Link or File'
+					});
+				}
+			}
+			
+			// Validation hooks don't exclude, just warn
+			return null;
+		}
+	},
+	
+	// Extract custom metadata: type, status, redirectLink, file
+	{
+		name: 'pages:metadata:page-type',
+		event: 'metadata:custom',
+		priority: 40,
+		fn: async (ctx) => {
+			const type = (ctx.page.properties.Type as any)?.select?.name || 'Content';
+			const status = (ctx.page.properties.Status as any)?.select?.name || 'Live';
+			const redirectLink = (ctx.page.properties['Redirect Link'] as any)?.url;
+			const file = (ctx.page.properties.File as any)?.files?.[0];
+			
+			return {
+				pageType: type,
+				pageStatus: status,
+				...(redirectLink && { redirectLink }),
+				...(file && {
+					file: {
+						name: file.name,
+						url: file.type === 'external' ? file.external?.url : file.file?.url,
+						type: file.type
+					}
+				})
+			};
+		}
+	}
+];
+
+/**
+ * Article hooks for tech-article-staging database.
+ * Exported as default export for backwards compatibility.
  */
 export const techHooks: Hook[] = [
 	excludePrintOnlyHook,
