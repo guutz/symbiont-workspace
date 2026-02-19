@@ -543,4 +543,35 @@ export class NotionPageToDatabasePageTransformer {
 		});
 		return publishDate;
 	}
+
+	/**
+	 * Create hook context for effect hooks (includes services).
+	 * 
+	 * Effect hooks need access to NotionClient and Supabase for side effects.
+	 */
+	private createEffectHookContext(page: PageObjectResponse) {
+		return {
+			page,
+			config: this.config,
+			logger: this.logger,
+			services: {
+				notionClient: this.notionClient,
+				supabaseUrl: this.supabaseUrl,
+				serviceRoleKey: this.serviceRoleKey
+			}
+		};
+	}
+
+	/**
+	 * Create hook context for extractor hooks (no services).
+	 * 
+	 * Extractor hooks should not perform side effects, so services are omitted.
+	 */
+	private createExtractorHookContext(page: PageObjectResponse) {
+		return {
+			page,
+			config: this.config,
+			logger: this.logger
+		};
+	}
 }

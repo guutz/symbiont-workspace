@@ -6,42 +6,67 @@ import type { Database } from '../database.types.js';
 /**
  * Hook lifecycle events in the page transformation pipeline.
  * These are built-in event types that Symbiont defines.
+ * 
+ * **Hook Patterns:**
+ * 
+ * 1. **Extractor Hooks** (pure, data-oriented):
+ *    - Return data extracted from ctx.page
+ *    - Compose via first-non-null (primitives), merge (objects), concat (arrays)
+ *    - Examples: metadata:*, slug:extract, cover:extract
+ * 
+ * 2. **Effect Hooks** (side-effect oriented):
+ *    - Perform actions (uploads, syncs, mutations)
+ *    - All hooks execute (no early stopping)
+ *    - Return void, boolean, or result object
+ *    - Examples: sync:*, *:process
  */
 export type HookEvent =
-	// Early validation
+	// Early validation (EXTRACTOR)
 	| 'page:exclude' // Should page be excluded from sync?
 	| 'page:validate' // Is page data valid?
 
-	// Metadata extraction
+	// Metadata extraction (EXTRACTOR)
 	| 'metadata:title' // Extract/transform title
 	| 'metadata:tags' // Extract/transform tags
 	| 'metadata:authors' // Extract/transform authors
 	| 'metadata:summary' // Extract/transform summary
 	| 'metadata:custom' // Extract custom metadata (user-defined data)
 
-	// Publishing logic
+	// Publishing logic (EXTRACTOR)
 	| 'publish:check' // Should page be published?
 	| 'publish:date' // Determine publish date
 
-	// Slug handling
+	// Slug handling (EXTRACTOR)
 	| 'slug:extract' // Extract custom slug from Notion
 	| 'slug:generate' // Generate slug from title
 	| 'slug:validate' // Validate slug uniqueness
 	| 'slug:transform' // Transform slug (sanitization, etc.)
 
-	// Content processing
+	// Content processing (EXTRACTOR)
 	| 'content:fetch' // Fetch page content
 	| 'content:transform' // Transform markdown content
-	| 'content:images' // Process inline images
+	
+	// Image processing (EFFECT - side effects OK)
+	| 'content:images' // Process inline images (upload, transform URLs)
+	| 'cover:extract' // Extract cover image URL (EXTRACTOR)
+	| 'cover:process' // Upload/process cover image (EFFECT)
 
-	// Cover image
-	| 'cover:extract' // Extract cover image
-	| 'cover:process' // Upload/process cover image
-
-	// Sync back to Notion
+	// Sync back to Notion (EFFECT - side effects expected)
 	| 'sync:slug' // Sync slug back to Notion
 	| 'sync:content' // Sync content back to Notion
 	| 'sync:images'; // Sync image URLs back to Notion
+
+/**
+ * Events that are effect hooks (side effects allowed).
+ * These hooks ALL execute (no early stopping on first result).
+ */
+export const EFFECT_HOOK_EVENTS: HookEvent[] = [
+	'content:images',
+	'cover:process',
+	'sync:slug',
+	'sync:content',
+	'sync:images'
+];
 
 /**
  * Context object passed to each hook function.
@@ -88,6 +113,23 @@ export type HookContext = {
 
 	/** Optional Supabase client for advanced use cases */
 	supabase?: SupabaseClient<Database>;
+
+	/**
+	 * Services for effect hooks (side-effect operations).
+	 * Only provided for effect hook events (sync:*, *:process).
+	 * 
+	 * Extractor hooks should not use these services.
+	 */
+	services?: {
+		/** NotionClient for syncing data back to Notion */
+		notionClient?: any; // Use 'any' to avoid circular dependency
+		
+		/** Supabase URL for image uploads */
+		supabaseUrl?: string;
+		
+		/** Supabase service role key for uploads */
+		serviceRoleKey?: string;
+	};
 
 	/** Internal flag to track abort state */
 	aborted: boolean;

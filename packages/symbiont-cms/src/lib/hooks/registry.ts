@@ -3,15 +3,22 @@ import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.j
 /**
  * HookRegistry manages registration and execution of hooks.
  * 
- * **NEW APPROACH (Extractor Pattern):**
+ * **TWO HOOK PATTERNS:**
  * 
- * Hooks are independent extractors that read from `ctx.page` and return values.
- * They do NOT transform data flowing through them (no `ctx.data`, no `ctx.skip()`).
+ * 1. **Extractor Hooks** (default pattern):
+ *    - Independent extractors that read from `ctx.page` and return values
+ *    - Composition based on return type:
+ *      - **Primitives**: First non-null wins (stops early)
+ *      - **Objects**: Merge all non-null results
+ *      - **Arrays**: Concatenate all non-null results
+ *    - Examples: metadata:*, slug:extract, cover:extract
  * 
- * The registry automatically composes results based on return type:
- * - **Primitives** (string, number, Date, boolean): First non-null wins (stops early)
- * - **Objects**: Merge all non-null results
- * - **Arrays**: Concatenate all non-null results
+ * 2. **Effect Hooks** (side-effect pattern):
+ *    - All hooks execute (no early stopping)
+ *    - Can perform side effects (uploads, syncs, mutations)
+ *    - Results are collected but not composed
+ *    - Events: sync:*, *:process (see EFFECT_HOOK_EVENTS)
+ *    - Examples: sync:slug, cover:process, content:images
  * 
  * @example Basic hook composition
  * ```typescript
@@ -147,14 +154,19 @@ export class HookRegistry {
 	/**
 	 * Execute all hooks for a given event.
 	 * 
-	 * Hooks run in priority order. The registry automatically composes results:
-	 * - **Primitives**: First non-null wins (stops early)
-	 * - **Objects**: Merge all non-null results
-	 * - **Arrays**: Concatenate all non-null results
+	 * **Extractor hooks** (default):
+	 * - Primitives: First non-null wins (stops early)
+	 * - Objects: Merge all non-null results
+	 * - Arrays: Concatenate all non-null results
+	 * 
+	 * **Effect hooks** (sync:*, *:process):
+	 * - All hooks execute (no early stopping)
+	 * - Results collected but not composed
+	 * - Used for side effects
 	 * 
 	 * @param event - The hook event to execute
 	 * @param context - Context object (without abort method)
-	 * @returns Composed result from all hooks
+	 * @returns Composed result from all hooks (or array of results for effect hooks)
 	 * @throws Error if a hook aborts or throws an error (unless continueOnError is true)
 	 */
 	async execute<TOutput = any>(
@@ -189,6 +201,78 @@ export class HookRegistry {
 			state.abortReason = reason;
 		};
 
+		// Check if this is an effect hook event
+		const isEffectHook = this.isEffectHookEvent(event);
+
+		// For effect hooks, collect all results
+		if (isEffectHook) {
+			const results: any[] = [];
+			
+			for (const hook of hooks) {
+				if (state.aborted) {
+					this.logger.warn({
+						event: 'hook_execution_aborted',
+						hookEvent: event,
+						hookName: hook.name,
+						reason: state.abortReason
+					});
+					throw new Error(`Hook execution aborted: ${state.abortReason}`);
+				}
+
+				try {
+					const fullContext: HookContext = {
+						...context,
+						aborted: state.aborted,
+						abortReason: state.abortReason,
+						abort
+					};
+
+					this.logger.debug({
+						event: 'executing_effect_hook',
+						hookName: hook.name,
+						hookEvent: event,
+						priority: hook.priority
+					});
+
+					const output = await hook.fn(fullContext);
+
+					if (state.aborted) {
+						throw new Error(`Hook aborted: ${state.abortReason}`);
+					}
+
+					results.push(output);
+					
+					this.logger.debug({
+						event: 'effect_hook_executed',
+						hookName: hook.name,
+						hasResult: output !== null && output !== undefined
+					});
+				} catch (error) {
+					this.logger.error({
+						event: 'effect_hook_execution_failed',
+						hookName: hook.name,
+						hookEvent: event,
+						error: error instanceof Error ? error.message : String(error),
+						continueOnError: hook.continueOnError
+					});
+
+					if (!hook.continueOnError) {
+						throw error;
+					}
+
+					this.logger.warn({
+						event: 'effect_hook_error_ignored',
+						hookName: hook.name,
+						hookEvent: event
+					});
+				}
+			}
+
+			// Return array of results for effect hooks
+			return results as any;
+		}
+
+		// Extractor hook pattern (original logic)
 		// Compose result based on type
 		let result: any = null;
 		let resultType: 'primitive' | 'object' | 'array' | null = null;
@@ -340,5 +424,22 @@ export class HookRegistry {
 	 */
 	getHookCount(event: HookEvent): number {
 		return this.hooks.get(event)?.length || 0;
+	}
+
+	/**
+	 * Check if an event is an effect hook (allows side effects).
+	 * 
+	 * @param event - The hook event
+	 * @returns True if this is an effect hook event
+	 */
+	private isEffectHookEvent(event: HookEvent): boolean {
+		const effectEvents: HookEvent[] = [
+			'content:images',
+			'cover:process',
+			'sync:slug',
+			'sync:content',
+			'sync:images'
+		];
+		return effectEvents.includes(event);
 	}
 }

@@ -511,52 +511,65 @@ export const defaultSlugTransformHook: Hook<string | null> = {
 
 /**
  * Default hook for syncing slug back to Notion.
- * By default, returns null (no sync).
+ * This is an EFFECT HOOK - it performs a side effect (Notion API call).
  * 
  * Priority: 50 (default)
  * 
- * **DESIGN NOTE**: Slug sync is currently handled in transformer.
- * This hook is a placeholder for when we migrate sync logic.
+ * **Pattern**: Effect hooks receive services in context and perform actions.
+ * They return void or a success indicator.
+ * 
+ * @example Custom slug sync with additional logic
+ * ```typescript
+ * {
+ *   name: 'custom:slug-sync',
+ *   event: 'sync:slug',
+ *   priority: 40,
+ *   fn: async (ctx) => {
+ *     if (!ctx.services?.notionClient || !ctx.config.slugSyncProperty) {
+ *       return; // No-op if services not available
+ *     }
+ *     // Custom sync logic here
+ *   }
+ * }
+ * ```
  */
-export const defaultSyncSlugHook: Hook<null> = {
+export const defaultSyncSlugHook: Hook<void> = {
 	name: 'symbiont:sync:slug:default',
 	event: 'sync:slug',
 	priority: 50,
 	fn: async (ctx) => {
-		// Sync logic - placeholder
-		return null;
+		// No-op by default - sync is orchestrated by transformer
+		// Users can add custom hooks to perform additional sync operations
 	}
 };
 
 /**
  * Default hook for syncing content back to Notion.
- * By default, returns null (no sync).
+ * This is an EFFECT HOOK - it performs a side effect (Notion API call).
  * 
  * Priority: 50 (default)
  */
-export const defaultSyncContentHook: Hook<null> = {
+export const defaultSyncContentHook: Hook<void> = {
 	name: 'symbiont:sync:content:default',
 	event: 'sync:content',
 	priority: 50,
 	fn: async (ctx) => {
-		// Sync logic - placeholder
-		return null;
+		// No-op by default - users can add custom hooks for content sync
 	}
 };
 
 /**
  * Default hook for syncing image URLs back to Notion.
- * By default, returns null (no sync).
+ * This is an EFFECT HOOK - it performs a side effect (Notion API call).
  * 
  * Priority: 50 (default)
  */
-export const defaultSyncImagesHook: Hook<null> = {
+export const defaultSyncImagesHook: Hook<void> = {
 	name: 'symbiont:sync:images:default',
 	event: 'sync:images',
 	priority: 50,
 	fn: async (ctx) => {
-		// Sync logic - placeholder
-		return null;
+		// No-op by default - users can add custom hooks for image sync
 	}
 };
 
