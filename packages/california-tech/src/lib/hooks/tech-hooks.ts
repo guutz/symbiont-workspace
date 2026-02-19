@@ -1,8 +1,14 @@
 import type { Hook } from 'symbiont-cms';
-import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
+import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
 
 /**
  * California Tech custom hooks for Symbiont CMS.
+ * 
+ * **Extractor Pattern:**
+ * - Hooks read from `ctx.page` and return values or `null`
+ * - No `ctx.data`, no `ctx.skip()` - registry handles composition
+ * - Return `null` to let next hook run (for primitives like dates)
+ * - Objects are auto-merged by registry
  * 
  * These hooks customize page processing for the California Tech newspaper:
  * - Exclude Print Only and Advertisement articles
@@ -17,8 +23,8 @@ import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-par
  * 
  * Priority: 40 (before default)
  */
-export const excludePrintOnlyHook: Hook<null, boolean> = {
-	name: 'caltech:exclude:print-only',
+export const excludePrintOnlyHook: Hook<boolean> = {
+	name: 'tech:exclude:print-only',
 	event: 'page:exclude',
 	priority: 40,
 	fn: async (ctx) => {
@@ -43,12 +49,12 @@ export const excludePrintOnlyHook: Hook<null, boolean> = {
 /**
  * Check if page should be published based on Status property.
  * Only pages with Status = "Published" are public.
- * Also excludes Print Only and Advertisement articles (redundant with excludeRule).
+ * Also excludes Print Only and Advertisement articles.
  * 
  * Priority: 40 (before default)
  */
-export const publishCheckHook: Hook<null, boolean> = {
-	name: 'caltech:publish:check',
+export const publishCheckHook: Hook<boolean> = {
+	name: 'tech:publish:check',
 	event: 'publish:check',
 	priority: 40,
 	fn: async (ctx) => {
@@ -69,6 +75,7 @@ export const publishCheckHook: Hook<null, boolean> = {
 			ctx.logger.debug({
 				event: 'publish_check_failed',
 				pageId: ctx.page.id,
+				// @ts-ignore - Notion types are complex
 				status: status?.status?.name,
 				hasPrintOnlyTag
 			});
@@ -81,15 +88,19 @@ export const publishCheckHook: Hook<null, boolean> = {
 /**
  * Parse publish date from Issue property or Website Publish Date.
  * 
+ * **Extractor Pattern:**
+ * - Returns parsed date if found
+ * - Returns `null` if no custom date (falls through to default hook)
+ * 
  * Priority order:
  * 1. Issue property (e.g., "January 20, 2023") - parsed with PST timezone
  * 2. Website Publish Date property
- * 3. Skip to default (last_edited_time)
+ * 3. Return null → falls through to default (last_edited_time)
  * 
  * Priority: 40 (before default)
  */
-export const publishDateHook: Hook<null, string | null> = {
-	name: 'caltech:publish:date:issue-based',
+export const publishDateHook: Hook<string | null> = {
+	name: 'tech:publish:date:issue-based',
 	event: 'publish:date',
 	priority: 40,
 	fn: async (ctx) => {
@@ -98,7 +109,7 @@ export const publishDateHook: Hook<null, string | null> = {
 
 		// Try Issue property first
 		if (issueProperty) {
-			const parsed = parseCalTechIssueDate(issueProperty);
+			const parsed = parseTechIssueDate(issueProperty);
 			if (parsed) {
 				ctx.logger.debug({
 					event: 'publish_date_from_issue',
@@ -125,24 +136,26 @@ export const publishDateHook: Hook<null, string | null> = {
 			}
 		}
 
-		// Fall back to default (last_edited_time) by skipping
+		// Return null to fall through to default hook (last_edited_time)
 		ctx.logger.debug({
 			event: 'publish_date_fallback_to_default',
 			pageId: ctx.page.id
 		});
-		ctx.skip();
-		return null; // Won't be used since we skipped
+		return null;
 	}
 };
 
 /**
  * Extract custom slug from Website Slug property.
- * If not present, fall back to auto-generation from title.
+ * 
+ * **Extractor Pattern:**
+ * - Returns custom slug if found
+ * - Returns `null` if not present (falls through to auto-generation)
  * 
  * Priority: 40 (before default)
  */
-export const slugExtractHook: Hook<null, string | null> = {
-	name: 'caltech:slug:extract',
+export const slugExtractHook: Hook<string | null> = {
+	name: 'tech:slug:extract',
 	event: 'slug:extract',
 	priority: 40,
 	fn: async (ctx) => {
@@ -166,7 +179,7 @@ export const slugExtractHook: Hook<null, string | null> = {
  * All California Tech hooks in one array.
  * Export this and register it in your symbiont.ts config.
  */
-export const calTechHooks: Hook[] = [
+export const techHooks: Hook[] = [
 	excludePrintOnlyHook,
 	publishCheckHook,
 	publishDateHook,

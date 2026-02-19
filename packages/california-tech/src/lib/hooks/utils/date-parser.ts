@@ -15,10 +15,10 @@
  * @returns ISO timestamp string or null if parsing fails
  * 
  * @example
- * parseCalTechIssueDate("January 20, 2023")
+ * parseTechIssueDate("January 20, 2023")
  * // Returns: "2023-01-20T14:00:00.000Z"
  */
-export function parseCalTechIssueDate(issueString: string): string | null {
+export function parseTechIssueDate(issueString: string): string | null {
 	if (!issueString || typeof issueString !== 'string') {
 		return null;
 	}
@@ -30,13 +30,13 @@ export function parseCalTechIssueDate(issueString: string): string | null {
 		const date = new Date(dateString);
 
 		if (isNaN(date.getTime())) {
-			console.warn(`[caltech] Invalid date format in Issue property: "${issueString}"`);
+			console.warn(`[tech.caltech.edu] Invalid date format in Issue property: "${issueString}"`);
 			return null;
 		}
 
 		return date.toISOString();
 	} catch (error) {
-		console.error(`[caltech] Error parsing Issue property "${issueString}":`, error);
+		console.error(`[tech.caltech.edu] Error parsing Issue property "${issueString}":`, error);
 		return null;
 	}
 }
@@ -60,13 +60,13 @@ export function parseWebsitePublishDate(dateString: string): string | null {
 		const date = new Date(dateString);
 
 		if (isNaN(date.getTime())) {
-			console.warn(`[caltech] Invalid date format in Website Publish Date: "${dateString}"`);
+			console.warn(`[tech.caltech.edu] Invalid date format in Website Publish Date: "${dateString}"`);
 			return null;
 		}
 
 		return date.toISOString();
 	} catch (error) {
-		console.error(`[caltech] Error parsing Website Publish Date "${dateString}":`, error);
+		console.error(`[tech.caltech.edu] Error parsing Website Publish Date "${dateString}":`, error);
 		return null;
 	}
 }

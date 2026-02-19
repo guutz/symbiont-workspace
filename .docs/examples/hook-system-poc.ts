@@ -317,7 +317,7 @@ export function createDefaultHooks(): Hook[] {
                 // Note: In practice, title would come from another hook's result
                 // or be extracted directly from ctx.page here
                 const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
-                const title = titleProp?.title?.[0]?.plain_text || 'untitled';
+                const title = (titleProp as any)?.title?.[0]?.plain_text || 'untitled';
                 return title
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, '-')
@@ -348,7 +348,7 @@ export function createCalTechHooks(): Hook[] {
             priority: 40,  // Run before default
             fn: async (ctx) => {
                 // Try to get date from Issue property
-                const issue = ctx.page.properties.Issue?.select?.name;
+                const issue = (ctx.page.properties.Issue as any)?.select?.name;
                 if (issue) {
                     // Parse "October 21, 2024" format
                     const match = issue.match(/(\w+)\s+(\d+),\s+(\d{4})/);
@@ -362,7 +362,7 @@ export function createCalTechHooks(): Hook[] {
                 }
                 
                 // Try Website Publish Date property
-                const websiteDate = ctx.page.properties['Website Publish Date']?.date?.start;
+                const websiteDate = (ctx.page.properties['Website Publish Date'] as any)?.date?.start;
                 if (websiteDate) {
                     return new Date(websiteDate).toISOString();
                 }
@@ -378,7 +378,7 @@ export function createCalTechHooks(): Hook[] {
             event: 'slug:extract',
             priority: 40,
             fn: async (ctx) => {
-                const slugProperty = ctx.page.properties['Website Slug']?.rich_text;
+                const slugProperty = (ctx.page.properties['Website Slug'] as any)?.rich_text;
                 const slug = slugProperty?.[0]?.plain_text?.trim();
                 return slug || null;
             }
@@ -390,9 +390,9 @@ export function createCalTechHooks(): Hook[] {
             event: 'metadata:custom',
             priority: 50,
             fn: async (ctx) => ({
-                layout: ctx.page.properties.Layout?.select?.name || 'standard',
-                featured: ctx.page.properties.Featured?.checkbox || false,
-                issueNumber: ctx.page.properties.Issue?.select?.name
+                layout: (ctx.page.properties.Layout as any)?.select?.name || 'standard',
+                featured: (ctx.page.properties.Featured as any)?.checkbox || false,
+                issueNumber: (ctx.page.properties.Issue as any)?.select?.name
             })
         }
     ];
@@ -606,7 +606,7 @@ async function testControlFlow() {
                 console.log('No custom date, returning null');
                 return null;  // Falls through to next hook
             }
-            return ctx.page.properties.CustomDate.date.start;
+            return (ctx.page.properties.CustomDate as any)?.date?.start;
         }
     });
     
@@ -695,7 +695,7 @@ async function testHookComposition() {
                 console.log('Custom date hook: No custom date, returning null');
                 return null;  // Falls through to next hook
             }
-            return custom.date.start;
+            return (custom as any)?.date?.start;
         }
     });
     
@@ -796,8 +796,10 @@ async function testHookComposition() {
     // Expected: { layout: 'blog' } ← First hook's null was ignored
 }
 
-// Run examples if this file is executed directly
-if (require.main === module) {
+// Run examples if this file is executed directly (ESM version)
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+
+if (isMainModule) {
     console.log('=== Example Usage ===');
     exampleUsage().catch(console.error);
     

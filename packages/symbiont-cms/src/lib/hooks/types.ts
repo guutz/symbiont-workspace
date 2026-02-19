@@ -45,17 +45,38 @@ export type HookEvent =
 
 /**
  * Context object passed to each hook function.
- * Contains the current state and utilities for hook execution.
+ * 
+ * **Hook Philosophy: Extractors, Not Transformers**
+ * 
+ * Hooks are independent extractors that read from `ctx.page` and return values.
+ * They do NOT transform data flowing through them (no `ctx.data`).
+ * 
+ * The HookRegistry automatically composes results based on return type:
+ * - **Primitives** (string, number, Date, boolean): First non-null wins
+ * - **Objects**: Merge all non-null results
+ * - **Arrays**: Concatenate all non-null results
+ * 
+ * @example Extractor pattern (correct)
+ * ```typescript
+ * fn: async (ctx) => {
+ *   return parseDate(ctx.page.properties.Date);
+ * }
+ * ```
+ * 
+ * @example Return null to skip
+ * ```typescript
+ * fn: async (ctx) => {
+ *   if (!hasCustomDate(ctx.page)) return null; // Falls through to next hook
+ *   return extractCustomDate(ctx.page);
+ * }
+ * ```
  */
-export type HookContext<T = any> = {
+export type HookContext = {
 	/** The Notion page being processed */
 	page: PageObjectResponse;
 
 	/** The database configuration */
 	config: DatabaseBlueprint;
-
-	/** Current state/data being transformed (varies by hook event) */
-	data: T;
 
 	/** Logger instance for structured logging */
 	logger: {
@@ -68,26 +89,63 @@ export type HookContext<T = any> = {
 	/** Optional Supabase client for advanced use cases */
 	supabase?: SupabaseClient<Database>;
 
+	/** Internal flag to track abort state */
+	aborted: boolean;
+
+	/** Abort reason if aborted */
+	abortReason?: string;
+
 	/** Stop processing this page with a reason */
 	abort: (reason: string) => void;
-
-	/** Skip to next hook (don't modify data) */
-	skip: () => void;
 };
 
 /**
  * Hook function signature.
- * Can be async or sync, receives context, returns transformed data.
+ * 
+ * Hooks are extractors that read from `ctx.page` and return a value or `null`.
+ * - Return your extracted value if you have data to contribute
+ * - Return `null` if you have nothing to contribute (registry continues to next hook)
+ * 
+ * The registry automatically composes results:
+ * - **Primitives**: First non-null wins (stops processing)
+ * - **Objects**: Merged together
+ * - **Arrays**: Concatenated together
+ * 
+ * @example
+ * ```typescript
+ * // Custom date extraction
+ * fn: async (ctx) => {
+ *   const date = ctx.page.properties.Date?.date?.start;
+ *   return date ? new Date(date).toISOString() : null;
+ * }
+ * ```
  */
-export type HookFunction<TInput = any, TOutput = any> = (
-	context: HookContext<TInput>
-) => Promise<TOutput> | TOutput;
+export type HookFunction<TOutput = any> = (
+	context: HookContext
+) => Promise<TOutput | null> | TOutput | null;
 
 /**
  * Hook definition.
  * Associates a function with an event and priority.
+ * 
+ * Hooks execute in priority order (lower = earlier):
+ * - **1-20**: Pre-processing (debug logging, property inspection)
+ * - **30-40**: Custom logic (runs before defaults)
+ * - **50**: Default hooks (Symbiont's built-in behavior)
+ * - **60-70**: Post-processing (validation, computed fields)
+ * - **80-99**: Final validation (error checking, warnings)
+ * 
+ * @example
+ * ```typescript
+ * {
+ *   name: 'caltech:publish-date',
+ *   event: 'publish:date',
+ *   priority: 40,
+ *   fn: async (ctx) => parseIssueDate(ctx.page) || null
+ * }
+ * ```
  */
-export interface Hook<TInput = any, TOutput = any> {
+export interface Hook<TOutput = any> {
 	/** User-defined name for this hook (for logging/debugging) */
 	name: string;
 
@@ -98,9 +156,11 @@ export interface Hook<TInput = any, TOutput = any> {
 	 * Priority for execution order (lower runs first)
 	 * Default: 50
 	 * Suggested ranges:
-	 * - 10-30: High priority (runs early)
-	 * - 40-60: Normal priority (default range)
-	 * - 70-90: Low priority (runs late)
+	 * - 1-20: Pre-processing (debug logging)
+	 * - 30-40: Custom logic (before defaults)
+	 * - 50: Default hooks
+	 * - 60-70: Post-processing (validation)
+	 * - 80-99: Final validation
 	 */
 	priority?: number;
 
@@ -111,7 +171,7 @@ export interface Hook<TInput = any, TOutput = any> {
 	continueOnError?: boolean;
 
 	/** The hook function to execute */
-	fn: HookFunction<TInput, TOutput>;
+	fn: HookFunction<TOutput>;
 }
 
 /**
@@ -120,5 +180,4 @@ export interface Hook<TInput = any, TOutput = any> {
 export interface HookExecutionState {
 	aborted: boolean;
 	abortReason?: string;
-	skipped: boolean;
 }

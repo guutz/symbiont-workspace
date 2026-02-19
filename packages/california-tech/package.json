@@ -34,7 +34,6 @@
     "createblog": "bash utils/create-blog.sh"
   },
   "devDependencies": {
-    "@qwik.dev/partytown": "0.11.2",
     "@changesets/cli": "2.29.7",
     "@iconify-json/akar-icons": "1.2.7",
     "@iconify-json/bxs": "1.2.2",
@@ -45,6 +44,7 @@
     "@iconify-json/mdi": "1.2.3",
     "@iconify-json/tabler": "1.2.23",
     "@iconify-json/vscode-icons": "1.2.30",
+    "@qwik.dev/partytown": "0.11.2",
     "@sveltejs/adapter-cloudflare": "7.2.3",
     "@sveltejs/adapter-netlify": "5.2.3",
     "@sveltejs/adapter-node": "5.3.2",
@@ -105,6 +105,7 @@
     "unocss": "66.5.2",
     "unocss-preset-scrollbar": "3.2.0",
     "vite": "7.1.7",
-    "vite-imagetools": "8.0.0"
+    "vite-imagetools": "8.0.0",
+    "wrangler": "^4.65.0"
   }
 }
