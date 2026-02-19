@@ -164,10 +164,11 @@ private async extractCoreMetadata(page: PageObjectResponse) {
 
 The hook registry composes results based on return type:
 
-1. **Primitives** (string, number, Date): First non-null wins, stops processing
-2. **Booleans**: AND all results together (for validation) ## PLEASE VERIFY IF THIS IS THE CASE, OR IF IT'S FIRST NON-NULL WINS. WE NEED TO BE CONSISTENT AND CLEAR ABOUT THIS IN DOCUMENTATION AND IMPLEMENTATION.
-3. **Objects**: Deep merge all non-null results
-4. **Arrays**: Concatenate all non-null results
+1. **Primitives** (string, number, Date, **boolean**): First non-null wins, stops processing
+2. **Objects**: Deep merge all non-null results
+3. **Arrays**: Concatenate all non-null results
+
+**VERIFIED**: Booleans follow the first-non-null-wins pattern (line 254 in registry.ts), NOT AND composition.
 
 This is already implemented in `HookRegistry.execute()`.
 
