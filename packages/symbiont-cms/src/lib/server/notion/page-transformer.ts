@@ -88,8 +88,8 @@ export class NotionPageToDatabasePageTransformer {
 			return null;
 		}
 
-		// 1. Extract core metadata (title, tags, authors, summary)
-		const coreMeta = this.extractCoreMetadata(page);
+		// 1. Extract core metadata (title, tags, authors, summary) - using hooks
+		const coreMeta = await this.extractCoreMetadata(page);
 
 		// 2. Check publishing rules
 		const isPublic = await this.shouldPublish(page);
@@ -415,25 +415,23 @@ export class NotionPageToDatabasePageTransformer {
 	/**
 	 * Extract core metadata (title, tags, authors)
 	 */
-	private extractCoreMetadata(page: PageObjectResponse): {
+	private async extractCoreMetadata(page: PageObjectResponse): Promise<{
 		title: string;
 		tags: string[];
 		authors: string[];
 		summary: string;
-	} {
-		const title = this.notionClient.getTitleProperty(page);
+	}> {
+		// Use hooks for metadata extraction (Phase 1 migration)
+		const hookContext = {
+			page,
+			config: this.config,
+			logger: this.logger
+		};
 
-		const tags = this.config.tagsProperty
-			? this.notionClient.getPropertyValues(page, this.config.tagsProperty)
-			: [];
-
-		const authors = this.config.authorsProperty
-			? this.notionClient.getPropertyValues(page, this.config.authorsProperty)
-			: [];
-
-		const summary = this.config.summaryProperty
-			? this.notionClient.getPropertyValues(page, this.config.summaryProperty)?.[0] || ''
-			: '';
+		const title = await this.hookRegistry.execute<string>('metadata:title', hookContext) || 'Untitled';
+		const tags = await this.hookRegistry.execute<string[]>('metadata:tags', hookContext) || [];
+		const authors = await this.hookRegistry.execute<string[]>('metadata:authors', hookContext) || [];
+		const summary = await this.hookRegistry.execute<string>('metadata:summary', hookContext) || '';
 
 		return { title, tags, authors, summary };
 	}
