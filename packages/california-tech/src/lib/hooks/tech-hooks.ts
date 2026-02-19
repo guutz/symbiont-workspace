@@ -1,5 +1,5 @@
 import type { Hook } from 'symbiont-cms';
-import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
+import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
 
 /**
  * California Tech custom hooks for Symbiont CMS.
@@ -24,7 +24,7 @@ import { parseCalTechIssueDate, parseWebsitePublishDate } from './utils/date-par
  * Priority: 40 (before default)
  */
 export const excludePrintOnlyHook: Hook<boolean> = {
-	name: 'caltech:exclude:print-only',
+	name: 'tech:exclude:print-only',
 	event: 'page:exclude',
 	priority: 40,
 	fn: async (ctx) => {
@@ -54,7 +54,7 @@ export const excludePrintOnlyHook: Hook<boolean> = {
  * Priority: 40 (before default)
  */
 export const publishCheckHook: Hook<boolean> = {
-	name: 'caltech:publish:check',
+	name: 'tech:publish:check',
 	event: 'publish:check',
 	priority: 40,
 	fn: async (ctx) => {
@@ -100,7 +100,7 @@ export const publishCheckHook: Hook<boolean> = {
  * Priority: 40 (before default)
  */
 export const publishDateHook: Hook<string | null> = {
-	name: 'caltech:publish:date:issue-based',
+	name: 'tech:publish:date:issue-based',
 	event: 'publish:date',
 	priority: 40,
 	fn: async (ctx) => {
@@ -109,7 +109,7 @@ export const publishDateHook: Hook<string | null> = {
 
 		// Try Issue property first
 		if (issueProperty) {
-			const parsed = parseCalTechIssueDate(issueProperty);
+			const parsed = parseTechIssueDate(issueProperty);
 			if (parsed) {
 				ctx.logger.debug({
 					event: 'publish_date_from_issue',
@@ -155,7 +155,7 @@ export const publishDateHook: Hook<string | null> = {
  * Priority: 40 (before default)
  */
 export const slugExtractHook: Hook<string | null> = {
-	name: 'caltech:slug:extract',
+	name: 'tech:slug:extract',
 	event: 'slug:extract',
 	priority: 40,
 	fn: async (ctx) => {
@@ -179,7 +179,7 @@ export const slugExtractHook: Hook<string | null> = {
  * All California Tech hooks in one array.
  * Export this and register it in your symbiont.ts config.
  */
-export const calTechHooks: Hook[] = [
+export const techHooks: Hook[] = [
 	excludePrintOnlyHook,
 	publishCheckHook,
 	publishDateHook,

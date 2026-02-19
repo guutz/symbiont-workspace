@@ -8,12 +8,16 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.31",
-    "svelte": "5.49.1",
+    "svelte": "5.51.2",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.9.0"
   }
 }
