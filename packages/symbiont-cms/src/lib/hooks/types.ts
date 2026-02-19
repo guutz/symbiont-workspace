@@ -57,16 +57,28 @@ export type HookEvent =
 	| 'sync:images'; // Sync image URLs back to Notion
 
 /**
- * Events that are effect hooks (side effects allowed).
+ * Events that use the effect hook pattern (side effects allowed).
  * These hooks ALL execute (no early stopping on first result).
+ * 
+ * Effect hooks receive services in context (NotionClient, Supabase).
  */
-export const EFFECT_HOOK_EVENTS: HookEvent[] = [
+export const EFFECT_HOOK_EVENTS = new Set<HookEvent>([
 	'content:images',
 	'cover:process',
 	'sync:slug',
 	'sync:content',
 	'sync:images'
-];
+] as const);
+
+/**
+ * Check if an event uses the effect hook pattern.
+ * 
+ * @param event - The hook event to check
+ * @returns True if this is an effect hook event
+ */
+export function isEffectHookEvent(event: HookEvent): boolean {
+	return EFFECT_HOOK_EVENTS.has(event);
+}
 
 /**
  * Context object passed to each hook function.

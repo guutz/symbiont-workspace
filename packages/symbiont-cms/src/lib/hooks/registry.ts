@@ -1,4 +1,6 @@
 import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.js';
+import { isEffectHookEvent } from './types.js';
+import { getResultType, composeResults, shouldStopEarly, type ResultType } from './composition.js';
 
 /**
  * HookRegistry manages registration and execution of hooks.
@@ -202,7 +204,7 @@ export class HookRegistry {
 		};
 
 		// Check if this is an effect hook event
-		const isEffectHook = this.isEffectHookEvent(event);
+		const isEffectHook = isEffectHookEvent(event);
 
 		// For effect hooks, collect all results
 		if (isEffectHook) {
@@ -275,7 +277,7 @@ export class HookRegistry {
 		// Extractor hook pattern (original logic)
 		// Compose result based on type
 		let result: any = null;
-		let resultType: 'primitive' | 'object' | 'array' | null = null;
+		let resultType: ResultType = null;
 
 		// Execute hooks in priority order
 		for (const hook of hooks) {
@@ -325,39 +327,24 @@ export class HookRegistry {
 
 				// Determine result type on first non-null output
 				if (resultType === null) {
-					if (Array.isArray(output)) {
-						resultType = 'array';
-					} else if (typeof output === 'object' && output !== null) {
-						resultType = 'object';
-					} else {
-						resultType = 'primitive';
-					}
+					resultType = getResultType(output);
 				}
 
 				// Compose based on type
-				if (resultType === 'primitive') {
-					// First non-null wins, stop processing
-					result = output;
-					this.logger.debug({
-						event: 'hook_executed_first_wins',
-						hookName: hook.name,
-						stoppingEarly: true
-					});
+				result = composeResults(result, output, resultType);
+				
+				// Log composition
+				this.logger.debug({
+					event: resultType === 'primitive' ? 'hook_executed_first_wins' 
+						: resultType === 'object' ? 'hook_executed_merged'
+						: 'hook_executed_concatenated',
+					hookName: hook.name,
+					stoppingEarly: shouldStopEarly(resultType)
+				});
+
+				// Stop early for primitives (first non-null wins)
+				if (shouldStopEarly(resultType)) {
 					break;
-				} else if (resultType === 'object') {
-					// Merge objects
-					result = { ...result, ...output };
-					this.logger.debug({
-						event: 'hook_executed_merged',
-						hookName: hook.name
-					});
-				} else if (resultType === 'array') {
-					// Concatenate arrays
-					result = result === null ? output : [...result, ...output];
-					this.logger.debug({
-						event: 'hook_executed_concatenated',
-						hookName: hook.name
-					});
 				}
 			} catch (error) {
 				this.logger.error({
@@ -424,22 +411,5 @@ export class HookRegistry {
 	 */
 	getHookCount(event: HookEvent): number {
 		return this.hooks.get(event)?.length || 0;
-	}
-
-	/**
-	 * Check if an event is an effect hook (allows side effects).
-	 * 
-	 * @param event - The hook event
-	 * @returns True if this is an effect hook event
-	 */
-	private isEffectHookEvent(event: HookEvent): boolean {
-		const effectEvents: HookEvent[] = [
-			'content:images',
-			'cover:process',
-			'sync:slug',
-			'sync:content',
-			'sync:images'
-		];
-		return effectEvents.includes(event);
 	}
 }
