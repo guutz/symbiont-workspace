@@ -44,8 +44,17 @@ export class NotionPageToDatabasePageTransformer {
 			dataSourceId: this.config.dataSourceId
 		});
 
-		// Initialize hook registry
-		this.hookRegistry = new HookRegistry(this.logger);
+		// Initialize hook registry with config and services
+		this.hookRegistry = new HookRegistry(
+			this.logger,
+			this.config,
+			{
+				notionClient: this.notionClient,
+				supabase: undefined, // TODO: Pass instantiated Supabase client
+				supabaseUrl: this.supabaseUrl,
+				serviceRoleKey: this.serviceRoleKey
+			}
+		);
 
 		// Register default hooks
 		this.hookRegistry.registerMany(defaultHooks);
@@ -141,12 +150,8 @@ export class NotionPageToDatabasePageTransformer {
 	 */
 	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
 		try {
-			// Use hook to extract cover URL (Phase 2 migration - partial)
-			const coverUrl = await this.hookRegistry.execute<string | null>('cover:extract', {
-				page,
-				config: this.config,
-				logger: this.logger
-			});
+			// Use hook to extract cover URL
+			const coverUrl = await this.hookRegistry.execute('cover:extract', page);
 
 			// No cover found
 			if (!coverUrl) {
@@ -354,14 +359,7 @@ export class NotionPageToDatabasePageTransformer {
 		}
 
 		// Get custom metadata via hooks (auto-merged by registry)
-		const customMeta = await this.hookRegistry.execute<Record<string, any>>(
-			'metadata:custom',
-			{
-				page,
-				config: this.config,
-				logger: this.logger
-			}
-		);
+		const customMeta = await this.hookRegistry.execute('metadata:custom', page);
 
 		// Merge hook result with system fields
 		if (customMeta) {
@@ -381,17 +379,11 @@ export class NotionPageToDatabasePageTransformer {
 		authors: string[];
 		summary: string;
 	}> {
-		// Use hooks for metadata extraction (Phase 1 migration)
-		const hookContext = {
-			page,
-			config: this.config,
-			logger: this.logger
-		};
-
-		const title = await this.hookRegistry.execute<string>('metadata:title', hookContext) || 'Untitled';
-		const tags = await this.hookRegistry.execute<string[]>('metadata:tags', hookContext) || [];
-		const authors = await this.hookRegistry.execute<string[]>('metadata:authors', hookContext) || [];
-		const summary = await this.hookRegistry.execute<string>('metadata:summary', hookContext) || '';
+		// Use hooks for metadata extraction - simplified signature
+		const title = await this.hookRegistry.execute('metadata:title', page) || 'Untitled';
+		const tags = await this.hookRegistry.execute('metadata:tags', page) || [];
+		const authors = await this.hookRegistry.execute('metadata:authors', page) || [];
+		const summary = await this.hookRegistry.execute('metadata:summary', page) || '';
 
 		return { title, tags, authors, summary };
 	}
@@ -402,11 +394,7 @@ export class NotionPageToDatabasePageTransformer {
 	 */
 	private async resolveSlug(page: PageObjectResponse, title: string): Promise<string> {
 		// 1. Extract custom slug via hooks
-		const customSlug = await this.hookRegistry.execute<string | null>('slug:extract', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
+		const customSlug = await this.hookRegistry.execute('slug:extract', page);
 
 		// 2. Check if page already exists in DB
 		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
@@ -434,15 +422,7 @@ export class NotionPageToDatabasePageTransformer {
 			}
 		} else {
 			// New page or existing page without slug - generate via hooks
-			// In the new extractor pattern, slug:generate extracts title directly from page
-			const baseSlug = await this.hookRegistry.execute<string>(
-				'slug:generate',
-				{
-					page,
-					config: this.config,
-					logger: this.logger
-				}
-			);
+			const baseSlug = await this.hookRegistry.execute('slug:generate', page);
 
 			// If custom slug was extracted, use it instead of generated
 			const finalBaseSlug = customSlug || baseSlug;
@@ -512,11 +492,7 @@ export class NotionPageToDatabasePageTransformer {
 	 * Check if page should be excluded from sync (apply page:exclude hook)
 	 */
 	private async shouldExclude(page: PageObjectResponse): Promise<boolean> {
-		const shouldExclude = await this.hookRegistry.execute<boolean>('page:exclude', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
+		const shouldExclude = await this.hookRegistry.execute('page:exclude', page);
 		return shouldExclude || false; // Default to false if no hooks return a value
 	}
 
@@ -524,11 +500,7 @@ export class NotionPageToDatabasePageTransformer {
 	 * Check if page should be published (apply publish:check hook)
 	 */
 	private async shouldPublish(page: PageObjectResponse): Promise<boolean> {
-		const shouldPublish = await this.hookRegistry.execute<boolean>('publish:check', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
+		const shouldPublish = await this.hookRegistry.execute('publish:check', page);
 		return shouldPublish || false; // Default to false if no hooks return a value
 	}
 
@@ -536,11 +508,7 @@ export class NotionPageToDatabasePageTransformer {
 	 * Get publish date (apply publish:date hook)
 	 */
 	private async getPublishDate(page: PageObjectResponse): Promise<string | null> {
-		const publishDate = await this.hookRegistry.execute<string>('publish:date', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
+		const publishDate = await this.hookRegistry.execute('publish:date', page);
 		return publishDate;
 	}
 
