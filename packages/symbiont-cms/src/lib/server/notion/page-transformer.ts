@@ -145,58 +145,26 @@ export class NotionPageToDatabasePageTransformer {
 	}
 
 	/**
-	 * Process cover image: upload to Supabase and sync URL back to Notion
+	 * Process cover image: extract URL and process it (upload, etc.)
 	 * Falls back to extracting first image from content if no cover is set
 	 */
 	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
 		try {
-			// Use hook to extract cover URL
-			const coverUrl = await this.hookRegistry.execute('cover:extract', page);
-
-			// No cover found
-			if (!coverUrl) {
-				// Try to extract from content as fallback
+			// Extract cover URL using hook
+			const rawCoverUrl = await this.hookRegistry.execute('cover:extract', page);
+			
+			// No cover found - try content fallback
+			if (!rawCoverUrl) {
 				return await this.extractCoverFromContent(page);
 			}
-
-			// Upload to Supabase if needed
-			if (needsUploadToSupabase(coverUrl)) {
-				const result = await uploadImageToSupabase(coverUrl, {
-					supabaseUrl: this.supabaseUrl,
-					serviceRoleKey: this.serviceRoleKey,
-					pageId: page.id
-				});
-				
-				this.logger.info({
-					event: 'cover_image_uploaded',
-					pageId: page.id,
-					originalUrl: coverUrl,
-					newUrl: result.newUrl,
-					filename: result.filename
-				});
-
-				// Sync permanent URL back to Notion
-				if (this.config.coverProperty) {
-					await this.notionClient.updateFileProperty(
-						page.id,
-						this.config.coverProperty,
-						result.newUrl
-					);
-				}
-
-				return result.newUrl;
-			}
-
-			// Already a permanent URL
-			this.logger.info({
-				event: 'cover_image_external',
-				pageId: page.id,
-				coverUrl
-			});
-			return coverUrl;
+			
+			// Process cover URL using hook (upload, transform, etc.)
+			const finalCoverUrl = await this.hookRegistry.execute('cover:process', page, rawCoverUrl);
+			
+			return finalCoverUrl;
 		} catch (error: any) {
 			this.logger.warn({
-				event: 'cover_image_upload_failed',
+				event: 'cover_image_processing_failed',
 				pageId: page.id,
 				error: error?.message
 			});
@@ -258,82 +226,25 @@ export class NotionPageToDatabasePageTransformer {
 	}
 
 	/**
-	 * Process content and images: upload to Supabase and sync markdown back to Notion
+	 * Process content pipeline: fetch, transform, process images
+	 * Uses content:transform and content:images hooks
 	 */
 	private async processContentAndUploadImages(page: PageObjectResponse): Promise<string> {
-		// Get content as markdown
-		const content = await this.notionClient.pageToMarkdown(page.id);
+		// Fetch content as markdown (always from Notion)
+		const rawContent = await this.notionClient.pageToMarkdown(page.id);
 		
-		// Find and process all images
-		let processedContent = content;
-		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-		const imagePromises: Promise<void>[] = [];
-		let match;
-
-		while ((match = imageRegex.exec(content)) !== null) {
-			const [fullMatch, alt, url] = match;
-			
-			if (needsUploadToSupabase(url)) {
-				const imagePromise = uploadImageToSupabase(url, {
-					supabaseUrl: this.supabaseUrl,
-					serviceRoleKey: this.serviceRoleKey,
-					pageId: page.id,
-					altText: alt || undefined
-				}).then((uploaded) => {
-					processedContent = processedContent.replace(fullMatch, `![${alt}](${uploaded.newUrl})`);
-					this.logger.info({
-						event: 'content_image_uploaded',
-						pageId: page.id,
-						filename: uploaded.filename
-					});
-				}).catch((error) => {
-					this.logger.warn({
-						event: 'content_image_upload_failed',
-						pageId: page.id,
-						url,
-						error: error.message
-					});
-				});
-				
-				imagePromises.push(imagePromise);
-			}
+		// Transform content (user can strip/rewrite via hooks)
+		const transformed = await this.hookRegistry.execute('content:transform', page, rawContent) ?? rawContent;
+		
+		// Process inline images (upload, transform URLs)
+		const finalContent = await this.hookRegistry.execute('content:images', page, transformed) ?? transformed;
+		
+		// Sync updated content back to Notion if changed
+		if (finalContent !== rawContent) {
+			await this.hookRegistry.execute('sync:content', page, finalContent);
 		}
 
-		// Wait for all uploads
-		await Promise.all(imagePromises);
-
-		// Sync updated content back to Notion if images changed
-		// TODO: Decide if we want to keep images that are in Notion CDN, in Notion CDN -- or replace all images in Notion with Supabase URLs (current behavior)
-		// As is, Martian convertMarkdownToNotionBlocks does not rebuild Notion internal image blocks correctly, so that would need to be fixed first
-		if (processedContent !== content) {
-			try {
-				const blocks = convertMarkdownToNotionBlocks(processedContent, {
-					strictImageUrls: false,
-					truncate: true,
-					onLimitExceeded: (err) => this.logger.warn({
-						event: 'notion_content_limit_exceeded',
-						pageId: page.id,
-						error: err.message
-					})
-				});
-
-				await this.notionClient.updatePageBlocks(page.id, blocks);
-				
-				this.logger.info({
-					event: 'notion_content_images_synced',
-					pageId: page.id,
-					message: 'Updated Notion page with Supabase image URLs'
-				});
-			} catch (error: any) {
-				this.logger.warn({
-					event: 'notion_content_sync_failed',
-					pageId: page.id,
-					error: error?.message
-				});
-			}
-		}
-
-		return processedContent;
+		return finalContent;
 	}
 
 	/**
@@ -436,17 +347,9 @@ export class NotionPageToDatabasePageTransformer {
 			});
 		}
 
-		// 4. Sync back to Notion ONLY if slug is new or changed
-		if (this.config.slugSyncProperty && slugChanged) {
-			// Also check if Notion already has the correct slug to avoid unnecessary updates
-			if (customSlug !== slug) {
-				await this.notionClient.updateProperty(page.id, this.config.slugSyncProperty, slug);
-				this.logger.debug({
-					event: 'slug_synced_to_notion',
-					pageId: page.id,
-					slug
-				});
-			}
+		// 4. Sync back to Notion if slug changed
+		if (slugChanged) {
+			await this.hookRegistry.execute('sync:slug', page, slug);
 		}
 
 		return slug;
