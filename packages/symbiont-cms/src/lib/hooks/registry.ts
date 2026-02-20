@@ -1,75 +1,16 @@
-import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.js';
-import { isEffectHookEvent } from './types.js';
-import { getResultType, composeResults, shouldStopEarly, type ResultType } from './composition.js';
+import type { PageObjectResponse } from '@notionhq/client';
+import type { HookEvent, Hook, HookContext, HookExecutionState, EventSignatures, DatabaseBlueprint } from './types.js';
+import { HOOK_EVENTS } from './types.js';
 
 /**
- * HookRegistry manages registration and execution of hooks.
+ * Hook Registry manages registration and execution of hooks.
  * 
- * **TWO HOOK PATTERNS:**
- * 
- * 1. **Extractor Hooks** (default pattern):
- *    - Independent extractors that read from `ctx.page` and return values
- *    - Composition based on return type:
- *      - **Primitives**: First non-null wins (stops early)
- *      - **Objects**: Merge all non-null results
- *      - **Arrays**: Concatenate all non-null results
- *    - Examples: metadata:*, slug:extract, cover:extract
- * 
- * 2. **Effect Hooks** (side-effect pattern):
- *    - All hooks execute (no early stopping)
- *    - Can perform side effects (uploads, syncs, mutations)
- *    - Results are collected but not composed
- *    - Events: sync:*, *:process (see EFFECT_HOOK_EVENTS)
- *    - Examples: sync:slug, cover:process, content:images
- * 
- * @example Basic hook composition
- * ```typescript
- * // Hook 1: Try custom date extraction (priority 40)
- * {
- *   name: 'custom-date',
- *   event: 'publish:date',
- *   priority: 40,
- *   fn: async (ctx) => {
- *     const date = ctx.page.properties.CustomDate?.date?.start;
- *     return date || null; // Falls through to next hook if null
- *   }
- * }
- * 
- * // Hook 2: Default fallback (priority 50)
- * {
- *   name: 'default-date',
- *   event: 'publish:date',
- *   priority: 50,
- *   fn: async (ctx) => ctx.page.last_edited_time
- * }
- * // Result: Custom date if available, otherwise last_edited_time
- * ```
- * 
- * @example Object auto-merge
- * ```typescript
- * // Hook 1: Layout metadata
- * {
- *   name: 'meta:layout',
- *   event: 'metadata:custom',
- *   priority: 30,
- *   fn: async (ctx) => ({
- *     layout: ctx.page.properties.Layout?.select?.name,
- *     featured: ctx.page.properties.Featured?.checkbox
- *   })
- * }
- * 
- * // Hook 2: SEO metadata (auto-merged by registry)
- * {
- *   name: 'meta:seo',
- *   event: 'metadata:custom',
- *   priority: 40,
- *   fn: async (ctx) => ({
- *     // No spreading needed! Registry merges automatically
- *     ogImage: ctx.page.properties.OGImage?.url
- *   })
- * }
- * // Result: { layout, featured, ogImage } - all merged!
- * ```
+ * Execution is determined by the event's composition strategy:
+ * - 'first-wins': Stop at first non-null result
+ * - 'collect': Accumulate all results (merge objects, concat arrays)
+ * - 'or-all': Run all; true if any returns true
+ * - 'and-all': Run all; false if any returns false
+ * - 'run-all': Run all; ignore return values
  */
 export class HookRegistry {
 	private hooks: Map<HookEvent, Hook[]> = new Map();
@@ -79,6 +20,12 @@ export class HookRegistry {
 		warn: (data: any) => void;
 		error: (data: any) => void;
 	};
+	private config: DatabaseBlueprint;
+	private services: {
+		notionClient?: any;
+		supabase?: any;
+		[key: string]: unknown;
+	};
 
 	constructor(
 		logger: {
@@ -86,30 +33,40 @@ export class HookRegistry {
 			info: (data: any) => void;
 			warn: (data: any) => void;
 			error: (data: any) => void;
+		},
+		config: DatabaseBlueprint,
+		services: {
+			notionClient?: any;
+			supabase?: any;
+			[key: string]: unknown;
 		}
 	) {
 		this.logger = logger;
+		this.config = config;
+		this.services = services;
 	}
 
 	/**
 	 * Register a hook for an event.
-	 * Hooks are automatically sorted by priority (lower = earlier).
+	 * Hooks are automatically sorted by priority.
 	 * 
 	 * @param hook - The hook to register
 	 */
 	register(hook: Hook): void {
-		// Set default priority if not specified
+		// Map named priorities to numbers
+		const priorityNumber = this.mapPriority(hook.priority);
+		
 		const hookWithDefaults = {
 			...hook,
-			priority: hook.priority ?? 50,
+			priority: hook.priority ?? undefined, // Keep original for logging
 			continueOnError: hook.continueOnError ?? false
 		};
 
 		const existing = this.hooks.get(hook.event) || [];
 		existing.push(hookWithDefaults);
 
-		// Sort by priority (lower runs first)
-		existing.sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
+		// Sort by numeric priority
+		existing.sort((a, b) => this.mapPriority(a.priority) - this.mapPriority(b.priority));
 
 		this.hooks.set(hook.event, existing);
 
@@ -117,7 +74,7 @@ export class HookRegistry {
 			event: 'hook_registered',
 			hookName: hook.name,
 			hookEvent: hook.event,
-			priority: hookWithDefaults.priority,
+			priority: hook.priority ?? 'default',
 			totalHooks: existing.length
 		});
 	}
@@ -135,7 +92,6 @@ export class HookRegistry {
 
 	/**
 	 * Unregister a hook by name.
-	 * Useful for testing or dynamic hook management.
 	 * 
 	 * @param hookName - Name of the hook to remove
 	 */
@@ -156,33 +112,27 @@ export class HookRegistry {
 	/**
 	 * Execute all hooks for a given event.
 	 * 
-	 * **Extractor hooks** (default):
-	 * - Primitives: First non-null wins (stops early)
-	 * - Objects: Merge all non-null results
-	 * - Arrays: Concatenate all non-null results
-	 * 
-	 * **Effect hooks** (sync:*, *:process):
-	 * - All hooks execute (no early stopping)
-	 * - Results collected but not composed
-	 * - Used for side effects
+	 * The execution strategy is determined by the event's composition strategy.
 	 * 
 	 * @param event - The hook event to execute
-	 * @param context - Context object (without abort method)
-	 * @returns Composed result from all hooks (or array of results for effect hooks)
-	 * @throws Error if a hook aborts or throws an error (unless continueOnError is true)
+	 * @param page - The Notion page being processed
+	 * @param input - Optional pipeline input (for events that declare it)
+	 * @returns Composed result from all hooks
 	 */
-	async execute<TOutput = any>(
-		event: HookEvent,
-		context: Omit<HookContext, 'abort' | 'aborted' | 'abortReason'>
-	): Promise<TOutput | null> {
+	async execute<E extends HookEvent>(
+		event: E,
+		page: PageObjectResponse,
+		...args: EventSignatures[E]['input'] extends never ? [] : [EventSignatures[E]['input']]
+	): Promise<EventSignatures[E]['output'] | null> {
 		const hooks = this.hooks.get(event) || [];
+		const input = args.length > 0 ? args[0] : undefined;
 
 		if (hooks.length === 0) {
 			this.logger.debug({
 				event: 'no_hooks_registered',
 				hookEvent: event
 			});
-			return null;
+			return null as any;
 		}
 
 		this.logger.debug({
@@ -203,120 +153,99 @@ export class HookRegistry {
 			state.abortReason = reason;
 		};
 
-		// Check if this is an effect hook event
-		const isEffectHook = isEffectHookEvent(event);
+		const strategy = HOOK_EVENTS[event]?.composition || 'first-wins';
 
-		// For effect hooks, collect all results
-		if (isEffectHook) {
-			const results: any[] = [];
-			
-			for (const hook of hooks) {
-				if (state.aborted) {
-					this.logger.warn({
-						event: 'hook_execution_aborted',
-						hookEvent: event,
-						hookName: hook.name,
-						reason: state.abortReason
-					});
-					throw new Error(`Hook execution aborted: ${state.abortReason}`);
-				}
-
-				try {
-					const fullContext: HookContext = {
-						...context,
-						aborted: state.aborted,
-						abortReason: state.abortReason,
-						abort
-					};
-
-					this.logger.debug({
-						event: 'executing_effect_hook',
-						hookName: hook.name,
-						hookEvent: event,
-						priority: hook.priority
-					});
-
-					const output = await hook.fn(fullContext);
-
-					if (state.aborted) {
-						throw new Error(`Hook aborted: ${state.abortReason}`);
-					}
-
-					results.push(output);
-					
-					this.logger.debug({
-						event: 'effect_hook_executed',
-						hookName: hook.name,
-						hasResult: output !== null && output !== undefined
-					});
-				} catch (error) {
-					this.logger.error({
-						event: 'effect_hook_execution_failed',
-						hookName: hook.name,
-						hookEvent: event,
-						error: error instanceof Error ? error.message : String(error),
-						continueOnError: hook.continueOnError
-					});
-
-					if (!hook.continueOnError) {
-						throw error;
-					}
-
-					this.logger.warn({
-						event: 'effect_hook_error_ignored',
-						hookName: hook.name,
-						hookEvent: event
-					});
-				}
-			}
-
-			// Return array of results for effect hooks
-			return results as any;
+		// Execute based on composition strategy
+		switch (strategy) {
+			case 'first-wins':
+				return await this.executeFirstWins(hooks, page, input, state, abort) as any;
+			case 'collect':
+				return await this.executeCollect(hooks, page, input, state, abort) as any;
+			case 'or-all':
+				return await this.executeOrAll(hooks, page, input, state, abort) as any;
+			case 'and-all':
+				return await this.executeAndAll(hooks, page, input, state, abort) as any;
+			case 'run-all':
+				return await this.executeRunAll(hooks, page, input, state, abort) as any;
+			default:
+				throw new Error(`Unknown composition strategy: ${strategy}`);
 		}
+	}
 
-		// Extractor hook pattern (original logic)
-		// Compose result based on type
-		let result: any = null;
-		let resultType: ResultType = null;
-
-		// Execute hooks in priority order
+	/**
+	 * Execute hooks with first-wins strategy.
+	 * Stop at first non-null result.
+	 */
+	private async executeFirstWins(
+		hooks: Hook[],
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<any> {
 		for (const hook of hooks) {
-			// Check if we were aborted by a previous hook
 			if (state.aborted) {
-				this.logger.warn({
-					event: 'hook_execution_aborted',
-					hookEvent: event,
-					hookName: hook.name,
-					reason: state.abortReason
-				});
-				throw new Error(`Hook execution aborted: ${state.abortReason}`);
+				this.throwAbort(hook, state);
 			}
 
 			try {
-				// Build complete context
-				const fullContext: HookContext = {
-					...context,
-					aborted: state.aborted,
-					abortReason: state.abortReason,
-					abort
-				};
+				const context = this.buildContext(page, input, state, abort);
+				const output = await hook.fn(context);
 
-				this.logger.debug({
-					event: 'executing_hook',
-					hookName: hook.name,
-					hookEvent: event,
-					priority: hook.priority
-				});
-
-				// Execute the hook
-				const output = await hook.fn(fullContext);
-
-				// Check if hook called abort
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				// Skip null/undefined results
+				if (output !== null && output !== undefined) {
+					this.logger.debug({
+						event: 'hook_executed_first_wins',
+						hookName: hook.name,
+						hasResult: true
+					});
+					return output;
+				}
+
+				this.logger.debug({
+					event: 'hook_returned_null',
+					hookName: hook.name
+				});
+			} catch (error) {
+				if (!this.handleHookError(hook, error, state)) {
+					throw error;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Execute hooks with collect strategy.
+	 * Accumulate all results; infer merge (objects) or concat (arrays).
+	 */
+	private async executeCollect(
+		hooks: Hook[],
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<any> {
+		let result: any = null;
+		let resultType: 'object' | 'array' | null = null;
+
+		for (const hook of hooks) {
+			if (state.aborted) {
+				this.throwAbort(hook, state);
+			}
+
+			try {
+				const context = this.buildContext(page, input, state, abort);
+				const output = await hook.fn(context);
+
+				if (state.aborted) {
+					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
 				if (output === null || output === undefined) {
 					this.logger.debug({
 						event: 'hook_returned_null',
@@ -327,50 +256,241 @@ export class HookRegistry {
 
 				// Determine result type on first non-null output
 				if (resultType === null) {
-					resultType = getResultType(output);
+					resultType = Array.isArray(output) ? 'array' : 'object';
 				}
 
 				// Compose based on type
-				result = composeResults(result, output, resultType);
-				
-				// Log composition
-				this.logger.debug({
-					event: resultType === 'primitive' ? 'hook_executed_first_wins' 
-						: resultType === 'object' ? 'hook_executed_merged'
-						: 'hook_executed_concatenated',
-					hookName: hook.name,
-					stoppingEarly: shouldStopEarly(resultType)
-				});
-
-				// Stop early for primitives (first non-null wins)
-				if (shouldStopEarly(resultType)) {
-					break;
+				if (resultType === 'array') {
+					result = result === null ? output : [...result, ...output];
+					this.logger.debug({
+						event: 'hook_executed_concatenated',
+						hookName: hook.name
+					});
+				} else {
+					result = { ...result, ...output };
+					this.logger.debug({
+						event: 'hook_executed_merged',
+						hookName: hook.name
+					});
 				}
 			} catch (error) {
-				this.logger.error({
-					event: 'hook_execution_failed',
-					hookName: hook.name,
-					hookEvent: event,
-					error: error instanceof Error ? error.message : String(error),
-					stack: error instanceof Error ? error.stack : undefined,
-					continueOnError: hook.continueOnError
-				});
-
-				// Decide whether to continue or throw
-				if (!hook.continueOnError) {
+				if (!this.handleHookError(hook, error, state)) {
 					throw error;
 				}
-
-				// If continuing on error, log and proceed with current result
-				this.logger.warn({
-					event: 'hook_error_ignored',
-					hookName: hook.name,
-					hookEvent: event
-				});
 			}
 		}
 
 		return result;
+	}
+
+	/**
+	 * Execute hooks with or-all strategy.
+	 * Run all; true if any returns true, null = no opinion.
+	 */
+	private async executeOrAll(
+		hooks: Hook[],
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<boolean> {
+		let hasTrue = false;
+
+		for (const hook of hooks) {
+			if (state.aborted) {
+				this.throwAbort(hook, state);
+			}
+
+			try {
+				const context = this.buildContext(page, input, state, abort);
+				const output = await hook.fn(context);
+
+				if (state.aborted) {
+					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
+				if (output === true) {
+					hasTrue = true;
+					this.logger.debug({
+						event: 'hook_voted_true',
+						hookName: hook.name
+					});
+				} else if (output === false) {
+					this.logger.debug({
+						event: 'hook_voted_false',
+						hookName: hook.name
+					});
+				} else {
+					this.logger.debug({
+						event: 'hook_no_opinion',
+						hookName: hook.name
+					});
+				}
+			} catch (error) {
+				if (!this.handleHookError(hook, error, state)) {
+					throw error;
+				}
+			}
+		}
+
+		return hasTrue;
+	}
+
+	/**
+	 * Execute hooks with and-all strategy.
+	 * Run all; false if any returns false, null = no opinion.
+	 */
+	private async executeAndAll(
+		hooks: Hook[],
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<boolean> {
+		let hasFalse = false;
+
+		for (const hook of hooks) {
+			if (state.aborted) {
+				this.throwAbort(hook, state);
+			}
+
+			try {
+				const context = this.buildContext(page, input, state, abort);
+				const output = await hook.fn(context);
+
+				if (state.aborted) {
+					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
+				if (output === false) {
+					hasFalse = true;
+					this.logger.debug({
+						event: 'hook_voted_false',
+						hookName: hook.name
+					});
+				} else if (output === true) {
+					this.logger.debug({
+						event: 'hook_voted_true',
+						hookName: hook.name
+					});
+				} else {
+					this.logger.debug({
+						event: 'hook_no_opinion',
+						hookName: hook.name
+					});
+				}
+			} catch (error) {
+				if (!this.handleHookError(hook, error, state)) {
+					throw error;
+				}
+			}
+		}
+
+		return !hasFalse;
+	}
+
+	/**
+	 * Execute hooks with run-all strategy.
+	 * Run all; ignore return values.
+	 */
+	private async executeRunAll(
+		hooks: Hook[],
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<void> {
+		for (const hook of hooks) {
+			if (state.aborted) {
+				this.throwAbort(hook, state);
+			}
+
+			try {
+				const context = this.buildContext(page, input, state, abort);
+				await hook.fn(context);
+
+				if (state.aborted) {
+					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
+				this.logger.debug({
+					event: 'effect_hook_executed',
+					hookName: hook.name
+				});
+			} catch (error) {
+				if (!this.handleHookError(hook, error, state)) {
+					throw error;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Build hook context.
+	 */
+	private buildContext(
+		page: PageObjectResponse,
+		input: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): HookContext {
+		return {
+			page,
+			config: this.config,
+			logger: this.logger,
+			services: this.services,
+			input,
+			abort
+		};
+	}
+
+	/**
+	 * Handle hook error.
+	 * Returns true if error was handled (continue), false if should throw.
+	 */
+	private handleHookError(hook: Hook, error: unknown, state: HookExecutionState): boolean {
+		this.logger.error({
+			event: 'hook_execution_failed',
+			hookName: hook.name,
+			hookEvent: hook.event,
+			error: error instanceof Error ? error.message : String(error),
+			stack: error instanceof Error ? error.stack : undefined,
+			continueOnError: hook.continueOnError
+		});
+
+		if (!hook.continueOnError) {
+			return false;
+		}
+
+		this.logger.warn({
+			event: 'hook_error_ignored',
+			hookName: hook.name,
+			hookEvent: hook.event
+		});
+
+		return true;
+	}
+
+	/**
+	 * Throw abort error.
+	 */
+	private throwAbort(hook: Hook, state: HookExecutionState): never {
+		this.logger.warn({
+			event: 'hook_execution_aborted',
+			hookEvent: hook.event,
+			hookName: hook.name,
+			reason: state.abortReason
+		});
+		throw new Error(`Hook execution aborted: ${state.abortReason}`);
+	}
+
+	/**
+	 * Map named priority to number.
+	 */
+	private mapPriority(priority: 'override' | 'fallback' | undefined): number {
+		if (priority === 'override') return 40;
+		if (priority === 'fallback') return 60;
+		return 50; // default
 	}
 
 	/**

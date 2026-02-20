@@ -4,109 +4,115 @@ import type { DatabaseBlueprint } from '../types.js';
 import type { Database } from '../database.types.js';
 
 /**
+ * Composition strategy for hook execution.
+ * 
+ * Determines how results from multiple hooks are combined and when execution stops.
+ */
+export type CompositionStrategy =
+	| 'first-wins'   // stop at first non-null result (strings, numbers, dates)
+	| 'collect'      // accumulate all results; registry infers merge (objects) or concat (arrays)
+	| 'or-all'       // run all; true if any hook returns true (boolean OR)
+	| 'and-all'      // run all; false if any hook returns false (boolean AND)
+	| 'run-all';     // run all; ignore return values entirely (side effects)
+
+/**
+ * Event definition with composition strategy.
+ */
+export type EventDefinition = {
+	composition: CompositionStrategy;
+};
+
+/**
  * Hook lifecycle events in the page transformation pipeline.
- * These are built-in event types that Symbiont defines.
- * 
- * **Hook Patterns:**
- * 
- * 1. **Extractor Hooks** (pure, data-oriented):
- *    - Return data extracted from ctx.page
- *    - Compose via first-non-null (primitives), merge (objects), concat (arrays)
- *    - Examples: metadata:*, slug:extract, cover:extract
- * 
- * 2. **Effect Hooks** (side-effect oriented):
- *    - Perform actions (uploads, syncs, mutations)
- *    - All hooks execute (no early stopping)
- *    - Return void, boolean, or result object
- *    - Examples: sync:*, *:process
  */
 export type HookEvent =
-	// Early validation (EXTRACTOR)
-	| 'page:exclude' // Should page be excluded from sync?
-	| 'page:validate' // Is page data valid?
+	| 'page:exclude'       // Should page be excluded from sync?
+	| 'page:validate'      // Is page data valid?
+	| 'metadata:title'     // Extract/transform title
+	| 'metadata:tags'      // Extract/transform tags
+	| 'metadata:authors'   // Extract/transform authors
+	| 'metadata:summary'   // Extract/transform summary
+	| 'metadata:custom'    // Extract custom metadata (user-defined data)
+	| 'publish:check'      // Should page be published?
+	| 'publish:date'       // Determine publish date
+	| 'slug:extract'       // Extract custom slug from Notion
+	| 'slug:generate'      // Generate slug from title
+	| 'slug:validate'      // Validate slug uniqueness
+	| 'slug:transform'     // Transform slug (sanitization, etc.)
+	| 'content:fetch'      // Fetch page content
+	| 'content:transform'  // Transform markdown content
+	| 'content:images'     // Process inline images (upload, transform URLs)
+	| 'cover:extract'      // Extract cover image URL
+	| 'cover:process'      // Upload/process cover image
+	| 'sync:slug'          // Sync slug back to Notion
+	| 'sync:content'       // Sync content back to Notion
+	| 'sync:images';       // Sync image URLs back to Notion
 
-	// Metadata extraction (EXTRACTOR)
-	| 'metadata:title' // Extract/transform title
-	| 'metadata:tags' // Extract/transform tags
-	| 'metadata:authors' // Extract/transform authors
-	| 'metadata:summary' // Extract/transform summary
-	| 'metadata:custom' // Extract custom metadata (user-defined data)
+/**
+ * Built-in event definitions with fixed composition strategies.
+ */
+export const HOOK_EVENTS: Record<HookEvent, EventDefinition> = {
+	'page:exclude':       { composition: 'or-all'     },  // exclude if any hook says yes
+	'page:validate':      { composition: 'and-all'    },  // valid only if all hooks pass
+	'metadata:title':     { composition: 'first-wins' },
+	'metadata:tags':      { composition: 'collect'    },
+	'metadata:authors':   { composition: 'collect'    },
+	'metadata:summary':   { composition: 'first-wins' },
+	'metadata:custom':    { composition: 'collect'    },
+	'publish:check':      { composition: 'and-all'    },  // publish only if all hooks agree
+	'publish:date':       { composition: 'first-wins' },
+	'slug:extract':       { composition: 'first-wins' },
+	'slug:generate':      { composition: 'first-wins' },
+	'slug:validate':      { composition: 'and-all'    },
+	'slug:transform':     { composition: 'first-wins' },
+	'content:fetch':      { composition: 'first-wins' },
+	'content:transform':  { composition: 'first-wins' },
+	'content:images':     { composition: 'run-all'    },
+	'cover:extract':      { composition: 'first-wins' },
+	'cover:process':      { composition: 'run-all'    },
+	'sync:slug':          { composition: 'run-all'    },
+	'sync:content':       { composition: 'run-all'    },
+	'sync:images':        { composition: 'run-all'    },
+};
 
-	// Publishing logic (EXTRACTOR)
-	| 'publish:check' // Should page be published?
-	| 'publish:date' // Determine publish date
-
-	// Slug handling (EXTRACTOR)
-	| 'slug:extract' // Extract custom slug from Notion
-	| 'slug:generate' // Generate slug from title
-	| 'slug:validate' // Validate slug uniqueness
-	| 'slug:transform' // Transform slug (sanitization, etc.)
-
-	// Content processing (EXTRACTOR)
-	| 'content:fetch' // Fetch page content
-	| 'content:transform' // Transform markdown content
+/**
+ * Event signatures: input and output types for each event.
+ * 
+ * Used to derive the `execute()` signature with full type safety.
+ */
+export type EventSignatures = {
+	// Events that receive a pipeline input value:
+	'content:transform': { input: string;      output: string       };
+	'content:images':    { input: string;      output: string       };
+	'cover:process':     { input: string|null; output: string|null  };
+	'sync:slug':         { input: string;      output: void         };
+	'sync:content':      { input: string;      output: void         };
+	'sync:images':       { input: unknown;     output: void         };
 	
-	// Image processing (EFFECT - side effects OK)
-	| 'content:images' // Process inline images (upload, transform URLs)
-	| 'cover:extract' // Extract cover image URL (EXTRACTOR)
-	| 'cover:process' // Upload/process cover image (EFFECT)
+	// Events with no pipeline input (ctx.page is the only source):
+	'page:exclude':      { input: never; output: boolean    };
+	'page:validate':     { input: never; output: boolean    };
+	'metadata:title':    { input: never; output: string     };
+	'metadata:tags':     { input: never; output: string[]   };
+	'metadata:authors':  { input: never; output: string[]   };
+	'metadata:summary':  { input: never; output: string     };
+	'metadata:custom':   { input: never; output: Record<string, unknown> };
+	'publish:check':     { input: never; output: boolean    };
+	'publish:date':      { input: never; output: string     };
+	'slug:extract':      { input: never; output: string     };
+	'slug:generate':     { input: never; output: string     };
+	'slug:validate':     { input: never; output: boolean    };
+	'slug:transform':    { input: never; output: string     };
+	'content:fetch':     { input: never; output: string     };
+	'cover:extract':     { input: never; output: string     };
+};
 
-	// Sync back to Notion (EFFECT - side effects expected)
-	| 'sync:slug' // Sync slug back to Notion
-	| 'sync:content' // Sync content back to Notion
-	| 'sync:images'; // Sync image URLs back to Notion
-
-/**
- * Events that use the effect hook pattern (side effects allowed).
- * These hooks ALL execute (no early stopping on first result).
- * 
- * Effect hooks receive services in context (NotionClient, Supabase).
- */
-export const EFFECT_HOOK_EVENTS = new Set<HookEvent>([
-	'content:images',
-	'cover:process',
-	'sync:slug',
-	'sync:content',
-	'sync:images'
-] as const);
-
-/**
- * Check if an event uses the effect hook pattern.
- * 
- * @param event - The hook event to check
- * @returns True if this is an effect hook event
- */
-export function isEffectHookEvent(event: HookEvent): boolean {
-	return EFFECT_HOOK_EVENTS.has(event);
-}
 
 /**
  * Context object passed to each hook function.
  * 
- * **Hook Philosophy: Extractors, Not Transformers**
- * 
- * Hooks are independent extractors that read from `ctx.page` and return values.
- * They do NOT transform data flowing through them (no `ctx.data`).
- * 
- * The HookRegistry automatically composes results based on return type:
- * - **Primitives** (string, number, Date, boolean): First non-null wins
- * - **Objects**: Merge all non-null results
- * - **Arrays**: Concatenate all non-null results
- * 
- * @example Extractor pattern (correct)
- * ```typescript
- * fn: async (ctx) => {
- *   return parseDate(ctx.page.properties.Date);
- * }
- * ```
- * 
- * @example Return null to skip
- * ```typescript
- * fn: async (ctx) => {
- *   if (!hasCustomDate(ctx.page)) return null; // Falls through to next hook
- *   return extractCustomDate(ctx.page);
- * }
- * ```
+ * Contains everything a hook needs to operate: the page being processed,
+ * configuration, logging, services for side effects, and control flow.
  */
 export type HookContext = {
 	/** The Notion page being processed */
@@ -123,31 +129,27 @@ export type HookContext = {
 		error: (data: any) => void;
 	};
 
-	/** Optional Supabase client for advanced use cases */
-	supabase?: SupabaseClient<Database>;
-
 	/**
-	 * Services for effect hooks (side-effect operations).
-	 * Only provided for effect hook events (sync:*, *:process).
+	 * Services for side-effect operations.
+	 * Always present as an object (individual fields may be undefined).
 	 * 
-	 * Extractor hooks should not use these services.
+	 * Built-in services:
+	 * - notionClient: For syncing data back to Notion
+	 * - supabase: Supabase client for storage operations
+	 * 
+	 * Custom services can be added via index signature.
 	 */
-	services?: {
-		/** NotionClient for syncing data back to Notion */
+	services: {
 		notionClient?: any; // Use 'any' to avoid circular dependency
-		
-		/** Supabase URL for image uploads */
-		supabaseUrl?: string;
-		
-		/** Supabase service role key for uploads */
-		serviceRoleKey?: string;
+		supabase?: SupabaseClient<Database>;
+		[key: string]: unknown; // custom services
 	};
 
-	/** Internal flag to track abort state */
-	aborted: boolean;
-
-	/** Abort reason if aborted */
-	abortReason?: string;
+	/**
+	 * Pipeline input value (for events that operate on data flow).
+	 * Present only for events that declare it in EventSignatures.
+	 */
+	input?: unknown;
 
 	/** Stop processing this page with a reason */
 	abort: (reason: string) => void;
@@ -156,23 +158,11 @@ export type HookContext = {
 /**
  * Hook function signature.
  * 
- * Hooks are extractors that read from `ctx.page` and return a value or `null`.
- * - Return your extracted value if you have data to contribute
- * - Return `null` if you have nothing to contribute (registry continues to next hook)
+ * Hooks read from `ctx.page` (and optionally `ctx.input`) and return a value or `null`.
+ * - Return your value if you have data to contribute
+ * - Return `null` if you have nothing to contribute (continues to next hook)
  * 
- * The registry automatically composes results:
- * - **Primitives**: First non-null wins (stops processing)
- * - **Objects**: Merged together
- * - **Arrays**: Concatenated together
- * 
- * @example
- * ```typescript
- * // Custom date extraction
- * fn: async (ctx) => {
- *   const date = ctx.page.properties.Date?.date?.start;
- *   return date ? new Date(date).toISOString() : null;
- * }
- * ```
+ * The registry composes results based on the event's composition strategy.
  */
 export type HookFunction<TOutput = any> = (
 	context: HookContext
@@ -182,22 +172,10 @@ export type HookFunction<TOutput = any> = (
  * Hook definition.
  * Associates a function with an event and priority.
  * 
- * Hooks execute in priority order (lower = earlier):
- * - **1-20**: Pre-processing (debug logging, property inspection)
- * - **30-40**: Custom logic (runs before defaults)
- * - **50**: Default hooks (Symbiont's built-in behavior)
- * - **60-70**: Post-processing (validation, computed fields)
- * - **80-99**: Final validation (error checking, warnings)
- * 
- * @example
- * ```typescript
- * {
- *   name: 'caltech:publish-date',
- *   event: 'publish:date',
- *   priority: 40,
- *   fn: async (ctx) => parseIssueDate(ctx.page) || null
- * }
- * ```
+ * Priority values:
+ * - 'override': Runs before Symbiont's defaults (wins for first-wins events)
+ * - 'fallback': Runs after Symbiont's defaults (only reached if defaults return null)
+ * - omitted: Same order as built-in defaults
  */
 export interface Hook<TOutput = any> {
 	/** User-defined name for this hook (for logging/debugging) */
@@ -207,20 +185,19 @@ export interface Hook<TOutput = any> {
 	event: HookEvent;
 
 	/**
-	 * Priority for execution order (lower runs first)
-	 * Default: 50
-	 * Suggested ranges:
-	 * - 1-20: Pre-processing (debug logging)
-	 * - 30-40: Custom logic (before defaults)
-	 * - 50: Default hooks
-	 * - 60-70: Post-processing (validation)
-	 * - 80-99: Final validation
+	 * Priority for execution order.
+	 * - 'override': Runs before defaults
+	 * - 'fallback': Runs after defaults
+	 * - omitted: Same level as defaults
 	 */
-	priority?: number;
+	priority?: 'override' | 'fallback';
 
 	/**
-	 * Whether to continue execution if this hook throws an error
+	 * Whether to continue execution if this hook throws an error.
 	 * Default: false (stop on error)
+	 * 
+	 * Set to true for best-effort side effects (notifications, analytics)
+	 * that shouldn't break the sync if they fail.
 	 */
 	continueOnError?: boolean;
 
