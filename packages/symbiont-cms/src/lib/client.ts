@@ -32,12 +32,17 @@ export interface GetAllPagesOptions {
  * The Symbiont client instance.
  * Created by calling createSymbiontClient() with your configuration.
  * Can be used in both client and server code.
+ * 
+ * **Supabase Client Pattern**:
+ * - Contains a public/anon Supabase client (read-only access)
+ * - Used for querying pages from your frontend/SSR
+ * - Service role client (admin) is separate - used only in sync operations
  */
 export interface SymbiontClient {
 	/** The configuration passed during creation */
 	config: SymbiontConfig;
 	
-	/** Supabase client instance (public/anon key) */
+	/** Supabase client instance (public/anon key for read-only queries) */
 	supabase: SupabaseClient<Database>;
 	
 	/** Fetch a single page by slug */
