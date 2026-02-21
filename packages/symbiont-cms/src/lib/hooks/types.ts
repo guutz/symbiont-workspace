@@ -8,16 +8,23 @@ import type { Database } from '../database.types.js';
  */
 export enum CompositionStrategy {
 	/** Stop at first non-null result (strings, numbers, dates) */
-	FirstWins = 'first-wins',
+	FirstWins,
 	/** Accumulate all results; registry infers merge (objects) or concat (arrays) */
-	Collect = 'collect',
+	Collect,
 	/** Run all; true if any hook returns true (boolean OR) */
-	OrAll = 'or-all',
+	OrAll,
 	/** Run all; false if any hook returns false (boolean AND) */
-	AndAll = 'and-all',
+	AndAll,
 	/** Run all; ignore return values entirely (side effects) */
-	RunAll = 'run-all'
+	RunAll
 }
+
+/** Helper to define a hook event with typed input/output and a composition strategy. */
+function e<TInput, TOutput>(strategy: CompositionStrategy) {
+	return { input: null as unknown as TInput, output: null as unknown as TOutput, strategy };
+}
+
+const S = CompositionStrategy;
 
 /**
  * Hook event definitions - THE SINGLE SOURCE OF TRUTH
@@ -28,28 +35,41 @@ export enum CompositionStrategy {
  * - strategy: How to compose results from multiple hooks
  */
 export const HOOK_EVENTS = {
-	'page:exclude':      { input: null as never, output: null as boolean,    strategy: CompositionStrategy.OrAll },
-	'page:validate':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
-	'metadata:title':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'metadata:tags':     { input: null as never, output: null as string[],   strategy: CompositionStrategy.Collect },
-	'metadata:authors':  { input: null as never, output: null as string[],   strategy: CompositionStrategy.Collect },
-	'metadata:summary':  { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'metadata:custom':   { input: null as never, output: null as Record<string, unknown>, strategy: CompositionStrategy.Collect },
-	'publish:check':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
-	'publish:date':      { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'slug:extract':      { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'slug:generate':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'slug:validate':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
-	'slug:transform':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'content:fetch':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'content:transform': { input: null as string, output: null as string,    strategy: CompositionStrategy.FirstWins },
-	'content:images':    { input: null as string, output: null as string,    strategy: CompositionStrategy.RunAll },
-	'cover:extract':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'cover:fallback':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
-	'cover:process':     { input: null as (string|null), output: null as (string|null), strategy: CompositionStrategy.RunAll },
-	'sync:slug':         { input: null as string, output: null as void,      strategy: CompositionStrategy.RunAll },
-	'sync:content':      { input: null as string, output: null as void,      strategy: CompositionStrategy.RunAll },
-	'sync:images':       { input: null as unknown, output: null as void,     strategy: CompositionStrategy.RunAll },
+	// Page lifecycle
+	'page:exclude': e<never, boolean>(S.OrAll),
+	'page:validate': e<never, boolean>(S.AndAll),
+
+	// Metadata extraction
+	'metadata:title': e<never, string>(S.FirstWins),
+	'metadata:tags': e<never, string[]>(S.Collect),
+	'metadata:authors': e<never, string[]>(S.Collect),
+	'metadata:summary': e<never, string>(S.FirstWins),
+	'metadata:custom': e<never, Record<string, unknown>>(S.Collect),
+
+	// Publishing
+	'publish:check': e<never, boolean>(S.AndAll),
+	'publish:date': e<never, string>(S.FirstWins),
+
+	// Slug handling
+	'slug:extract': e<never, string>(S.FirstWins),
+	'slug:generate': e<never, string>(S.FirstWins),
+	'slug:validate': e<never, boolean>(S.AndAll),
+	'slug:transform': e<never, string>(S.FirstWins),
+
+	// Content pipeline
+	'content:fetch': e<never, string>(S.FirstWins),
+	'content:transform': e<string, string>(S.FirstWins),
+	'content:images': e<string, string>(S.RunAll),
+
+	// Cover image pipeline
+	'cover:extract': e<never, string>(S.FirstWins),
+	'cover:fallback': e<never, string>(S.FirstWins),
+	'cover:process': e<string | null, string | null>(S.RunAll),
+
+	// Sync back to Notion
+	'sync:slug': e<string, void>(S.RunAll),
+	'sync:content': e<string, void>(S.RunAll),
+	'sync:images': e<unknown, void>(S.RunAll),
 } as const;
 
 /**
