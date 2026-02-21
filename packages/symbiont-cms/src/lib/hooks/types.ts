@@ -20,63 +20,52 @@ export enum CompositionStrategy {
 }
 
 /**
+ * Hook event definitions - THE SINGLE SOURCE OF TRUTH
+ * 
+ * Each event has:
+ * - input: Type of input value passed to hooks (never if no input)
+ * - output: Type of value returned by hooks
+ * - strategy: How to compose results from multiple hooks
+ */
+export const HOOK_EVENTS = {
+	'page:exclude':      { input: null as never, output: null as boolean,    strategy: CompositionStrategy.OrAll },
+	'page:validate':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
+	'metadata:title':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'metadata:tags':     { input: null as never, output: null as string[],   strategy: CompositionStrategy.Collect },
+	'metadata:authors':  { input: null as never, output: null as string[],   strategy: CompositionStrategy.Collect },
+	'metadata:summary':  { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'metadata:custom':   { input: null as never, output: null as Record<string, unknown>, strategy: CompositionStrategy.Collect },
+	'publish:check':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
+	'publish:date':      { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'slug:extract':      { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'slug:generate':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'slug:validate':     { input: null as never, output: null as boolean,    strategy: CompositionStrategy.AndAll },
+	'slug:transform':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'content:fetch':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'content:transform': { input: null as string, output: null as string,    strategy: CompositionStrategy.FirstWins },
+	'content:images':    { input: null as string, output: null as string,    strategy: CompositionStrategy.RunAll },
+	'cover:extract':     { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'cover:fallback':    { input: null as never, output: null as string,     strategy: CompositionStrategy.FirstWins },
+	'cover:process':     { input: null as (string|null), output: null as (string|null), strategy: CompositionStrategy.RunAll },
+	'sync:slug':         { input: null as string, output: null as void,      strategy: CompositionStrategy.RunAll },
+	'sync:content':      { input: null as string, output: null as void,      strategy: CompositionStrategy.RunAll },
+	'sync:images':       { input: null as unknown, output: null as void,     strategy: CompositionStrategy.RunAll },
+} as const;
+
+/**
+ * Hook event names derived from HOOK_EVENTS.
+ */
+export type HookEvent = keyof typeof HOOK_EVENTS;
+
+/**
  * Event signatures: input and output types for each event.
- * Single source of truth for all hook events.
+ * Derived from HOOK_EVENTS.
  */
 export type EventSignatures = {
-	'page:exclude':      { input: never; output: boolean    };
-	'page:validate':     { input: never; output: boolean    };
-	'metadata:title':    { input: never; output: string     };
-	'metadata:tags':     { input: never; output: string[]   };
-	'metadata:authors':  { input: never; output: string[]   };
-	'metadata:summary':  { input: never; output: string     };
-	'metadata:custom':   { input: never; output: Record<string, unknown> };
-	'publish:check':     { input: never; output: boolean    };
-	'publish:date':      { input: never; output: string     };
-	'slug:extract':      { input: never; output: string     };
-	'slug:generate':     { input: never; output: string     };
-	'slug:validate':     { input: never; output: boolean    };
-	'slug:transform':    { input: never; output: string     };
-	'content:fetch':     { input: never; output: string     };
-	'content:transform': { input: string; output: string    };
-	'content:images':    { input: string; output: string    };
-	'cover:extract':     { input: never; output: string     };
-	'cover:process':     { input: string|null; output: string|null };
-	'sync:slug':         { input: string; output: void      };
-	'sync:content':      { input: string; output: void      };
-	'sync:images':       { input: unknown; output: void     };
-};
-
-/**
- * Hook event names derived from EventSignatures.
- */
-export type HookEvent = keyof EventSignatures;
-
-/**
- * Composition strategies for each hook event.
- */
-export const HOOK_EVENTS: Record<HookEvent, CompositionStrategy> = {
-	'page:exclude':      CompositionStrategy.OrAll,
-	'page:validate':     CompositionStrategy.AndAll,
-	'metadata:title':    CompositionStrategy.FirstWins,
-	'metadata:tags':     CompositionStrategy.Collect,
-	'metadata:authors':  CompositionStrategy.Collect,
-	'metadata:summary':  CompositionStrategy.FirstWins,
-	'metadata:custom':   CompositionStrategy.Collect,
-	'publish:check':     CompositionStrategy.AndAll,
-	'publish:date':      CompositionStrategy.FirstWins,
-	'slug:extract':      CompositionStrategy.FirstWins,
-	'slug:generate':     CompositionStrategy.FirstWins,
-	'slug:validate':     CompositionStrategy.AndAll,
-	'slug:transform':    CompositionStrategy.FirstWins,
-	'content:fetch':     CompositionStrategy.FirstWins,
-	'content:transform': CompositionStrategy.FirstWins,
-	'content:images':    CompositionStrategy.RunAll,
-	'cover:extract':     CompositionStrategy.FirstWins,
-	'cover:process':     CompositionStrategy.RunAll,
-	'sync:slug':         CompositionStrategy.RunAll,
-	'sync:content':      CompositionStrategy.RunAll,
-	'sync:images':       CompositionStrategy.RunAll,
+	[K in HookEvent]: {
+		input: typeof HOOK_EVENTS[K]['input'];
+		output: typeof HOOK_EVENTS[K]['output'];
+	}
 };
 
 

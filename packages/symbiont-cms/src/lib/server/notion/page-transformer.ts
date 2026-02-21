@@ -7,8 +7,6 @@ import { createSlug } from '../utils/slug.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
-import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
-import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 import { HookRegistry } from '../../hooks/registry.js';
 import { defaultHooks } from '../../hooks/default-hooks.js';
 
@@ -145,16 +143,21 @@ export class NotionPageToDatabasePageTransformer {
 
 	/**
 	 * Process cover image: extract URL and process it (upload, etc.)
-	 * Falls back to extracting first image from content if no cover is set
+	 * Falls back to extracting first image from content via cover:fallback hook
 	 */
 	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
 		try {
 			// Extract cover URL using hook
 			const rawCoverUrl = await this.hookRegistry.execute('cover:extract', page);
 			
-			// No cover found - try content fallback
+			// No cover found - try content fallback via hook
 			if (!rawCoverUrl) {
-				return await this.extractCoverFromContent(page);
+				const fallbackUrl = await this.hookRegistry.execute('cover:fallback', page);
+				if (!fallbackUrl) return null;
+				
+				// Process fallback cover URL using hook (upload, transform, etc.)
+				const finalCoverUrl = await this.hookRegistry.execute('cover:process', page, fallbackUrl);
+				return finalCoverUrl;
 			}
 			
 			// Process cover URL using hook (upload, transform, etc.)
@@ -164,58 +167,6 @@ export class NotionPageToDatabasePageTransformer {
 		} catch (error: any) {
 			this.logger.warn({
 				event: 'cover_image_processing_failed',
-				pageId: page.id,
-				error: error?.message
-			});
-			return null;
-		}
-	}
-
-	/**
-	 * Extract first image from page content to use as cover
-	 */
-	private async extractCoverFromContent(page: PageObjectResponse): Promise<string | null> {
-		try {
-			// Get content as markdown
-			const content = await this.notionClient.pageToMarkdown(page.id);
-			
-			// Find first image in content
-			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/;
-			const match = content.match(imageRegex);
-			
-			if (!match) return null;
-			
-			const [, alt, url] = match;
-			
-			// Upload to Supabase if needed
-			if (needsUploadToSupabase(url)) {
-				const result = await uploadImageToSupabase(url, {
-					supabase: this.supabase,
-					pageId: page.id,
-					altText: alt || undefined
-				});
-				
-				this.logger.info({
-					event: 'cover_image_extracted_from_content',
-					pageId: page.id,
-					originalUrl: url,
-					newUrl: result.newUrl,
-					filename: result.filename
-				});
-				
-				return result.newUrl;
-			}
-			
-			// Use URL as-is if already permanent
-			this.logger.info({
-				event: 'cover_image_extracted_from_content',
-				pageId: page.id,
-				coverUrl: url
-			});
-			return url;
-		} catch (error: any) {
-			this.logger.warn({
-				event: 'cover_image_content_extraction_failed',
 				pageId: page.id,
 				error: error?.message
 			});

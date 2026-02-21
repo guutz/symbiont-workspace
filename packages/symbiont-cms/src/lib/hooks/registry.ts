@@ -155,7 +155,7 @@ export class HookRegistry {
 			state.abortReason = reason;
 		};
 
-		const strategy = HOOK_EVENTS[event] || CompositionStrategy.FirstWins;
+		const strategy = HOOK_EVENTS[event]?.strategy || CompositionStrategy.FirstWins;
 
 		// Execute based on composition strategy
 		switch (strategy) {

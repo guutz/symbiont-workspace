@@ -381,6 +381,72 @@ export const defaultCoverExtractHook: Hook<string | null> = {
 };
 
 /**
+ * Default hook for cover fallback.
+ * Extracts first image from page content to use as cover when no cover property is set.
+ * 
+ * Composition: first-wins
+ */
+export const defaultCoverFallbackHook: Hook<string | null> = {
+	name: 'symbiont:cover:fallback:default',
+	event: 'cover:fallback',
+	fn: async (ctx) => {
+		const notionClient = ctx.services.notionClient;
+		const supabase = ctx.services.supabase;
+		
+		if (!notionClient || !supabase) {
+			return null;
+		}
+
+		try {
+			// Get content as markdown
+			const content = await notionClient.pageToMarkdown(ctx.page.id);
+			
+			// Find first image in content
+			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/;
+			const match = content.match(imageRegex);
+			
+			if (!match) return null;
+			
+			const [, alt, url] = match;
+			
+			// Upload to Supabase if needed
+			if (needsUploadToSupabase(url)) {
+				const result = await uploadImageToSupabase(url, {
+					supabase,
+					pageId: ctx.page.id,
+					altText: alt || undefined
+				});
+				
+				ctx.logger.info({
+					event: 'cover_image_extracted_from_content',
+					pageId: ctx.page.id,
+					originalUrl: url,
+					newUrl: result.newUrl,
+					filename: result.filename
+				});
+				
+				return result.newUrl;
+			}
+			
+			// Use URL as-is if already permanent
+			ctx.logger.info({
+				event: 'cover_image_extracted_from_content',
+				pageId: ctx.page.id,
+				coverUrl: url
+			});
+			return url;
+		} catch (error: any) {
+			ctx.logger.warn({
+				event: 'cover_image_content_extraction_failed',
+				pageId: ctx.page.id,
+				error: error?.message
+			});
+			return null;
+		}
+	}
+};
+
+/**
  * Default hook for processing cover image.
  * Uploads cover URL to Supabase, returns permanent URL.
  * 
@@ -498,6 +564,7 @@ export const defaultHooks: Hook[] = [
 	defaultContentTransformHook,
 	defaultContentImagesHook,
 	defaultCoverExtractHook,
+	defaultCoverFallbackHook,
 	defaultCoverProcessHook,
 	defaultSyncSlugHook,
 	defaultSyncContentHook,
