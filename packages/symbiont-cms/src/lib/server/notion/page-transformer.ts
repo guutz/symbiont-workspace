@@ -190,8 +190,7 @@ export class NotionPageToDatabasePageTransformer {
 			// Upload to Supabase if needed
 			if (needsUploadToSupabase(url)) {
 				const result = await uploadImageToSupabase(url, {
-					supabaseUrl: this.supabaseUrl,
-					serviceRoleKey: this.serviceRoleKey,
+					supabase: this.supabase,
 					pageId: page.id,
 					altText: alt || undefined
 				});

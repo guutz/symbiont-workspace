@@ -281,11 +281,13 @@ export class NotionToDatabaseSync {
 
 	/**
 	 * Check if page should be excluded from sync
+	 * 
+	 * Note: Exclusion is now handled by the page:exclude hook in the transformer.
+	 * This method is kept for backward compatibility but always returns false.
+	 * The transformer will call the page:exclude hook and return null if excluded.
 	 */
 	private shouldExclude(page: PageObjectResponse): boolean {
-		if (!this.config.excludeRule) {
-			return false; // No exclusion rule defined
-		}
-		return this.config.excludeRule(page);
+		// Exclusion is now handled by the page:exclude hook in transformer
+		return false;
 	}
 }

@@ -13,7 +13,15 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			warn: () => {},
 			error: () => {}
 		};
-		registry = new HookRegistry(mockLogger);
+		const mockConfig: any = {
+			alias: 'test',
+			dataSourceId: 'test-id'
+		};
+		const mockServices: any = {
+			notionClient: undefined,
+			supabase: undefined
+		};
+		registry = new HookRegistry(mockLogger, mockConfig, mockServices);
 	});
 
 	describe('registration', () => {
@@ -21,7 +29,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			const hook: Hook = {
 				name: 'test:hook',
 				event: 'publish:check',
-				priority: 50,
+				
 				fn: async () => true
 			};
 
@@ -34,8 +42,8 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 		it('should register multiple hooks', () => {
 			const hooks: Hook[] = [
-				{ name: 'hook1', event: 'publish:check', priority: 30, fn: async () => true },
-				{ name: 'hook2', event: 'publish:check', priority: 50, fn: async () => true }
+				{ name: 'hook1', event: 'publish:check', priority: 'override', fn: async () => true },
+				{ name: 'hook2', event: 'publish:check',  fn: async () => true }
 			];
 
 			registry.registerMany(hooks);
@@ -46,9 +54,9 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 		it('should sort hooks by priority (lower first)', () => {
 			const hooks: Hook[] = [
-				{ name: 'hook3', event: 'publish:check', priority: 70, fn: async () => true },
-				{ name: 'hook1', event: 'publish:check', priority: 30, fn: async () => true },
-				{ name: 'hook2', event: 'publish:check', priority: 50, fn: async () => true }
+				{ name: 'hook3', event: 'publish:check', priority: 'fallback', fn: async () => true },
+				{ name: 'hook1', event: 'publish:check', priority: 'override', fn: async () => true },
+				{ name: 'hook2', event: 'publish:check',  fn: async () => true }
 			];
 
 			registry.registerMany(hooks);
@@ -78,17 +86,13 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			const hook: Hook<string> = {
 				name: 'test:hook',
 				event: 'publish:date',
-				priority: 50,
+				
 				fn: async () => '2024-01-01T00:00:00Z'
 			};
 
 			registry.register(hook);
 
-			const result = await registry.execute('publish:date', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:date', {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 		});
@@ -100,7 +104,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'publish:date',
-					priority: 30,
+					priority: 'override',
 					fn: async () => {
 						executionOrder.push('hook1');
 						return '2024-01-01T00:00:00Z'; // First non-null
@@ -109,7 +113,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook2',
 					event: 'publish:date',
-					priority: 50,
+					
 					fn: async () => {
 						executionOrder.push('hook2'); // Should NOT execute
 						return '2024-02-01T00:00:00Z';
@@ -119,11 +123,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:date', {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 			expect(executionOrder).toEqual(['hook1']); // Only first hook ran
@@ -136,7 +136,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'publish:date',
-					priority: 30,
+					priority: 'override',
 					fn: async () => {
 						executionOrder.push('hook1');
 						return null; // Falls through
@@ -145,7 +145,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook2',
 					event: 'publish:date',
-					priority: 50,
+					
 					fn: async () => {
 						executionOrder.push('hook2');
 						return '2024-01-01T00:00:00Z'; // Second hook wins
@@ -155,11 +155,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:date', {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 			expect(executionOrder).toEqual(['hook1', 'hook2']); // Both ran
@@ -170,24 +166,20 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'publish:date',
-					priority: 30,
+					priority: 'override',
 					fn: async () => null
 				},
 				{
 					name: 'hook2',
 					event: 'publish:date',
-					priority: 50,
+					
 					fn: async () => null
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:date', {} as any);
 
 			expect(result).toBeNull();
 		});
@@ -199,30 +191,26 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'metadata:custom',
-					priority: 30,
+					priority: 'override',
 					fn: async () => ({ field1: 'value1' }) // No spreading needed!
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:custom',
-					priority: 40,
+					priority: 'override',
 					fn: async () => ({ field2: 'value2' }) // No ctx.data!
 				},
 				{
 					name: 'hook3',
 					event: 'metadata:custom',
-					priority: 50,
+					
 					fn: async () => ({ field3: 'value3' })
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('metadata:custom', {} as any);
 
 			expect(result).toEqual({
 				field1: 'value1',
@@ -236,30 +224,26 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'metadata:custom',
-					priority: 30,
+					priority: 'override',
 					fn: async () => ({ field1: 'value1' })
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:custom',
-					priority: 40,
+					priority: 'override',
 					fn: async () => null // Skipped
 				},
 				{
 					name: 'hook3',
 					event: 'metadata:custom',
-					priority: 50,
+					
 					fn: async () => ({ field3: 'value3' })
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('metadata:custom', {} as any);
 
 			expect(result).toEqual({
 				field1: 'value1',
@@ -272,24 +256,20 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'metadata:custom',
-					priority: 30,
+					priority: 'override',
 					fn: async () => ({ field: 'first' })
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:custom',
-					priority: 50,
+					
 					fn: async () => ({ field: 'second' }) // Overwrites
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('metadata:custom', {} as any);
 
 			expect(result).toEqual({ field: 'second' });
 		});
@@ -301,24 +281,20 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'metadata:tags',
-					priority: 30,
+					priority: 'override',
 					fn: async () => ['tag1', 'tag2']
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:tags',
-					priority: 50,
+					
 					fn: async () => ['tag3', 'tag4']
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:tags', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('metadata:tags', {} as any);
 
 			expect(result).toEqual(['tag1', 'tag2', 'tag3', 'tag4']);
 		});
@@ -328,30 +304,26 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'metadata:tags',
-					priority: 30,
+					priority: 'override',
 					fn: async () => ['tag1']
 				},
 				{
 					name: 'hook2',
 					event: 'metadata:tags',
-					priority: 40,
+					priority: 'override',
 					fn: async () => null // Skipped
 				},
 				{
 					name: 'hook3',
 					event: 'metadata:tags',
-					priority: 50,
+					
 					fn: async () => ['tag2']
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:tags', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('metadata:tags', {} as any);
 
 			expect(result).toEqual(['tag1', 'tag2']);
 		});
@@ -359,11 +331,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 	describe('control flow', () => {
 		it('should return null if no hooks registered', async () => {
-			const result = await registry.execute('publish:check', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:check', {} as any);
 
 			expect(result).toBeNull();
 		});
@@ -372,7 +340,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			const hook: Hook = {
 				name: 'failing:hook',
 				event: 'publish:check',
-				priority: 50,
+				
 				fn: async () => {
 					throw new Error('Hook failed');
 				}
@@ -381,11 +349,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			registry.register(hook);
 
 			await expect(
-				registry.execute('publish:check', {
-					page: {} as any,
-					config: {} as any,
-					logger: mockLogger
-				})
+				registry.execute('publish:check', {} as any)
 			).rejects.toThrow('Hook failed');
 		});
 
@@ -394,7 +358,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'failing:hook',
 					event: 'publish:check',
-					priority: 30,
+					priority: 'override',
 					continueOnError: true,
 					fn: async () => {
 						throw new Error('Hook failed');
@@ -403,18 +367,14 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'success:hook',
 					event: 'publish:check',
-					priority: 50,
+					
 					fn: async () => true
 				}
 			];
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:check', {
-				page: {} as any,
-				config: {} as any,
-				logger: mockLogger
-			});
+			const result = await registry.execute('publish:check', {} as any);
 
 			expect(result).toBe(true); // Second hook ran
 		});
@@ -426,7 +386,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook1',
 					event: 'publish:check',
-					priority: 30,
+					priority: 'override',
 					fn: async (ctx) => {
 						executionOrder.push('hook1');
 						ctx.abort('Page is invalid');
@@ -436,7 +396,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 				{
 					name: 'hook2',
 					event: 'publish:check',
-					priority: 50,
+					
 					fn: async () => {
 						executionOrder.push('hook2'); // Should NOT run
 						return true;
@@ -447,11 +407,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			registry.registerMany(hooks);
 
 			await expect(
-				registry.execute('publish:check', {
-					page: {} as any,
-					config: {} as any,
-					logger: mockLogger
-				})
+				registry.execute('publish:check', {} as any)
 			).rejects.toThrow('Page is invalid');
 
 			expect(executionOrder).toEqual(['hook1']); // Only first hook ran

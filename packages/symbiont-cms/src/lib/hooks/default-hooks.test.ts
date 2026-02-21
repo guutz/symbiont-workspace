@@ -25,7 +25,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 		page: {} as any,
 		config: {} as any,
 		logger: mockLogger,
-		aborted: false,
+		services: {},
 		abort: () => {},
 		...overrides
 	});
