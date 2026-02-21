@@ -323,8 +323,7 @@ export const defaultContentImagesHook: Hook<string> = {
 			uploads.push(
 				uploadImageToSupabase(url, { 
 					supabase: ctx.services.supabase, 
-					pageId: ctx.page.id, 
-					altText: alt 
+					pageId: ctx.page.id
 				})
 					.then(({ newUrl }) => { 
 						processed = processed.replace(full, `![${alt}](${newUrl})`); 
@@ -413,8 +412,7 @@ export const defaultCoverFallbackHook: Hook<string | null> = {
 			if (needsUploadToSupabase(url)) {
 				const result = await uploadImageToSupabase(url, {
 					supabase,
-					pageId: ctx.page.id,
-					altText: alt || undefined
+					pageId: ctx.page.id
 				});
 				
 				ctx.logger.info({

@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type { DatabasePage } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
@@ -14,7 +14,7 @@ import { createLogger } from '../utils/logger.js';
  * Does NOT contain business logic - just database queries.
  * 
  * **Supabase Client Pattern**:
- * - Creates its own service role Supabase client (admin access)
+ * - Receives service role Supabase client from coordinator (admin access)
  * - Service role key required for write operations (upsert, delete)
  * - Separate from user's public client (which is read-only)
  */
@@ -23,18 +23,10 @@ export class DatabasePageCRUD {
 	private supabase: SupabaseClient<Database>;
 
 	/**
-	 * @param supabaseUrl - Supabase project URL
-	 * @param supabaseServiceRoleKey - Service role key for admin access
+	 * @param supabase - Supabase client with service role key (admin access)
 	 */
-	constructor(supabaseUrl: string, supabaseServiceRoleKey: string) {
-		// Create admin Supabase client with service role key for mutations
-		this.supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
-			auth: {
-				autoRefreshToken: false,
-				persistSession: false,
-				detectSessionInUrl: false
-			}
-		});
+	constructor(supabase: SupabaseClient<Database>) {
+		this.supabase = supabase;
 	}
 
 	/**

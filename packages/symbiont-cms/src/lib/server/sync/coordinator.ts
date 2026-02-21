@@ -77,8 +77,11 @@ export function createNotionToDatabaseSyncCoordinator(
 	const notionClient = new NotionClient(notion, n2m);
 
 	// Create Supabase admin client for sync operations
+	// This is the SINGLE service role client used for all sync operations:
+	// - Image uploads to storage
+	// - Database mutations (upsert/delete pages)
+	// - Passed to DatabasePageCRUD and NotionPageToDatabasePageTransformer
 	// This is separate from the user's public client in SymbiontClient
-	// Service role key grants full access for mutations and storage
 	const supabase = createClient<Database>(
 		client.config.supabase.url,
 		serviceRoleKey,
@@ -92,10 +95,7 @@ export function createNotionToDatabaseSyncCoordinator(
 	);
 
 	// Create page CRUD layer (Database) with service role client
-	const pageCrud = new DatabasePageCRUD(
-		client.config.supabase.url,
-		serviceRoleKey
-	);
+	const pageCrud = new DatabasePageCRUD(supabase);
 
 	// Create transformation layer (Notion page to website page)
 	// Receives admin Supabase client for image uploads

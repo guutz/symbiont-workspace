@@ -16,7 +16,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export interface UploadImageOptions {
 	supabase: SupabaseClient;
 	pageId: string;
-	altText?: string; // Optional alt text from markdown for filename
 }
 
 export interface UploadImageResult {
@@ -76,7 +75,7 @@ export async function uploadImageToSupabase(
 	url: string,
 	options: UploadImageOptions
 ): Promise<UploadImageResult> {
-	const { supabase, pageId, altText } = options;
+	const { supabase, pageId } = options;
 	
 	// Download image
 	const response = await fetch(url);
@@ -86,7 +85,7 @@ export async function uploadImageToSupabase(
 	const arrayBuffer = await response.arrayBuffer();
 	const buffer = Buffer.from(arrayBuffer);
 	
-	// Resolve filename (with optional alt text)
+	// Resolve filename using content hash
 	const filename = resolveFilename(url, buffer);
 	const path = `${pageId}/${filename}`;
 	
