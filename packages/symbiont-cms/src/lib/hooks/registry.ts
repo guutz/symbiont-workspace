@@ -1,6 +1,8 @@
 import type { PageObjectResponse } from '@notionhq/client';
-import type { HookEvent, Hook, HookContext, HookExecutionState, EventSignatures, DatabaseBlueprint } from './types.js';
-import { HOOK_EVENTS } from './types.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { HookEvent, Hook, HookContext, HookExecutionState, EventSignatures } from './types.js';
+import type { DatabaseBlueprint } from '../types.js';
+import { HOOK_EVENTS, CompositionStrategy } from './types.js';
 
 /**
  * Hook Registry manages registration and execution of hooks.
@@ -23,7 +25,7 @@ export class HookRegistry {
 	private config: DatabaseBlueprint;
 	private services: {
 		notionClient?: any;
-		supabase?: any;
+		supabase?: SupabaseClient;
 		[key: string]: unknown;
 	};
 
@@ -37,7 +39,7 @@ export class HookRegistry {
 		config: DatabaseBlueprint,
 		services: {
 			notionClient?: any;
-			supabase?: any;
+			supabase?: SupabaseClient;
 			[key: string]: unknown;
 		}
 	) {
@@ -153,19 +155,19 @@ export class HookRegistry {
 			state.abortReason = reason;
 		};
 
-		const strategy = HOOK_EVENTS[event]?.composition || 'first-wins';
+		const strategy = HOOK_EVENTS[event] || CompositionStrategy.FirstWins;
 
 		// Execute based on composition strategy
 		switch (strategy) {
-			case 'first-wins':
+			case CompositionStrategy.FirstWins:
 				return await this.executeFirstWins(hooks, page, input, state, abort) as any;
-			case 'collect':
+			case CompositionStrategy.Collect:
 				return await this.executeCollect(hooks, page, input, state, abort) as any;
-			case 'or-all':
+			case CompositionStrategy.OrAll:
 				return await this.executeOrAll(hooks, page, input, state, abort) as any;
-			case 'and-all':
+			case CompositionStrategy.AndAll:
 				return await this.executeAndAll(hooks, page, input, state, abort) as any;
-			case 'run-all':
+			case CompositionStrategy.RunAll:
 				return await this.executeRunAll(hooks, page, input, state, abort) as any;
 			default:
 				throw new Error(`Unknown composition strategy: ${strategy}`);

@@ -5,91 +5,25 @@ import type { Database } from '../database.types.js';
 
 /**
  * Composition strategy for hook execution.
- * 
- * Determines how results from multiple hooks are combined and when execution stops.
  */
-export type CompositionStrategy =
-	| 'first-wins'   // stop at first non-null result (strings, numbers, dates)
-	| 'collect'      // accumulate all results; registry infers merge (objects) or concat (arrays)
-	| 'or-all'       // run all; true if any hook returns true (boolean OR)
-	| 'and-all'      // run all; false if any hook returns false (boolean AND)
-	| 'run-all';     // run all; ignore return values entirely (side effects)
-
-/**
- * Event definition with composition strategy.
- */
-export type EventDefinition = {
-	composition: CompositionStrategy;
-};
-
-/**
- * Hook lifecycle events in the page transformation pipeline.
- */
-export type HookEvent =
-	| 'page:exclude'       // Should page be excluded from sync?
-	| 'page:validate'      // Is page data valid?
-	| 'metadata:title'     // Extract/transform title
-	| 'metadata:tags'      // Extract/transform tags
-	| 'metadata:authors'   // Extract/transform authors
-	| 'metadata:summary'   // Extract/transform summary
-	| 'metadata:custom'    // Extract custom metadata (user-defined data)
-	| 'publish:check'      // Should page be published?
-	| 'publish:date'       // Determine publish date
-	| 'slug:extract'       // Extract custom slug from Notion
-	| 'slug:generate'      // Generate slug from title
-	| 'slug:validate'      // Validate slug uniqueness
-	| 'slug:transform'     // Transform slug (sanitization, etc.)
-	| 'content:fetch'      // Fetch page content
-	| 'content:transform'  // Transform markdown content
-	| 'content:images'     // Process inline images (upload, transform URLs)
-	| 'cover:extract'      // Extract cover image URL
-	| 'cover:process'      // Upload/process cover image
-	| 'sync:slug'          // Sync slug back to Notion
-	| 'sync:content'       // Sync content back to Notion
-	| 'sync:images';       // Sync image URLs back to Notion
-
-/**
- * Built-in event definitions with fixed composition strategies.
- */
-export const HOOK_EVENTS: Record<HookEvent, EventDefinition> = {
-	'page:exclude':       { composition: 'or-all'     },  // exclude if any hook says yes
-	'page:validate':      { composition: 'and-all'    },  // valid only if all hooks pass
-	'metadata:title':     { composition: 'first-wins' },
-	'metadata:tags':      { composition: 'collect'    },
-	'metadata:authors':   { composition: 'collect'    },
-	'metadata:summary':   { composition: 'first-wins' },
-	'metadata:custom':    { composition: 'collect'    },
-	'publish:check':      { composition: 'and-all'    },  // publish only if all hooks agree
-	'publish:date':       { composition: 'first-wins' },
-	'slug:extract':       { composition: 'first-wins' },
-	'slug:generate':      { composition: 'first-wins' },
-	'slug:validate':      { composition: 'and-all'    },
-	'slug:transform':     { composition: 'first-wins' },
-	'content:fetch':      { composition: 'first-wins' },
-	'content:transform':  { composition: 'first-wins' },
-	'content:images':     { composition: 'run-all'    },
-	'cover:extract':      { composition: 'first-wins' },
-	'cover:process':      { composition: 'run-all'    },
-	'sync:slug':          { composition: 'run-all'    },
-	'sync:content':       { composition: 'run-all'    },
-	'sync:images':        { composition: 'run-all'    },
-};
+export enum CompositionStrategy {
+	/** Stop at first non-null result (strings, numbers, dates) */
+	FirstWins = 'first-wins',
+	/** Accumulate all results; registry infers merge (objects) or concat (arrays) */
+	Collect = 'collect',
+	/** Run all; true if any hook returns true (boolean OR) */
+	OrAll = 'or-all',
+	/** Run all; false if any hook returns false (boolean AND) */
+	AndAll = 'and-all',
+	/** Run all; ignore return values entirely (side effects) */
+	RunAll = 'run-all'
+}
 
 /**
  * Event signatures: input and output types for each event.
- * 
- * Used to derive the `execute()` signature with full type safety.
+ * Single source of truth for all hook events.
  */
 export type EventSignatures = {
-	// Events that receive a pipeline input value:
-	'content:transform': { input: string;      output: string       };
-	'content:images':    { input: string;      output: string       };
-	'cover:process':     { input: string|null; output: string|null  };
-	'sync:slug':         { input: string;      output: void         };
-	'sync:content':      { input: string;      output: void         };
-	'sync:images':       { input: unknown;     output: void         };
-	
-	// Events with no pipeline input (ctx.page is the only source):
 	'page:exclude':      { input: never; output: boolean    };
 	'page:validate':     { input: never; output: boolean    };
 	'metadata:title':    { input: never; output: string     };
@@ -104,7 +38,45 @@ export type EventSignatures = {
 	'slug:validate':     { input: never; output: boolean    };
 	'slug:transform':    { input: never; output: string     };
 	'content:fetch':     { input: never; output: string     };
+	'content:transform': { input: string; output: string    };
+	'content:images':    { input: string; output: string    };
 	'cover:extract':     { input: never; output: string     };
+	'cover:process':     { input: string|null; output: string|null };
+	'sync:slug':         { input: string; output: void      };
+	'sync:content':      { input: string; output: void      };
+	'sync:images':       { input: unknown; output: void     };
+};
+
+/**
+ * Hook event names derived from EventSignatures.
+ */
+export type HookEvent = keyof EventSignatures;
+
+/**
+ * Composition strategies for each hook event.
+ */
+export const HOOK_EVENTS: Record<HookEvent, CompositionStrategy> = {
+	'page:exclude':      CompositionStrategy.OrAll,
+	'page:validate':     CompositionStrategy.AndAll,
+	'metadata:title':    CompositionStrategy.FirstWins,
+	'metadata:tags':     CompositionStrategy.Collect,
+	'metadata:authors':  CompositionStrategy.Collect,
+	'metadata:summary':  CompositionStrategy.FirstWins,
+	'metadata:custom':   CompositionStrategy.Collect,
+	'publish:check':     CompositionStrategy.AndAll,
+	'publish:date':      CompositionStrategy.FirstWins,
+	'slug:extract':      CompositionStrategy.FirstWins,
+	'slug:generate':     CompositionStrategy.FirstWins,
+	'slug:validate':     CompositionStrategy.AndAll,
+	'slug:transform':    CompositionStrategy.FirstWins,
+	'content:fetch':     CompositionStrategy.FirstWins,
+	'content:transform': CompositionStrategy.FirstWins,
+	'content:images':    CompositionStrategy.RunAll,
+	'cover:extract':     CompositionStrategy.FirstWins,
+	'cover:process':     CompositionStrategy.RunAll,
+	'sync:slug':         CompositionStrategy.RunAll,
+	'sync:content':      CompositionStrategy.RunAll,
+	'sync:images':       CompositionStrategy.RunAll,
 };
 
 

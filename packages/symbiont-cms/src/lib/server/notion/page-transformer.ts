@@ -1,6 +1,8 @@
 import type { PageObjectResponse } from '@notionhq/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { DatabasePage } from '../../types.js';
+import type { Database } from '../../database.types.js';
 import { createSlug } from '../utils/slug.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
@@ -35,8 +37,7 @@ export class NotionPageToDatabasePageTransformer {
 		private config: DatabaseBlueprint,
 		private notionClient: NotionClient,
 		private pageCrud: DatabasePageCRUD,
-		private supabaseUrl: string,
-		private serviceRoleKey: string
+		private supabase: SupabaseClient<Database>
 	) {
 		this.logger = createLogger({
 			operation: 'page_transformer',
@@ -50,9 +51,7 @@ export class NotionPageToDatabasePageTransformer {
 			this.config,
 			{
 				notionClient: this.notionClient,
-				supabase: undefined, // TODO: Pass instantiated Supabase client
-				supabaseUrl: this.supabaseUrl,
-				serviceRoleKey: this.serviceRoleKey
+				supabase: this.supabase
 			}
 		);
 
@@ -336,7 +335,7 @@ export class NotionPageToDatabasePageTransformer {
 			const baseSlug = await this.hookRegistry.execute('slug:generate', page);
 
 			// If custom slug was extracted, use it instead of generated
-			const finalBaseSlug = customSlug || baseSlug;
+			const finalBaseSlug = customSlug || baseSlug || 'untitled';
 			slug = await this.ensureUniqueSlug(finalBaseSlug);
 			slugChanged = true;
 			this.logger.info({
@@ -413,36 +412,5 @@ export class NotionPageToDatabasePageTransformer {
 	private async getPublishDate(page: PageObjectResponse): Promise<string | null> {
 		const publishDate = await this.hookRegistry.execute('publish:date', page);
 		return publishDate;
-	}
-
-	/**
-	 * Create hook context for effect hooks (includes services).
-	 * 
-	 * Effect hooks need access to NotionClient and Supabase for side effects.
-	 */
-	private createEffectHookContext(page: PageObjectResponse) {
-		return {
-			page,
-			config: this.config,
-			logger: this.logger,
-			services: {
-				notionClient: this.notionClient,
-				supabaseUrl: this.supabaseUrl,
-				serviceRoleKey: this.serviceRoleKey
-			}
-		};
-	}
-
-	/**
-	 * Create hook context for extractor hooks (no services).
-	 * 
-	 * Extractor hooks should not perform side effects, so services are omitted.
-	 */
-	private createExtractorHookContext(page: PageObjectResponse) {
-		return {
-			page,
-			config: this.config,
-			logger: this.logger
-		};
 	}
 }

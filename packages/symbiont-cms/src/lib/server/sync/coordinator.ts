@@ -1,6 +1,8 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
+import { createClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint } from '../../types.js';
+import type { Database } from '../../database.types.js';
 import type { SymbiontClient } from '../../client.js';
 import { requireEnvVar } from '../utils/env.js';
 import { NotionClient } from '../notion/client.js';
@@ -66,6 +68,12 @@ export function createNotionToDatabaseSyncCoordinator(
 	// Create Notion client layer (Notion API)
 	const notionClient = new NotionClient(notion, n2m);
 
+	// Create Supabase admin client for storage operations
+	const supabase = createClient<Database>(
+		client.config.supabase.url,
+		serviceRoleKey
+	);
+
 	// Create page CRUD layer (Database) with Supabase admin client
 	const pageCrud = new DatabasePageCRUD(
 		client.config.supabase.url,
@@ -77,8 +85,7 @@ export function createNotionToDatabaseSyncCoordinator(
 		config,
 		notionClient,
 		pageCrud,
-		client.config.supabase.url,
-		serviceRoleKey
+		supabase
 	);
 
 	// Create sync coordinator (coordination layer)

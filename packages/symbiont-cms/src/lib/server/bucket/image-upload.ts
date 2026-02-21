@@ -11,11 +11,13 @@
  */
 
 import crypto from 'crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 
 export interface UploadImageOptions {
-	supabaseUrl: string;
-	serviceRoleKey: string;
+	supabase?: SupabaseClient;
+	supabaseUrl?: string;
+	serviceRoleKey?: string;
 	pageId: string;
 	altText?: string; // Optional alt text from markdown for filename
 }
@@ -77,9 +79,10 @@ export async function uploadImageToSupabase(
 	url: string,
 	options: UploadImageOptions
 ): Promise<UploadImageResult> {
-	const { supabaseUrl, serviceRoleKey, pageId, altText } = options;
+	const { supabase: supabaseClient, supabaseUrl, serviceRoleKey, pageId, altText } = options;
 	
-	const supabase = createClient(supabaseUrl, serviceRoleKey);
+	// Use provided client or create one from URL/key
+	const supabase = supabaseClient || createClient(supabaseUrl!, serviceRoleKey!);
 	
 	// Download image
 	const response = await fetch(url);
