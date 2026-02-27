@@ -1,80 +1,302 @@
-import type { Hook } from './types.js';
+import type { Hook, MdBlock } from './types.js';
+import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import { createSlug } from '../server/utils/slug.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../server/bucket/image-upload.js';
 import { convertMarkdownToNotionBlocks } from '../server/notion/markdown-to-blocks.js';
+import { NotionToMarkdown } from 'notion-to-md';
 
 /**
- * Default hooks that implement Symbiont's opinionated behavior.
+ * Default hooks implementing Symbiont's opinionated behavior.
+ * Aligned with design memo (2026-02-21-hook-events-design-memo.md).
  * 
- * Hooks use named priorities:
- * - No priority: Default level (runs with Symbiont's built-in hooks)
- * - 'override': Runs before defaults (wins for first-wins events)
- * - 'fallback': Runs after defaults (only if defaults return null)
- * 
- * Registry composes results based on event's composition strategy.
+ * All hooks use default priority (50) unless specified.
  */
 
-/**
- * Default hook for excluding pages from sync.
- * By default, no pages are excluded.
- * 
- * Composition: or-all (exclude if any hook returns true)
- */
-export const defaultPageExcludeHook: Hook<boolean> = {
-	name: 'symbiont:page:exclude:default',
-	event: 'page:exclude',
+// ── Page Lifecycle ─────────────────────────────────────────────────
+
+export const defaultPageBeforeHook: Hook<void> = {
+	name: 'symbiont:page:before',
+	event: 'page:before',
 	fn: async (ctx) => {
-		// By default, don't exclude any pages
-		return false;
+		// No-op lifecycle hook
+		return null;
 	}
 };
 
-/**
- * Default hook for validating page data.
- * By default, all pages are considered valid.
- * 
- * Composition: and-all (valid only if all hooks pass)
- */
-export const defaultPageValidateHook: Hook<boolean> = {
-	name: 'symbiont:page:validate:default',
-	event: 'page:validate',
+export const defaultPageShouldSyncHook: Hook<boolean> = {
+	name: 'symbiont:page:should-sync',
+	event: 'page:should-sync',
 	fn: async (ctx) => {
-		// By default, all pages are valid
+		// By default, all pages should sync
 		return true;
 	}
 };
 
+export const defaultPageAfterHook: Hook<void> = {
+	name: 'symbiont:page:after',
+	event: 'page:after',
+	fn: async (ctx) => {
+		// No-op lifecycle hook
+		return null;
+	}
+};
+
+// ── Publishing ─────────────────────────────────────────────────────
+
 /**
- * Default hook for extracting page title.
- * 
- * Composition: first-wins
+ * Cache for Notion database schema lookups (per sync run).
+ * Key: dataSourceId, Value: status property definition
  */
+const databaseSchemaCache = new Map<string, any>();
+
+export const defaultPublishCheckHook: Hook<boolean> = {
+	name: 'symbiont:publish:check',
+	event: 'publish:check',
+	fn: async (ctx) => {
+		const notionClient = ctx.services.notionClient;
+		if (!notionClient) {
+			// No Notion client available - default to false (opt-in)
+			return false;
+		}
+
+		const dataSourceId = ctx.config.dataSourceId;
+		
+		// Check cache first
+		if (!databaseSchemaCache.has(dataSourceId)) {
+			try {
+				// Fetch database schema
+				const dbSchema = await notionClient.getDatabaseSchema(dataSourceId);
+				databaseSchemaCache.set(dataSourceId, dbSchema);
+			} catch (error) {
+				ctx.logger.warn({
+					event: 'publish_check_schema_fetch_failed',
+					dataSourceId,
+					error: error instanceof Error ? error.message : String(error)
+				});
+				// Default to false if can't fetch schema
+				return false;
+			}
+		}
+
+		const dbSchema = databaseSchemaCache.get(dataSourceId);
+		
+		// Find Status property
+		const statusProp = Object.entries(dbSchema?.properties || {}).find(
+			([name, prop]: [string, any]) => prop.type === 'status'
+		);
+
+		if (!statusProp) {
+			// No status property - default to false (opt-in)
+			return false;
+		}
+
+		const [statusPropName, statusPropDef] = statusProp as [string, any];
+		
+		// Find the 'Complete' group
+		const completeGroup = statusPropDef.status?.groups?.find(
+			(group: any) => group.name === 'Complete'
+		);
+
+		if (!completeGroup) {
+			// No Complete group - default to false
+			return false;
+		}
+
+		// Check if page's status option is in the Complete group
+		const pageStatusProp = ctx.page.properties[statusPropName];
+		if (!pageStatusProp || !('status' in pageStatusProp)) {
+			return false;
+		}
+
+		const pageStatusId = (pageStatusProp as any).status?.id;
+		if (!pageStatusId) {
+			return false;
+		}
+
+		const isComplete = completeGroup.option_ids?.includes(pageStatusId);
+		return isComplete || false;
+	}
+};
+
+export const defaultPublishDateHook: Hook<string | Date> = {
+	name: 'symbiont:publish:date',
+	event: 'publish:date',
+	fn: async (ctx) => {
+		// Use last edited time as publish date
+		return ctx.page.last_edited_time;
+	}
+};
+
+// ── Slug Pipeline ──────────────────────────────────────────────────
+
+export const defaultSlugExtractHook: Hook<string> = {
+	name: 'symbiont:slug:extract',
+	event: 'slug:extract',
+	fn: async (ctx) => {
+		const slugProperty = ctx.config.slugProperty;
+		if (!slugProperty) {
+			return null;
+		}
+
+		const slugProp = ctx.page.properties[slugProperty];
+		
+		// Handle rich_text property
+		if (slugProp && 'rich_text' in slugProp) {
+			const richText = (slugProp as any).rich_text;
+			const extractedSlug = richText?.map((rt: any) => rt.plain_text).join('') || null;
+			return extractedSlug || null;
+		}
+
+		return null;
+	}
+};
+
+export const defaultSlugGenerateHook: Hook<string> = {
+	name: 'symbiont:slug:generate',
+	event: 'slug:generate',
+	fn: async (ctx) => {
+		// Check if slug already extracted - defer to slug:extract
+		if (ctx.output.slug) {
+			return null;
+		}
+
+		// Generate from title
+		const title = ctx.output.title || 'untitled';
+		return createSlug(title);
+	}
+};
+
+export const defaultSlugConflictHook: Hook<string> = {
+	name: 'symbiont:slug:conflict',
+	event: 'slug:conflict',
+	fn: async (ctx) => {
+		const supabase = ctx.services.supabase;
+		if (!supabase) {
+			// No database access - just return input unchanged
+			return ctx.input as string;
+		}
+
+		const candidateSlug = ctx.input as string;
+		const pageId = ctx.page.id;
+		const dataSourceId = ctx.config.dataSourceId;
+		const strategy = ctx.config.onSlugConflict || 'auto-rename';
+
+		// Check for conflict
+		const { data: existingPage } = await supabase
+			.from('pages')
+			.select('page_id, slug')
+			.eq('slug', candidateSlug)
+			.eq('datasource_id', dataSourceId)
+			.maybeSingle();
+
+		// No conflict, or conflict is with the same page
+		if (!existingPage || existingPage.page_id === pageId) {
+			return candidateSlug;
+		}
+
+		// Handle conflict based on strategy
+		switch (strategy) {
+			case 'error':
+				throw new Error(`Slug conflict: "${candidateSlug}" already exists`);
+
+			case 'use-page-id':
+				return `${candidateSlug}-${pageId.slice(0, 8)}`;
+
+			case 'auto-rename':
+			default:
+				// Try -2, -3, etc. up to 100 attempts
+				for (let i = 2; i <= 100; i++) {
+					const numberedSlug = `${candidateSlug}-${i}`;
+					const { data: conflict } = await supabase
+						.from('pages')
+						.select('page_id')
+						.eq('slug', numberedSlug)
+						.eq('datasource_id', dataSourceId)
+						.maybeSingle();
+
+					if (!conflict || conflict.page_id === pageId) {
+						ctx.logger.warn({
+							event: 'slug_conflict_auto_renamed',
+							originalSlug: candidateSlug,
+							finalSlug: numberedSlug
+						});
+						return numberedSlug;
+					}
+				}
+
+				// Fallback: use random suffix
+				const randomSlug = `${candidateSlug}-${Math.random().toString(36).substring(2, 8)}`;
+				ctx.logger.warn({
+					event: 'slug_conflict_random_fallback',
+					originalSlug: candidateSlug,
+					finalSlug: randomSlug
+				});
+				return randomSlug;
+		}
+	}
+};
+
+export const defaultSlugSyncHook: Hook<void> = {
+	name: 'symbiont:slug:sync',
+	event: 'slug:sync',
+	fn: async (ctx) => {
+		const slugProperty = ctx.config.slugProperty;
+		const notionClient = ctx.services.notionClient;
+		
+		if (!slugProperty || !notionClient) {
+			return null;
+		}
+
+		const finalSlug = ctx.output.slug;
+		if (!finalSlug) {
+			return null;
+		}
+
+		// Write slug back to Notion
+		try {
+			await notionClient.updateProperty(ctx.page.id, {
+				[slugProperty]: {
+					rich_text: [{ text: { content: finalSlug } }]
+				}
+			});
+			
+			ctx.logger.debug({
+				event: 'slug_synced_to_notion',
+				pageId: ctx.page.id,
+				slug: finalSlug
+			});
+		} catch (error) {
+			ctx.logger.warn({
+				event: 'slug_sync_failed',
+				pageId: ctx.page.id,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+
+		return null;
+	}
+};
+
+// ── Metadata Extraction ────────────────────────────────────────────
+
 export const defaultTitleExtractHook: Hook<string> = {
-	name: 'symbiont:metadata:title:default',
+	name: 'symbiont:metadata:title',
 	event: 'metadata:title',
 	fn: async (ctx) => {
-		// Extract title from Notion page
 		const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
 		
 		if (titleProp && 'title' in titleProp) {
-			// @ts-ignore - Notion types are complex
-			return titleProp.title?.[0]?.plain_text || 'Untitled';
+			return (titleProp as any).title?.[0]?.plain_text || 'Untitled';
 		}
 		
 		return 'Untitled';
 	}
 };
 
-/**
- * Default hook for extracting tags from Notion.
- * 
- * Composition: collect (arrays concatenated)
- */
 export const defaultTagsExtractHook: Hook<string[]> = {
-	name: 'symbiont:metadata:tags:default',
+	name: 'symbiont:metadata:tags',
 	event: 'metadata:tags',
 	fn: async (ctx) => {
-		// Extract tags from configured property
 		const tagsProperty = ctx.config.tagsProperty;
 		if (!tagsProperty) {
 			return [];
@@ -82,24 +304,17 @@ export const defaultTagsExtractHook: Hook<string[]> = {
 		
 		const tagsProp = ctx.page.properties[tagsProperty];
 		if (tagsProp && 'multi_select' in tagsProp) {
-			// @ts-ignore - Notion types are complex
-			return tagsProp.multi_select?.map((tag: any) => tag.name) || [];
+			return (tagsProp as any).multi_select?.map((tag: any) => tag.name) || [];
 		}
 		
 		return [];
 	}
 };
 
-/**
- * Default hook for extracting authors from Notion.
- * 
- * Composition: collect (arrays concatenated)
- */
 export const defaultAuthorsExtractHook: Hook<string[]> = {
-	name: 'symbiont:metadata:authors:default',
+	name: 'symbiont:metadata:authors',
 	event: 'metadata:authors',
 	fn: async (ctx) => {
-		// Extract authors from configured property
 		const authorsProperty = ctx.config.authorsProperty;
 		if (!authorsProperty) {
 			return [];
@@ -109,462 +324,335 @@ export const defaultAuthorsExtractHook: Hook<string[]> = {
 		
 		// Handle people property
 		if (authorsProp && 'people' in authorsProp) {
-			// @ts-ignore - Notion types are complex
-			return authorsProp.people?.map((person: any) => person.name || person.id) || [];
+			return (authorsProp as any).people?.map((person: any) => person.name || person.id) || [];
 		}
 		
 		// Handle multi_select property
 		if (authorsProp && 'multi_select' in authorsProp) {
-			// @ts-ignore - Notion types are complex
-			return authorsProp.multi_select?.map((tag: any) => tag.name) || [];
+			return (authorsProp as any).multi_select?.map((tag: any) => tag.name) || [];
 		}
 		
 		return [];
 	}
 };
 
-/**
- * Default hook for extracting summary from Notion.
- * 
- * Composition: first-wins
- */
 export const defaultSummaryExtractHook: Hook<string> = {
-	name: 'symbiont:metadata:summary:default',
+	name: 'symbiont:metadata:summary',
 	event: 'metadata:summary',
 	fn: async (ctx) => {
-		// Extract summary from configured property
 		const summaryProperty = ctx.config.summaryProperty;
 		if (!summaryProperty) {
-			return '';
+			return null;
 		}
 		
 		const summaryProp = ctx.page.properties[summaryProperty];
 		
 		// Handle rich_text property
 		if (summaryProp && 'rich_text' in summaryProp) {
-			// @ts-ignore - Notion types are complex
-			const richText = summaryProp.rich_text;
-			return richText?.map((rt: any) => rt.plain_text).join('') || '';
+			const richText = (summaryProp as any).rich_text;
+			return richText?.map((rt: any) => rt.plain_text).join('') || null;
 		}
 		
-		return '';
+		return null;
 	}
 };
 
-/**
- * Default hook for extracting custom metadata.
- * Returns empty object by default.
- * 
- * Composition: collect (objects merged)
- */
-export const defaultCustomMetadataHook: Hook<Record<string, any>> = {
-	name: 'symbiont:metadata:custom:default',
+export const defaultCustomMetadataHook: Hook<Record<string, unknown>> = {
+	name: 'symbiont:metadata:custom',
 	event: 'metadata:custom',
 	fn: async (ctx) => {
-		// Return empty object (other hooks can add fields, will be auto-merged)
+		// Return empty object by default (other hooks can add fields)
 		return {};
 	}
 };
 
-/**
- * Default hook for checking if a page should be published.
- * By default, all pages are publishable.
- * 
- * Composition: and-all (publish only if all hooks agree)
- */
-export const defaultPublishCheckHook: Hook<boolean> = {
-	name: 'symbiont:publish:check:default',
-	event: 'publish:check',
-	fn: async (ctx) => {
-		// By default, all pages are publishable
-		return true;
-	}
-};
+// ── Content Pipeline ───────────────────────────────────────────────
 
-/**
- * Default hook for determining publish date.
- * Uses Notion's last_edited_time as the publish date.
- * 
- * Composition: first-wins
- */
-export const defaultPublishDateHook: Hook<string> = {
-	name: 'symbiont:publish:date:default',
-	event: 'publish:date',
+export const defaultContentPreprocessHook: Hook<MdBlock[]> = {
+	name: 'symbiont:content:preprocess',
+	event: 'content:preprocess',
 	fn: async (ctx) => {
-		// Use last edited time as publish date
-		return ctx.page.last_edited_time;
-	}
-};
-
-/**
- * Default hook for extracting custom slug from Notion.
- * Returns null by default, allowing slug generation from title.
- * 
- * Composition: first-wins
- */
-export const defaultSlugExtractHook: Hook<string | null> = {
-	name: 'symbiont:slug:extract:default',
-	event: 'slug:extract',
-	fn: async (ctx) => {
-		// By default, no custom slug - returns null
-		return null;
-	}
-};
-
-/**
- * Default hook for generating slug from title.
- * 
- * Composition: first-wins
- */
-export const defaultSlugGenerateHook: Hook<string> = {
-	name: 'symbiont:slug:generate:default',
-	event: 'slug:generate',
-	fn: async (ctx) => {
-		// Extract title from Notion page
-		// Title property is typically 'Title' or 'Name'
-		const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
+		// ctx.input contains BlockObjectResponse[] from Notion
+		const blocks = ctx.input as BlockObjectResponse[];
 		
-		let title = 'untitled';
-		if (titleProp && 'title' in titleProp) {
-			// @ts-ignore - Notion types are complex
-			title = titleProp.title?.[0]?.plain_text || 'untitled';
-		}
-		
-		return createSlug(title);
-	}
-};
-
-/**
- * Default hook for validating slug uniqueness.
- * By default, returns true (no validation).
- * 
- * Composition: and-all
- * 
- * Note: Slug uniqueness validation is currently handled in transformer's
- * ensureUniqueSlug() method. This hook is for additional custom validation.
- */
-export const defaultSlugValidateHook: Hook<boolean> = {
-	name: 'symbiont:slug:validate:default',
-	event: 'slug:validate',
-	fn: async (ctx) => {
-		// No additional validation by default
-		return true;
-	}
-};
-
-/**
- * Default hook for transforming/sanitizing slugs.
- * By default, returns null (no transformation).
- * 
- * Composition: first-wins
- */
-export const defaultSlugTransformHook: Hook<string | null> = {
-	name: 'symbiont:slug:transform:default',
-	event: 'slug:transform',
-	fn: async (ctx) => {
-		// No additional transformation
-		return null;
-	}
-};
-
-/**
- * Default hook for fetching page content.
- * By default, returns null (content fetched by transformer via NotionClient).
- * 
- * Composition: first-wins
- */
-export const defaultContentFetchHook: Hook<string | null> = {
-	name: 'symbiont:content:fetch:default',
-	event: 'content:fetch',
-	fn: async (ctx) => {
-		// Content is fetched by transformer; this is a placeholder for custom sources
-		return null;
-	}
-};
-
-/**
- * Default hook for transforming content.
- * Returns input as-is (pass-through).
- * 
- * Composition: first-wins
- * 
- * Users can add 'override' hooks to strip/rewrite content.
- */
-export const defaultContentTransformHook: Hook<string> = {
-	name: 'symbiont:content:transform:default',
-	event: 'content:transform',
-	fn: async (ctx) => {
-		return (ctx.input as string) || '';
-	}
-};
-
-/**
- * Default hook for processing inline images in content.
- * Finds image URLs in markdown, uploads to Supabase, returns updated markdown.
- * 
- * Composition: run-all
- */
-export const defaultContentImagesHook: Hook<string> = {
-	name: 'symbiont:content:images:default',
-	event: 'content:images',
-	fn: async (ctx) => {
-		const content = (ctx.input as string) || '';
-		if (!ctx.services.supabase || !content) return content;
-
-		let processed = content;
-		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-		const uploads: Promise<void>[] = [];
-		let match: RegExpExecArray | null;
-
-		while ((match = imageRegex.exec(content)) !== null) {
-			const [full, alt, url] = match;
-			if (!needsUploadToSupabase(url)) continue;
-
-			uploads.push(
-				uploadImageToSupabase(url, { 
-					supabase: ctx.services.supabase, 
-					pageId: ctx.page.id
-				})
-					.then(({ newUrl }) => { 
-						processed = processed.replace(full, `![${alt}](${newUrl})`); 
-					})
-					.catch((err) => ctx.logger.warn({ 
-						event: 'content_image_upload_failed', 
-						url, 
-						error: err.message 
-					}))
-			);
+		if (!blocks || blocks.length === 0) {
+			return [];
 		}
 
-		await Promise.all(uploads);
-		return processed;
-	}
-};
-
-/**
- * Default hook for extracting cover image URL.
- * Checks the configured cover property for file/external URLs.
- * 
- * Composition: first-wins
- */
-export const defaultCoverExtractHook: Hook<string | null> = {
-	name: 'symbiont:cover:extract:default',
-	event: 'cover:extract',
-	fn: async (ctx) => {
-		// No cover property configured
-		if (!ctx.config.coverProperty) {
-			return null;
-		}
-
-		const coverProp = ctx.page.properties[ctx.config.coverProperty];
-		
-		// No cover image in property
-		if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
-			return null;
-		}
-
-		const file = coverProp.files[0];
-		
-		// Handle Notion-hosted files
-		if (file.type === 'file') {
-			return file.file?.url || null;
-		}
-		
-		// Handle external files
-		if (file.type === 'external') {
-			return file.external?.url || null;
-		}
-
-		return null;
-	}
-};
-
-/**
- * Default hook for cover fallback.
- * Extracts first image from page content to use as cover when no cover property is set.
- * 
- * Composition: first-wins
- */
-export const defaultCoverFallbackHook: Hook<string | null> = {
-	name: 'symbiont:cover:fallback:default',
-	event: 'cover:fallback',
-	fn: async (ctx) => {
 		const notionClient = ctx.services.notionClient;
+		if (!notionClient || !notionClient.n2m) {
+			ctx.logger.warn({
+				event: 'content_preprocess_no_n2m',
+				message: 'NotionClient missing n2m instance'
+			});
+			return [];
+		}
+
+		try {
+			// Use n2m to convert blocks to MdBlock[]
+			// Note: n2m.pageToMarkdown() fetches blocks itself, but we already have them.
+			// We'll use a workaround: n2m's blockToMarkdown for each block
+			const mdBlocks: MdBlock[] = [];
+			
+			for (const block of blocks) {
+				try {
+					const mdBlock = await notionClient.n2m.blockToMarkdown(block);
+					if (mdBlock) {
+						mdBlocks.push(mdBlock as MdBlock);
+					}
+				} catch (error) {
+					ctx.logger.warn({
+						event: 'block_conversion_failed',
+						blockId: (block as any).id,
+						error: error instanceof Error ? error.message : String(error)
+					});
+				}
+			}
+
+			return mdBlocks;
+		} catch (error) {
+			ctx.logger.error({
+				event: 'content_preprocess_failed',
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return [];
+		}
+	}
+};
+
+export const defaultContentTextHook: Hook<string> = {
+	name: 'symbiont:content:text',
+	event: 'content:text',
+	fn: async (ctx) => {
+		// Pass-through by default (transformer converts MdBlock[] to string before this)
+		return ctx.input as string;
+	}
+};
+
+export const defaultContentMediaHook: Hook<string> = {
+	name: 'symbiont:content:media',
+	event: 'content:media',
+	fn: async (ctx) => {
+		const content = ctx.input as string;
 		const supabase = ctx.services.supabase;
 		
-		if (!notionClient || !supabase) {
+		if (!supabase || !content) {
+			return content;
+		}
+
+		// Extract and upload inline images
+		const imageUrlRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+		let processedContent = content;
+		const matches = Array.from(content.matchAll(imageUrlRegex));
+
+		for (const match of matches) {
+			const fullMatch = match[0];
+			const altText = match[1];
+			const imageUrl = match[2];
+
+			// Skip if already a Supabase URL
+			if (!needsUploadToSupabase(imageUrl, supabase)) {
+				continue;
+			}
+
+			try {
+				const uploadedUrl = await uploadImageToSupabase({
+					imageUrl,
+					supabase,
+					pageId: ctx.page.id
+				});
+
+				if (uploadedUrl) {
+					processedContent = processedContent.replace(fullMatch, `![${altText}](${uploadedUrl})`);
+					ctx.logger.debug({
+						event: 'inline_image_uploaded',
+						pageId: ctx.page.id,
+						originalUrl: imageUrl,
+						uploadedUrl
+					});
+				}
+			} catch (error) {
+				ctx.logger.warn({
+					event: 'inline_image_upload_failed',
+					pageId: ctx.page.id,
+					imageUrl,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
+
+		return processedContent;
+	}
+};
+
+export const defaultContentPostprocessHook: Hook<string> = {
+	name: 'symbiont:content:postprocess',
+	event: 'content:postprocess',
+	fn: async (ctx) => {
+		// Pass-through by default
+		return ctx.input as string;
+	}
+};
+
+export const defaultContentSyncHook: Hook<void> = {
+	name: 'symbiont:content:sync',
+	event: 'content:sync',
+	fn: async (ctx) => {
+		const notionClient = ctx.services.notionClient;
+		const finalContent = ctx.output.content;
+		
+		if (!notionClient || !finalContent) {
 			return null;
 		}
 
 		try {
-			// Get content as markdown
-			const content = await notionClient.pageToMarkdown(ctx.page.id);
+			// Convert markdown back to Notion blocks
+			const blocks = await convertMarkdownToNotionBlocks(finalContent);
 			
-			// Find first image in content
-			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/;
-			const match = content.match(imageRegex);
+			// Update Notion page with new blocks
+			await notionClient.updatePageBlocks(ctx.page.id, blocks);
 			
-			if (!match) return null;
-			
-			const [, alt, url] = match;
-			
-			// Upload to Supabase if needed
-			if (needsUploadToSupabase(url)) {
-				const result = await uploadImageToSupabase(url, {
-					supabase,
-					pageId: ctx.page.id
-				});
-				
-				ctx.logger.info({
-					event: 'cover_image_extracted_from_content',
-					pageId: ctx.page.id,
-					originalUrl: url,
-					newUrl: result.newUrl,
-					filename: result.filename
-				});
-				
-				return result.newUrl;
-			}
-			
-			// Use URL as-is if already permanent
-			ctx.logger.info({
-				event: 'cover_image_extracted_from_content',
-				pageId: ctx.page.id,
-				coverUrl: url
+			ctx.logger.debug({
+				event: 'content_synced_to_notion',
+				pageId: ctx.page.id
 			});
-			return url;
-		} catch (error: any) {
+		} catch (error) {
 			ctx.logger.warn({
-				event: 'cover_image_content_extraction_failed',
+				event: 'content_sync_failed',
 				pageId: ctx.page.id,
-				error: error?.message
+				error: error instanceof Error ? error.message : String(error)
 			});
-			return null;
 		}
+
+		return null;
 	}
 };
 
-/**
- * Default hook for processing cover image.
- * Uploads cover URL to Supabase, returns permanent URL.
- * 
- * Composition: run-all
- * 
- * ctx.input is the raw URL returned by cover:extract
- */
-export const defaultCoverProcessHook: Hook<string | null> = {
-	name: 'symbiont:cover:process:default',
+// ── Cover Pipeline ─────────────────────────────────────────────────
+
+export const defaultCoverExtractHook: Hook<string> = {
+	name: 'symbiont:cover:extract',
+	event: 'cover:extract',
+	fn: async (ctx) => {
+		const coverProperty = ctx.config.coverProperty;
+		
+		// Try to extract from configured property first
+		if (coverProperty) {
+			const coverProp = ctx.page.properties[coverProperty];
+			
+			if (coverProp && 'files' in coverProp) {
+				const files = (coverProp as any).files;
+				if (files && files.length > 0) {
+					const file = files[0];
+					const url = file.file?.url || file.external?.url;
+					if (url) {
+						return url;
+					}
+				}
+			}
+		}
+
+		// Fallback: scan content for first image
+		const content = ctx.output.content;
+		if (content) {
+			const imageMatch = content.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+			if (imageMatch) {
+				return imageMatch[2]; // Return the URL
+			}
+		}
+
+		return null;
+	}
+};
+
+export const defaultCoverProcessHook: Hook<string> = {
+	name: 'symbiont:cover:process',
 	event: 'cover:process',
 	fn: async (ctx) => {
-		const url = ctx.input as string | null;
-		if (!url || !ctx.services.supabase) return url;
-		if (!needsUploadToSupabase(url)) return url;
-
-		const { newUrl } = await uploadImageToSupabase(url, {
-			supabase: ctx.services.supabase,
-			pageId: ctx.page.id
-		});
-
-		// Sync permanent URL back to Notion
-		if (ctx.config.coverProperty && ctx.services.notionClient) {
-			await ctx.services.notionClient.updateFileProperty(
-				ctx.page.id, 
-				ctx.config.coverProperty, 
-				newUrl
-			);
+		const coverUrl = ctx.input as string | null;
+		const supabase = ctx.services.supabase;
+		
+		if (!coverUrl || !supabase) {
+			return coverUrl;
 		}
 
-		return newUrl;
+		// Skip if already a Supabase URL
+		if (!needsUploadToSupabase(coverUrl, supabase)) {
+			return coverUrl;
+		}
+
+		try {
+			const uploadedUrl = await uploadImageToSupabase({
+				imageUrl: coverUrl,
+				supabase,
+				pageId: ctx.page.id
+			});
+
+			if (uploadedUrl) {
+				ctx.logger.debug({
+					event: 'cover_image_uploaded',
+					pageId: ctx.page.id,
+					originalUrl: coverUrl,
+					uploadedUrl
+				});
+				return uploadedUrl;
+			}
+		} catch (error) {
+			ctx.logger.warn({
+				event: 'cover_upload_failed',
+				pageId: ctx.page.id,
+				coverUrl,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+
+		return coverUrl;
 	}
 };
 
-/**
- * Default hook for syncing slug back to Notion.
- * Writes final slug to the configured Notion property.
- * 
- * Composition: run-all
- */
-export const defaultSyncSlugHook: Hook<void> = {
-	name: 'symbiont:sync:slug:default',
-	event: 'sync:slug',
+export const defaultCoverSyncHook: Hook<void> = {
+	name: 'symbiont:cover:sync',
+	event: 'cover:sync',
 	fn: async (ctx) => {
-		const slug = ctx.input as string;
-		if (!ctx.services.notionClient || !ctx.config.slugSyncProperty || !slug) return;
-		
-		await ctx.services.notionClient.updateProperty(
-			ctx.page.id, 
-			ctx.config.slugSyncProperty, 
-			slug
-		);
+		// No-op by default (users can implement custom sync logic)
+		return null;
 	}
 };
 
-/**
- * Default hook for syncing content back to Notion.
- * Writes Supabase-URL-replaced markdown back to Notion as blocks.
- * 
- * Composition: run-all
- */
-export const defaultSyncContentHook: Hook<void> = {
-	name: 'symbiont:sync:content:default',
-	event: 'sync:content',
-	fn: async (ctx) => {
-		const content = ctx.input as string;
-		if (!ctx.services.notionClient || !content) return;
+// ── Export All ─────────────────────────────────────────────────────
 
-		const blocks = convertMarkdownToNotionBlocks(content, {
-			strictImageUrls: false,
-			truncate: true,
-			onLimitExceeded: (err) => ctx.logger.warn({ 
-				event: 'notion_content_limit_exceeded', 
-				error: err.message 
-			})
-		});
-		
-		await ctx.services.notionClient.updatePageBlocks(ctx.page.id, blocks);
-	}
-};
-
-/**
- * Default hook for syncing image URLs back to Notion.
- * No-op by default (covered by sync:content for inline images and cover:process for cover).
- * 
- * Composition: run-all
- * 
- * Keeping the event for user extensibility (e.g., syncing image captions).
- */
-export const defaultSyncImagesHook: Hook<void> = {
-	name: 'symbiont:sync:images:default',
-	event: 'sync:images',
-	fn: async (_ctx) => {
-		// No-op - images are synced via content:images and cover:process
-	}
-};
-
-/**
- * All default hooks in one array for easy registration.
- */
 export const defaultHooks: Hook[] = [
-	defaultPageExcludeHook,
-	defaultPageValidateHook,
+	// Page lifecycle
+	defaultPageBeforeHook,
+	defaultPageShouldSyncHook,
+	defaultPageAfterHook,
+
+	// Publishing
+	defaultPublishCheckHook,
+	defaultPublishDateHook,
+
+	// Slug pipeline
+	defaultSlugExtractHook,
+	defaultSlugGenerateHook,
+	defaultSlugConflictHook,
+	defaultSlugSyncHook,
+
+	// Metadata extraction
 	defaultTitleExtractHook,
 	defaultTagsExtractHook,
 	defaultAuthorsExtractHook,
 	defaultSummaryExtractHook,
 	defaultCustomMetadataHook,
-	defaultPublishCheckHook,
-	defaultPublishDateHook,
-	defaultSlugExtractHook,
-	defaultSlugGenerateHook,
-	defaultSlugValidateHook,
-	defaultSlugTransformHook,
-	defaultContentFetchHook,
-	defaultContentTransformHook,
-	defaultContentImagesHook,
+
+	// Content pipeline
+	defaultContentPreprocessHook,
+	defaultContentTextHook,
+	defaultContentMediaHook,
+	defaultContentPostprocessHook,
+	defaultContentSyncHook,
+
+	// Cover pipeline
 	defaultCoverExtractHook,
-	defaultCoverFallbackHook,
 	defaultCoverProcessHook,
-	defaultSyncSlugHook,
-	defaultSyncContentHook,
-	defaultSyncImagesHook
+	defaultCoverSyncHook
 ];
