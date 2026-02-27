@@ -10,7 +10,7 @@
  * - Store original URL in file metadata for reference
  */
 
-import crypto from 'crypto';
+import { createHash } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface UploadImageOptions {
@@ -59,7 +59,7 @@ function getExtensionFromUrl(urlOrFilename: string): string {
  * - Original filename/URL preserved in file metadata
  */
 function resolveFilename(url: string, buffer: Buffer): string {
-	const hash = crypto.createHash('sha256')
+	const hash = createHash('sha256')
 		.update(buffer)
 		.digest('hex')
 		.substring(0, 12);

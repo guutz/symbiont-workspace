@@ -98,8 +98,8 @@ export class HookRegistry {
 	 * @param hookName - Name of the hook to remove
 	 */
 	unregister(hookName: string): void {
-		for (const [event, hooks] of this.hooks.entries()) {
-			const filtered = hooks.filter((h) => h.name !== hookName);
+		for (const [event, hooks] of Array.from(this.hooks.entries())) {
+			const filtered = hooks.filter((h: Hook) => h.name !== hookName);
 			if (filtered.length !== hooks.length) {
 				this.hooks.set(event, filtered);
 				this.logger.debug({
