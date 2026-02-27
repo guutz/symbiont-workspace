@@ -1,384 +1,366 @@
 # Hook Events Design Memo
 
-**Date:** February 21, 2026  
-**Status:** DRAFT — for iteration, not implementation  
-**Context:** The hook system is built and wired up on `copilot/perform-hook-migration-status`. This memo audits the current `HOOK_EVENTS` definition in `types.ts` and proposes revisions before we lock the API.
+**Date:** February 21, 2026 (revised February 24, 2026)
+**Status:** SIGNED OFF — ready for implementation
+**Context:** The hook system is built and wired up on `copilot/perform-hook-migration-status`. This memo defines the target API for `HOOK_EVENTS`, `CompositionStrategy`, and `HookContext` in `types.ts`.
 
 ---
 
-## Framing: What Symbiont Should Own vs. What California Tech Should Own
+## The Symbiont Page Contract
 
-Before going event-by-event, the right question is: **what is the invariant core of any Notion→Supabase sync, and what is newspaper-specific?**
+Every Symbiont site gets these fields. Three are non-negotiable:
 
-### Symbiont Core (built-in defaults make sense here)
+- **`title`** — every piece of content has a name
+- **`content`** — the body (markdown, stored in Supabase)
+- **`slug`** — the URL identifier
 
-These are things every Symbiont site will need regardless of content type:
+The rest are optional-core — Symbiont has a hook and a default for each, but sites can opt out or override:
 
-- Reading title/content from Notion
-- Generating and de-duplicating slugs
-- Uploading Notion-hosted images to Supabase (they expire)
-- Extracting and uploading cover images
-- Syncing permanent URLs back to Notion
-- Deciding whether a page is published (at minimum: is it in the database?)
-- Attaching a date to a page
-RIGHT, WE SHOULD DEFINE MORE OFFICIALLY THE ARCHETYPICAL 'PAGE' AND ITS REQUIRED PROPERTIES. TITLE, CONTENT, AUTHOR(S), PUBLISH DATE, SLUG, COVER IMAGE, TAGS, AND OTHER METADATA. THIS DEFINES THE CORE CONTRACT OF THE CMS. NOT SURE WHAT SHOULD BE CONSIDERED METADATA VS. CORE PROPERTIES. FOR EXAMPLE, AUTHOR(S) COULD BE CORE OR METADATA DEPENDING ON THE SITE'S NEEDS. SUMMARY TOO. DATE TOO. ALL OF IT I GUESS TECHNICALLY EXCEPT TITLE AND CONTENT AND SLUG?
+- **`publish_at`** — when the content becomes public
+- **`tags`** — multi-value classification
+- **`authors`** — who wrote it
+- **`summary`** — short description or excerpt
+- **`cover`** — cover image URL (dedicated column; currently stored in `meta.cover` — schema debt to fix)
+- **`meta`** — arbitrary JSONB for site-specific fields
 
-### California Tech Specific (belongs in their `hooks: []` config, not in defaults)
-
-- **Issue/volume system** — parsing `"October 21, 2024"` from a select property to derive a publish date. No generic site would need this.
-- **Section taxonomy** — mapping Notion section names to route categories.
-- **Print layout metadata** — `layout`, `template`, `emphasis` fields for the InDesign pipeline.
-- **Featured flag** — editorial "featured article" checkbox.
-- **Author name formatting** — whether to use Notion People vs. a multi-select display authors field.
-- **Draft/staging exclusion** — excluding pages with a specific status property value.
-- **Website Slug passthrough** — reading a manually-set slug property by name. THIS ONE I FEEL LIKE IS A MORE GENERAL USE CASE?
-
-This boundary means Symbiont's defaults should be minimal and correct, not comprehensive. A default that's wrong more than 20% of the time is a trap.
+**Rule:** every named field Symbiont knows about gets its own column. Site-specific data lives in `meta`.
 
 ---
 
-## Audit: Current Events
+## Config Sugar
 
-### `page:*` — Page Lifecycle
-
-| Event | Strategy | Current Behavior | Assessment |
-|---|---|---|---|
-| `page:exclude` | OrAll | Returns false by default | ✅ Correct |
-| `page:validate` | AndAll | Returns true by default | ⚠️ See below |
-
-**`page:exclude` vs `page:validate`:** These semantically overlap in a confusing way. Right now:
-- `exclude` = "skip this page entirely, don't write to DB"
-- `validate` = "this page's data is structurally valid"
-
-The problem: there's no observable difference in behavior today. The transformer presumably skips on both. If they produce the same outcome, having two events is noise. 
-
-**Proposal:** Collapse into a single `page:should-sync` (AndAll → sync if all return true) so the intent is unambiguous. Or, if we keep both, make their effects explicit: `exclude` = don't even attempt, `validate` = attempt but log a warning and skip if invalid. That distinction is meaningful for observability.
-YEAH I AM NOT SURE WHERE EXCLUDE VS VALIDATE CAME FROM TBH. SHOULD-SYNC SOUNDS GOOD.
-
-**Missing: `page:before` and `page:after`**
-
-There's no hook that fires at the start and end of processing a single page. This matters for:
-- Setting up per-page state that multiple hooks share via `services` (e.g., fetching a related "Issue" page from Notion once, rather than in each metadata hook)
-- Teardown / cleanup
-- Timing/tracing individual pages
-
-Without these, hooks can't efficiently share expensive Notion API calls.
-
----
-
-### `metadata:*` — Metadata Extraction
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `metadata:title` | FirstWins | ✅ Correct |
-| `metadata:tags` | Collect | ✅ Correct |
-| `metadata:authors` | Collect | ✅ Correct |
-| `metadata:summary` | FirstWins | ✅ Correct |
-| `metadata:custom` | Collect (merge objects) | ✅ Correct, but see below |
-
-SEE COMMENT ABOVE
-
-**`metadata:custom` is doing too much work.** Right now it's the escape hatch for everything california-tech cares about: `layout`, `featured`, `issueNumber`, section, print template, etc. This works but:
-
-1. There's no type safety on the `meta` JSONB bag — you get `Record<string, unknown>`
-2. There's no way for Symbiont to know what's in `meta`, which limits features like indexing or querying
-3. Multiple hooks adding to the same `meta` bag via Collect strategy risks silent key collisions THIS ONE COULD JUST BE SOLVED BY PRIORITY BASED OVERRIDE?
-
-**Missing: `metadata:status`**
-
-Publication status (`draft` | `published` | `scheduled`) is a first-class concept in any CMS. Right now it's handled implicitly via `publish:check` returning false, which excludes the page entirely. But:
-- California Tech has articles that are "submitted" or "in review" — they exist in Notion, they shouldn't sync yet, but they also shouldn't be confused with a validation error.
-- A `metadata:status` event returning a typed status enum would let the database store drafts as rows with `status = 'draft'`, enabling an editorial preview mode without a separate database.
-MY FEELING IS THAT WE DON'T NEED TO CODIFY PUBLICATION STATUS INTO SYMBIONT, IT MAKES MORE SENSE FOR THAT TO LIVE IN NOTION. I LIKE THE UI OF PUBLISH:CHECK AND PUBLISH:DATE HOOKS TO INTERPRET THAT STATUS HOWEVER THEY WANT, SINCE THOSE ARE THE ONES THAT DIRECTLY CONTROL SYMBIONT'S BEHAVIOR. THE USER CAN ADD A STATUS METADATA FIELD IF THEY WANT, BUT I DON'T THINK SYMBIONT NEEDS IT.
-
-**Missing: `metadata:date`**
-
-`publish:date` returns a date, but "publish date" conflates two things:
-- `created_at` — when the article was written/first published (often the print issue date for california-tech)
-- `updated_at` — when it was last changed (already tracked by Supabase via `updated_at` column)
-
-California-tech parses an issue date from a Notion select property and uses it as both. These should probably be separate columns / separate events. `metadata:date` could return `{ created: string, published: string }` or we just add a `metadata:created-at` event alongside `publish:date`.
-SIMILAR COMMENTS AS PREVIOUS. THE INTENTION OF THE PUBLISH:DATE HOOK IS THE TIMESTAMP THE POST SHOULD BE AVAILABLE TO THE PUBLIC. FURTHER DISTINCTIONS BETWEEN CREATED VS PUBLISHED SEEM OUT OF SCOPE FOR SYMBIONT ITSELF, AND MORE A MATTER OF HOW THE USER CHOOSES TO MODEL THEIR NOTION DATABASE AND HOOKS AND METADATA AVAILABLE TO THEIR WEBSITE.
-
----
-
-### `publish:*` — Publication
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `publish:check` | AndAll | ⚠️ See below |
-| `publish:date` | FirstWins | ✅ Mostly OK |
-
-**`publish:check` default is too permissive.** The default hook returns `true` for all pages. That means an article a Notion user leaves half-written in the database will sync. Real-world: california-tech already needed to add their own exclude logic for this. Consider making the default check for a standard `Status` or `Published` property if `publishProperty` is configured in `DatabaseBlueprint`. Opt-in defaults are better than opt-out defaults.
-PERHAPS THE DEFAULT CAN BE TO SEARCH FOR A PROPERTY OF TYPE STATUS, AND CHECK IF IT'S IN THE COMPLETED CATEGORY OF STATUSES. NOT SURE IF THAT INFO IS AVAILABLE FROM THE NOTION API THOUGH. AND FALLBACK FALSE.
-
-**`publish:date` and iso strings.** The return type is `string` — there's an implicit expectation it's an ISO 8601 string but nothing enforces it. A `Date` union type would at least make the contract explicit.
-SURE. DEFAULT VALUE CAN BE THE NOTION PAGE LAST UPDATED TIME.
-
----
-
-### `slug:*` — Slug Handling
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `slug:extract` | FirstWins | ✅ Correct |
-| `slug:generate` | FirstWins | ✅ Correct |
-| `slug:validate` | AndAll | ⚠️ Questionable |
-| `slug:transform` | FirstWins | ⚠️ Questionable |
-
-**`slug:validate` vs `slug:transform`:** These feel like they're solving the same problem in different ways. `transform` processes the slug string; `validate` says whether it's acceptable. But:
-- Validate has no way to fix a bad slug — it can only abort the page
-- Transform currently has no default implementation (returns null)
-- The combination means: the slug is generated, then transformed (if anyone registered a hook), then validated (if anyone registered a hook). The pipeline ordering is unclear.
-
-**Proposal:** Consider merging into a single `slug:finalize` event with a Waterfall strategy (see Pipeline section below) that lets hooks chain transformations, with the final result being the slug. Validation can be a boolean-returning sub-step or just a consequence of the abort mechanism.
-
-**Missing: `slug:conflict`**
-
-When slug de-duplication runs (the `ensureUniqueSlug` function in the transformer), there's no hook to customize what happens. Right now it appends `-2`, `-3`, etc. California-tech might want different behavior (e.g., error instead of silent renaming, or use the Notion page ID as a suffix).
-
-YEAH THIS NEEDS A REWORK. IT IS A BIT TRICKY MAKING SURE THE DATABASE AND THE NOTION PAGE PROPERTY (IF APPLICABLE) STAY IN SYNC. CHECK IF THERE'S ANYTHING IN THE NOTION SLUG FIELD AND SLUGIFY IT IF NECESSARY, OTHERWISE GENERATE ONE FROM THE POST TITLE, THEN CHECK AND FIX CONFLICTS, THEN SYNC BACK THE FINAL SLUG TO NOTION IF NECESSARY.
-MY INITIAL APPROACH TO THE NOTION SLUG SYNC WAS THE 'WEBSITE SLUG' FIELD IN THE SYMBIONT CONFIG, OBVIOUSLY THINGS HAVE EVOLVED SINCE THEN, BUT I THINK IN GENERAL IT COULD BE GOOD TO HAVE THOSE HIGHER LEVEL CONFIG OPTIONS THAT MAP TO COMMON HOOK USE CASES. I THINK THE SLUG CONFLICT ONE IS A GOOD EXAMPLE OF THIS. MAYBE IN THE CONFIG YOU CAN SPECIFY 'ON SLUG CONFLICT: ERROR / AUTO-RENAME / USE NOTION ID' OR WHATEVER, AND THEN SYMBIONT REGISTERS THE APPROPRIATE HOOKS UNDER THE HOOD BASED ON THAT SETTING. OR THEY CAN ALSO REGISTER THEIR OWN CUSTOM HOOK IF THEY WANT TO DO SOMETHING MORE COMPLEX.
-
----
-
-### `content:*` — Content Pipeline
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `content:fetch` | FirstWins | ⚠️ Placeholder |
-| `content:transform` | FirstWins | ✅ OK |
-| `content:images` | RunAll | ❌ Bug |
-
-**`content:fetch` is a well-intentioned placeholder with no pathway.** The comment says "content is fetched by transformer." So this event never fires in the current code. Either wire it in (fetching Notion blocks and converting to markdown happens inside this event) or remove it until it can be properly implemented. A dead event in the public API is worse than no event.
-YES I THINK WE'RE GETTING RID OF THIS ENTIRELY. FETCHING CONTENT FROM ANYWHERE ELSE BESIDES NOTION IS OUTSIDE THE SCOPE OF SYMBIONT.
-
-**`content:images` has a strategy mismatch.** The hook returns a modified markdown string (transformed content). But `RunAll` ignores return values — it's for side effects. This is a bug. The image URL substitution result gets discarded. 
-
-The right model for content transformation is a **Waterfall/Pipeline** strategy: output of hook N becomes the input of hook N+1. Neither `FirstWins` nor `RunAll` captures this. `content:transform` and `content:images` are both pipeline steps — one does semantic transforms, one does URL rewriting. They should both be pipeline events.
-
-**Missing: `content:postprocess`**
-
-Post-processing after images are uploaded but before storing: things like stripping Notion artifacts, normalizing whitespace, applying custom markdown extensions. This is currently jammed into `content:transform` (which fires before images) but ideally you want a chance to process after the full content pipeline runs.
-
-I THINK THE MAIN CONTENT HOOKS SHOULD BE CONTENT:TEXT AND CONTENT:MEDIA. POSTPROCESS COULD BE USEFUL TOO, NOT SURE. AND I DO THINK IT SHOULD BE A PIPELINE, THE NOTION PAGEOBJECTRESPONSE GOES IN AND THE FINAL MARKDOWN TO STORE IN THE DATABASE COMES OUT. MORE COMMENTS ON PIPELINE LATER.
-
----
-
-### `cover:*` — Cover Image
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `cover:extract` | FirstWins | ✅ Correct |
-| `cover:fallback` | FirstWins | ✅ Correct |
-| `cover:process` | RunAll | ❌ Same bug as content:images |
-
-**`cover:process` has the same `RunAll` mismatch.** It returns a URL but `RunAll` ignores return values. The URL transformation result is lost. This needs to be either a `FirstWins` pipeline event or use the new Pipeline strategy.
-
-**The extract/fallback two-step is slightly awkward.** The flow is: run `cover:extract`, if null run `cover:fallback`, then pipe result into `cover:process`. But this means `cover:fallback` is only called if `cover:extract` returns null — is that wired up in the transformer, or does it fall through naturally? Worth making the fallback chaining explicit in docs/comments.
-
-I'M THINKING COVER IMAGE OPERATIONS MIGHT NOT BE A CORE SYMBIONT FEATURE, OR AT LEAST NOT ONE THAT'S ALWAYS ON, SO MAYBE IT CAN BE A BUILTIN HOOK ENABLED VIA CONFIG. AND I THINK IT SHOULD BE UNDER A DIFFERENT HOOK NAME -- SAME STEP AS METADATA EXTRACTION, OR OTHER POST-PROCESSING.
-
----
-
-### `sync:*` — Write-back to Notion
-
-| Event | Strategy | Assessment |
-|---|---|---|
-| `sync:slug` | RunAll | ✅ Correct (side effect) |
-| `sync:content` | RunAll | ✅ Correct (side effect) |
-| `sync:images` | RunAll | ✅ Correct but vestigial |
-
-**`sync:images` is effectively dead code.** The comment says "covered by sync:content and cover:process." This is correct but having a registered default no-op hook that does nothing is confusing. Either remove it or have it serve a real purpose (e.g., deduplicate image upload tracking).
-
-**Missing: `sync:before` and `sync:after`** (database-level, not page-level)
-
-There's no hook for "a full sync run is starting" or "a full sync run just completed." These would be valuable for:
-- Invalidating caches (Vercel ISR revalidation, CDN purge) after a sync completes
-- Reporting sync results (send a webhook, update a status page)
-- Database cleanup (soft-delete pages that were removed from Notion)
-
-Right now all three of these live outside the hook system (or aren't implemented).
-
-CAN DEFINITELY RETHINK THIS. SYNC:IMAGES CAN GO AWAY, OR ELSE HAVE SOME STUFF FROM CONTENT:IMAGES MOVED TO IT, NOT SURE WHAT MAKES THE MOST SENSE. I LIKE THE BEFORE AND AFTER HOOKS, THERES A BUNCH OF EXISTING CODE THAT CAN MOVE INTO THOSE HOOKS TOO. 
-
----
-
-## The Missing Strategy: Waterfall/Pipeline
-
-The current `CompositionStrategy` enum is missing a critical pattern used by `content:transform` and `content:images`: **sequential pipeline where each hook's output becomes the next hook's input**.
-
-```
-// What we want for content processing:
-raw_markdown
-  → [hook: content:transform] → modified_markdown
-  → [hook: content:images] → url_replaced_markdown
-  → [hook: content:postprocess] → final_markdown
-```
-
-`RunAll` is wrong here (ignores outputs). `FirstWins` is wrong (stops at first result). We need:
+Common behaviors are expressible as config options in `DatabaseBlueprint`. Symbiont installs the appropriate built-in hook at registration time. Custom hooks with `priority: 'override'` run before config-sugar hooks; for `FirstWins` events, the first non-null result wins, so overrides naturally take precedence.
 
 ```typescript
-Pipeline, // Output of hook N becomes input of hook N+1; final hook's output is returned
-```
+interface DatabaseBlueprint {
+  slugProperty?: string | null;       // reads authored slug from AND writes final slug back to this Notion property
+  tagsProperty?: string | null;
+  authorsProperty?: string | null;
+  summaryProperty?: string | null;
+  coverProperty?: string | null;      // if set, activates cover:* hooks
 
-With Pipeline strategy, the initial `input` seeds the chain, and every hook receives the previous hook's output as its `ctx.input`. A hook returning `null` means "pass through unchanged." This is exactly how Express middleware or the Remark plugin pipeline works.
-
-**Affected events that should switch to Pipeline:**
-- `content:transform`
-- `content:images`
-- `cover:process`
-
-DEFINITELY DOWN TO BAKE THE PIPELINE INFRASTRUCTURE IN NOW, IT MAKES THE MOST SENSE FOR ALL HOOKS TO TAKE AN INPUT AND RETURN AN OUTPUT EVEN IF IT'S NULL.
-
----
-
-## Proposed Revised Event List
-
-This is the proposed revised `HOOK_EVENTS`, annotated with what's new, changed, or removed:
-
-```
-// ── Sync Lifecycle ──────────────────────────────────────
-sync:before-all          RunAll      NEW - before processing any pages in a run
-sync:after-all           RunAll      NEW - after all pages processed (receives SyncResult)
-
-// ── Page Lifecycle ──────────────────────────────────────
-page:before              RunAll      NEW - setup before processing a single page
-page:should-sync         AndAll      CHANGED - replaces page:exclude + page:validate
-page:after               RunAll      NEW - teardown/notification after page processed
-
-// ── Metadata Extraction ──────────────────────────────────
-metadata:title           FirstWins   unchanged
-metadata:status          FirstWins   NEW - 'draft' | 'published' | 'scheduled' | string
-metadata:date            FirstWins   NEW - { created: string, published?: string }
-metadata:tags            Collect     unchanged
-metadata:authors         Collect     unchanged
-metadata:summary         FirstWins   unchanged
-metadata:custom          Collect     unchanged (but better scoped: not a dumping ground)
-
-// ── Publishing ────────────────────────────────────────────
-publish:check            AndAll      unchanged (may be redundant with metadata:status)
-publish:date             FirstWins   unchanged (may be merged into metadata:date)
-
-// ── Slug Pipeline ────────────────────────────────────────
-slug:extract             FirstWins   unchanged
-slug:generate            FirstWins   unchanged
-slug:finalize            Pipeline    CHANGED - replaces slug:validate + slug:transform
-slug:conflict            FirstWins   NEW - called when a slug collision is detected
-
-// ── Content Pipeline ─────────────────────────────────────
-content:transform        Pipeline    CHANGED strategy from FirstWins to Pipeline
-content:images           Pipeline    CHANGED strategy from RunAll to Pipeline
-content:postprocess      Pipeline    NEW - final pass after image URLs resolved
-
-// ── Cover Pipeline ───────────────────────────────────────
-cover:extract            FirstWins   unchanged
-cover:fallback           FirstWins   unchanged
-cover:process            Pipeline    CHANGED strategy from RunAll to Pipeline
-
-// ── Notion Write-back ────────────────────────────────────
-sync:slug                RunAll      unchanged
-sync:content             RunAll      unchanged
-// sync:images           REMOVED     vestigial no-op
+  onSlugConflict?: 'auto-rename' | 'error' | 'use-page-id';  // default: 'auto-rename'
+}
 ```
 
 ---
 
-## Open Questions for Iteration
+## HookContext
 
-1. **`publish:check` + `metadata:status`:** Do we need both? If `metadata:status` returns `'draft'`, the system could automatically skip syncing. `publish:check` becomes redundant. Or keep `publish:check` as the explicit gate and have `metadata:status` merely inform the stored row.
-
-2. **`page:should-sync` vs `page:exclude` + `page:validate`:** Is collapsing them a breaking change we want to make now, or keep backward compat?
-
-3. **`publication:date` vs `metadata:date`:** Are publish date and created date always the same for california-tech (they derive one from the issue)? Or do they need to be tracked separately?
-
-4. **`sync:before-all` / `sync:after-all` input types:** What data should they receive? Probably the list of `PageObjectResponse` to process (before) and the `SyncResult[]` (after).
-
-5. **Pipeline strategy exit condition:** If a Pipeline hook returns `null`, does that mean "pass through" or "abort pipeline"? The natural choice is pass-through (null = identity transform), but we should be explicit. YEAH, NULL SHOULD MEAN PASS-THROUGH, ABORTING CAN BE DONE BY THROWING AN ERROR
-
-6. **`page:before` shared state:** How do hooks share expensive per-page data (e.g., a resolved Issue page fetched from Notion)? The `services` object is the natural place (mutable), but that's a bit loose. Alternatively, `HookContext` could include an `state: Record<string, unknown>` that's per-page and reset between pages. I THINK THIS CAN BE SOLVED WITH THE SAME INFRASTRUCTURE AS THE PIPELINE?
-
----
-
-## What California Tech's Hooks Would Look Like (Post-Changes)
-
-This is the concrete smoke test — does the revised API let california-tech express everything they need cleanly?
+Every hook receives the same context shape — `HookContext` is non-generic:
 
 ```typescript
-hooks: [
-  // Exclude pages without a published checkbox
-  {
-    name: 'caltech:page:should-sync',
-    event: 'page:should-sync',
-    fn: (ctx) => {
-      const status = ctx.page.properties.Status?.select?.name;
-      return status === 'Published' || status === 'Approved';
-    }
-  },
-
-  // Derive publish date from the Issue select property
-  {
-    name: 'caltech:publish:date',
-    event: 'publish:date',
-    priority: 'override',
-    fn: (ctx) => {
-      const issue = ctx.page.properties.Issue?.select?.name;
-      if (!issue) return ctx.page.properties['Website Publish Date']?.date?.start ?? null;
-      const match = issue.match(/(\w+)\s+(\d+),\s+(\d{4})/);
-      if (!match) return null;
-      // ... parse and return ISO string
-    }
-  },
-
-  // Read manually-set slug from Notion property
-  {
-    name: 'caltech:slug:extract',
-    event: 'slug:extract',
-    priority: 'override',
-    fn: (ctx) => ctx.page.properties['Website Slug']?.rich_text?.[0]?.plain_text?.trim() ?? null
-  },
-
-  // Attach newspaper-specific metadata
-  {
-    name: 'caltech:metadata:custom',
-    event: 'metadata:custom',
-    fn: (ctx) => ({
-      layout: ctx.page.properties.Layout?.select?.name ?? 'standard',
-      featured: ctx.page.properties.Featured?.checkbox ?? false,
-      issueNumber: ctx.page.properties.Issue?.select?.name ?? null,
-      section: ctx.page.properties.Section?.select?.name ?? null,
-      printTemplate: ctx.page.properties['Print Template']?.select?.name ?? null,
-    })
-  },
-
-  // Invalidate Vercel ISR after sync completes
-  {
-    name: 'caltech:sync:after-all',
-    event: 'sync:after-all',
-    continueOnError: true,
-    fn: async (ctx) => {
-      await fetch(`https://api.vercel.com/v1/integrations/deploy/${REVALIDATE_HOOK}`);
-    }
-  }
-]
+interface HookContext {
+  page: PageObjectResponse;                // raw Notion source
+  output: Readonly<Partial<DatabasePage>>; // accumulated output so far (read-only)
+  input?: unknown;                         // Pipeline: current value in chain; slug:conflict: current slug
+  // content:preprocess: ctx.input is BlockObjectResponse[]; hook returns MdBlock[] | null
+  config: DatabaseBlueprint;
+  logger: Logger;
+  services: {
+    notionClient?: NotionClient;
+    supabase?: SupabaseClient<Database>;
+    [key: string]: unknown;                // custom services for custom hooks
+  };
+  abort: (reason: string) => void;
+}
 ```
 
-This is clean, legible, and entirely within california-tech's config. No Symbiont internals need to know about issues, sections, or print templates.
+`ctx.page` is the raw Notion source — never mutated. `ctx.output` is a frozen (read-only) view of the `DatabasePage` being assembled — the transformer maintains a mutable version of this same object (also called `output` internally) and the registry freezes it before passing it to each hook as `ctx.output`. Read it to avoid recomputing what earlier hooks already resolved, but don't write to it directly. Hooks return their contribution; the registry merges it per the event's composition strategy and writes the result into `output[event.field]`.
+
+**Hook return values:** return the contribution value, or `null` to contribute nothing (or pass-through in Pipeline). The registry uses the event's `field` to write the result into `output`. Events without a `field` produce values used only for flow control (`AndAll`) or have no meaningful return (`RunAll`/void).
 
 ---
 
-## Summary of Recommended Changes
+## Composition Strategies
 
-| Priority | Change | Reason |
-|---|---|---|
-| 🔴 Bug | `content:images` → Pipeline strategy | RunAll discards return values |
-| 🔴 Bug | `cover:process` → Pipeline strategy | Same issue |
-| 🟠 Design | Add `Pipeline` to `CompositionStrategy` | Required for transform chains |
-| 🟠 Design | Add `page:before` / `page:after` | Shared state across per-page hooks |
-| 🟠 Design | Add `sync:before-all` / `sync:after-all` | Cache invalidation, reporting |
-| 🟡 Cleanup | Remove `sync:images` | Registered no-op is confusing |
-| 🟡 Cleanup | Wire or remove `content:fetch` | Dead event in current code |
-| 🟡 Design | Add `metadata:status` | First-class publication status |
-| 🟡 Design | Add `slug:conflict` | Slug collision customization |
-| 🟢 Consider | Collapse `page:exclude` + `page:validate` | Eliminate semantic ambiguity |
-| 🟢 Consider | Add `metadata:date` | Separate created vs. published date |
+The `e()` helper in `HOOK_EVENTS` becomes `e<TReturn>(strategy, field?)` where:
+- `TReturn` — the type hook functions must return (or `null`)
+- `field` — the `keyof DatabasePage` the registry writes the result into; omitted for flow-control events (`AndAll`) and side-effect events (`RunAll`/void)
+
+```typescript
+enum CompositionStrategy {
+  FirstWins,   // stop at first non-null result
+  Collect,     // accumulate all results; objects are merged, arrays are concatenated
+  OrAll,       // boolean OR across all results
+  AndAll,      // boolean AND across all results
+  RunAll,      // run all; ignore return values (side effects)
+  Pipeline,    // chain: each hook's return value becomes the next hook's input; null = pass-through
+}
+```
+
+**Pipeline:** within a single event, if multiple hooks are registered, each hook's return value becomes the next hook's input for that event. `null` means pass-through (current value unchanged). Throwing aborts. This is strictly within-event chaining — between-event sequencing is handled by the ordering contract below (the transformer fires events in order; each event reads from `ctx.output` which prior events have built).
+
+Priority for Pipeline hooks determines **position in the transform chain**, not who gets to contribute. Every registered hook executes — `null` passes the value through but doesn't skip the hook. `priority: 'override'` runs first (sees the raw value before defaults); `priority: 'fallback'` runs last (sees the fully-transformed result). This is different from `FirstWins` where lower-priority hooks are never reached once a value is returned.
+
+- `content:preprocess` — `FirstWins` over `ctx.input` (`BlockObjectResponse[]`); returns `MdBlock[]`; no `field`. The default hook runs n2m. An override hook returns its own `MdBlock[]` and the default never runs. The transformer reads the return value directly to feed the bridge step.
+- `content:text`, `content:media`, `content:postprocess` — each is its own event; within each event, multiple hooks chain over the current `ctx.input` string (the `content` field in progress)
+- `cover:process` — chains over `ctx.input` (the cover URL in progress)
+
+---
+
+## Event Ordering Contract
+
+The transformer fires events in this exact order. Each row shows which fields of `ctx.output` are guaranteed to be populated when that event fires.
+
+`onBeforeSync` / `onAfterSync` are lifecycle callbacks on `DatabaseBlueprint` (not hookable events) — they fire once per sync run before/after all pages are processed.
+
+```
+page:before           {}                                                   (ctx.output is empty — start of page)
+page:should-sync      {}
+publish:check         {}
+publish:date          {}
+slug:extract          {}
+slug:generate         {}
+slug:conflict         { slug }                                             (ctx.input = current slug)
+slug:sync             { slug }                                             (write-back to Notion)
+metadata:title        { slug }
+metadata:tags         { slug, title }
+metadata:authors      { slug, title, tags }
+metadata:summary      { slug, title, tags, authors }
+metadata:custom       { slug, title, tags, authors, summary }
+content:preprocess    { slug, title, tags, authors, summary, meta }        (ctx.input = BlockObjectResponse[])
+content:text          { ..., content: string (raw markdown) }              (ctx.input = current content)
+content:media         { ..., content: string (text-transformed) }          (ctx.input = current content)
+content:postprocess   { ..., content: string (media-resolved) }            (ctx.input = current content)
+content:sync          { ..., content: string (final) }                     (write-back to Notion)
+cover:extract         { ..., content: string (final) }                    (default hook falls back to content scan if no match)
+cover:process         { ..., content, cover }                              (ctx.input = current cover URL)
+cover:sync            { ..., content, cover }                              (write-back to Notion)
+page:after            { slug, title, tags, authors, summary, content, cover, meta, publish_at, ... }
+```
+
+Hooks must only read fields listed as available at their stage. This ordering is a stable API contract.
+
+---
+
+## Complete Event List
+
+```typescript
+export const HOOK_EVENTS = {
+  // ── Page Lifecycle ─────────────────────────────────────────────────
+  // Run lifecycle (onBeforeSync / onAfterSync) lives on DatabaseBlueprint, not here.
+  'page:before':          e<void>(S.RunAll),
+  'page:should-sync':     e<boolean>(S.AndAll),             // flow control — no field
+  'page:after':           e<void>(S.RunAll),
+
+  // ── Publishing ─────────────────────────────────────────────────────
+  'publish:check':        e<boolean>(S.AndAll),             // flow control — no field
+  'publish:date':         e<string|Date>(S.FirstWins,       'publish_at'),
+
+  // ── Slug Pipeline ──────────────────────────────────────────────────
+  'slug:extract':         e<string>(S.FirstWins,            'slug'),
+  'slug:generate':        e<string>(S.FirstWins,            'slug'),
+  'slug:conflict':        e<string>(S.FirstWins,            'slug'),  // receives current slug, returns resolved slug
+  'slug:sync':            e<void>(S.RunAll),                // side effect — no field
+
+  // ── Metadata Extraction ────────────────────────────────────────────
+  'metadata:title':       e<string>(S.FirstWins,            'title'),
+  'metadata:tags':        e<string[]>(S.Collect,            'tags'),
+  'metadata:authors':     e<string[]>(S.Collect,            'authors'),
+  'metadata:summary':     e<string>(S.FirstWins,            'summary'),
+  'metadata:custom':      e<Record<string,unknown>>(S.Collect, 'meta'),  // merged into output.meta
+
+  // ── Content Pipeline ───────────────────────────────────────────────
+  'content:preprocess':   e<MdBlock[]>(S.FirstWins),                              // ctx.input = BlockObjectResponse[]; no field
+  'content:text':         e<string>(S.Pipeline,             'content'),
+  'content:media':        e<string>(S.Pipeline,             'content'),
+  'content:postprocess':  e<string>(S.Pipeline,             'content'),
+  'content:sync':         e<void>(S.RunAll),                // side effect — no field
+
+  // ── Cover Pipeline (config-gated via coverProperty) ────────────────
+  'cover:extract':        e<string>(S.FirstWins,            'cover'),  // default hook falls back to scanning content if no coverProperty match
+  'cover:process':        e<string>(S.Pipeline,             'cover'),
+  'cover:sync':           e<void>(S.RunAll),                // side effect — no field
+
+  // REMOVED: page:exclude, page:validate (→ page:should-sync)
+  // REMOVED: sync:slug (→ slug:sync), sync:cover (→ cover:sync), sync:content (→ content:sync)
+  // REMOVED: sync:images (no-op), content:fetch (content always from Notion)
+  // REMOVED: sync:before-all, sync:after-all (→ onBeforeSync/onAfterSync on DatabaseBlueprint)
+  // REMOVED: cover:fallback (folded into default cover:extract hook — no conditional firing needed)
+  // NOT ADDED: slug:finalize (normalization belongs in slug:generate)
+} as const;
+```
+
+---
+
+## `publish:check` Default Implementation
+
+1. Call `databases.retrieve()` for the database once per sync run (cache the result)
+2. Find any property with `type: 'status'`
+3. Find the group with `name === 'Complete'` (Notion group names are fixed — not user-renameable)
+4. Check if the page's selected option ID appears in `group.option_ids`
+5. Fallback when no status property exists: return `false` (opt-in, not opt-out)
+
+---
+
+## California Tech Example
+
+```typescript
+{
+  alias: 'tech-article-staging',
+  dataSourceId: NOTION_DATABASE_ID,
+  slugProperty: 'Website Slug',
+  coverProperty: 'Cover Image',
+  tagsProperty: 'Tags',
+  authorsProperty: 'Authors',
+  summaryProperty: 'Summary',
+  onSlugConflict: 'auto-rename',
+
+  hooks: [
+    // Override page:should-sync — only "Ready to Print" and "Published" should sync.
+    // "Shelved" is also in the Complete group but must not sync.
+    {
+      name: 'caltech:page:should-sync',
+      event: 'page:should-sync',
+      priority: 'override',
+      fn: (ctx) => {
+        const status = ctx.page.properties.Status?.status?.name;
+        return status === 'Ready to Print' || status === 'Published';
+      }
+    },
+
+    // Derive publish date from the Issue select property ("October 21, 2024")
+    {
+      name: 'caltech:publish:date',
+      event: 'publish:date',
+      priority: 'override',
+      fn: (ctx) => {
+        const issue = ctx.page.properties.Issue?.select?.name;
+        if (!issue) return ctx.page.properties['Website Publish Date']?.date?.start ?? null;
+        const match = issue.match(/(\w+)\s+(\d+),\s+(\d{4})/);
+        if (!match) return null;
+        // parse month name to index, return ISO string...
+      }
+    },
+
+    // Attach newspaper-specific fields to the meta JSONB column
+    {
+      name: 'caltech:metadata:custom',
+      event: 'metadata:custom',
+      fn: (ctx) => ({
+        layout: ctx.page.properties.Layout?.select?.name ?? 'standard',
+        featured: ctx.page.properties.Featured?.checkbox ?? false,
+        issueNumber: ctx.page.properties.Issue?.select?.name ?? null,
+        section: ctx.page.properties.Section?.select?.name ?? null,
+        printTemplate: ctx.page.properties['Print Template']?.select?.name ?? null,
+      })
+    },
+  ],
+
+  // Invalidate Vercel ISR after a sync run completes (run-level lifecycle, not a hook)
+  onAfterSync: async () => {
+    await fetch(`https://api.vercel.com/v1/integrations/deploy/${REVALIDATE_HOOK}`);
+  },
+}
+```
+
+Four hooks. Everything else is config.
+
+---
+
+## Implementation Scope
+
+**Memo revision:** February 24, 2026 — design review complete.
+
+### Decisions Locked In
+
+**`slug:conflict` always fires.** The transformer fires it unconditionally after `slug:generate`, passing the candidate slug as `ctx.input`. The default hook reads `config.onSlugConflict`:
+- `'auto-rename'` (default) — appends `-2`, `-3`, etc. until unique; falls back to random suffix after 100 attempts
+- `'error'` — throws; transformer catches and skips the page
+- `'use-page-id'` — returns `${slug}-${page.id.slice(0, 8)}`
+
+All three strategies require a Supabase lookup — the default `slug:conflict` hook uses `ctx.services.supabase`.
+
+**`field` in `e()` is runtime.** The registry owns writing results to the `DatabasePage` output object. After each event resolves, the registry writes `result → output[event.field]`. Events without a `field` (side-effect events, flow-control events) do not trigger a write.
+
+**`publish:check` default is opt-in.** The default hook queries the Notion database's Status property definition (cached per sync run), finds the `'Complete'` group, and checks if the page's status option ID is in `group.option_ids`. If no Status property exists, returns `false`. This means pages are dark by default — they exist in the DB but `publish_at` is null until explicitly marked complete.
+
+**Transformer owns fetch + persist; hooks own everything in between.** The transformer has two responsibilities beyond sequencing events: (1) it fetches raw `BlockObjectResponse[]` from the Notion API and passes them as `ctx.input` when firing `content:preprocess` — the default hook calls n2m to convert them to `MdBlock[]`, and a custom `override`-priority hook can swap the converter entirely; (2) after `content:preprocess` resolves, it takes the final `MdBlock[]` and converts them to a markdown string to feed into `content:text` as `ctx.input` — this bridge step is fixed and not hookable. The transformer also performs the final Supabase upsert after `page:after`. All extraction, business logic, and write-back lives in default hooks. `ctx.services` exists because hooks themselves need external systems: image uploads in `content:media`, slug uniqueness checks in `slug:conflict`, write-backs to Notion in `slug:sync` / `cover:sync` / `content:sync`.
+
+---
+
+### File-by-File Implementation
+
+#### `src/lib/hooks/types.ts`
+
+- Add `Pipeline` to `CompositionStrategy` enum
+- Change `e()` helper signature to `e<TReturn>(strategy: CompositionStrategy, field?: keyof DatabasePage)` — drop the two-type-param form
+- Add `field?: keyof DatabasePage` to the object returned by `e()`
+- Replace `HOOK_EVENTS` wholesale with the final list from this memo
+- Add `ctx.output: Readonly<Partial<DatabasePage>>` to `HookContext`
+- Remove `ctx.blocks` — no longer needed. `content:preprocess` is FirstWins: the transformer passes `BlockObjectResponse[]` as `input` when calling `execute()`, the default hook returns `MdBlock[]`, and the transformer reads that return value directly. No chaining.
+- Change `ctx.input?: unknown` — keep as-is; Pipeline and slug:conflict events populate it
+- Remove `OrAll` from built-in events (no events use it; keep enum value in case it's useful later)
+- Remove `EventSignatures` derived type — replace with simpler direct inference from `HOOK_EVENTS`
+- Remove two-type-param `HookFunction` — simplify to `HookFunction<TReturn>`
+
+#### `src/lib/hooks/registry.ts`
+
+- Add `executePipeline(hooks, initialValue, output, state, abort, field?)`:
+  - `initialValue` is `ctx.input` for the first hook
+  - Each hook's non-null return becomes the next hook's `ctx.input`; `null` = pass-through (current value unchanged)
+  - After the chain, if `field` is set, writes final value to `output[field]`
+  - Handles `content:text`, `content:media`, `content:postprocess`, `cover:process` — note that `content:preprocess` is FirstWins and is handled by `executeFirstWins`, not this method
+- Update `execute()` to accept the mutable output object and pass it as `ctx.output` (frozen):
+  ```typescript
+  async execute<E extends HookEvent>(
+    event: E,
+    output: Partial<DatabasePage>,
+    page: PageObjectResponse,
+    input?: unknown
+  ): Promise<unknown>  // always returns the final composed value
+  ```
+- After each strategy's execution, write `result → output[HOOK_EVENTS[event].field]` if `field` is defined and result is non-null. Always return the result — the transformer uses return values in several places: boolean results from `page:should-sync` and `publish:check` control whether processing continues; `MdBlock[]` from `content:preprocess` feeds the bridge step. Most other events the transformer ignores the return value since it already landed in `output`.
+- Update `buildContext()` to accept and freeze `output` as `ctx.output`
+- Add `Pipeline` case to the strategy switch
+
+#### `src/lib/types.ts`
+
+- Rename `slugSyncProperty` → `slugProperty` in `DatabaseBlueprint` (reads authored slug from AND writes final slug back to this Notion property)
+- Add `onSlugConflict?: 'auto-rename' | 'error' | 'use-page-id'` to `DatabaseBlueprint` (default: `'auto-rename'`)
+- Add `onBeforeSync?: () => Promise<void>` to `DatabaseBlueprint`
+- Add `onAfterSync?: () => Promise<void>` to `DatabaseBlueprint`
+- Add `cover` as a first-class optional column to `DatabasePage` (currently stored in `meta.cover` — schema debt: fix the Supabase migration to add a dedicated `cover` column)
+- `publish_at` is already the correct DB column name — the memo now uses this consistently; no rename needed
+
+#### `src/lib/server/notion/page-transformer.ts`
+
+Full rewrite. The transformer becomes a thin ordered sequencer:
+
+1. Maintain a mutable `output: Partial<DatabasePage>` initialized with `page_id`, `datasource_id`, `datasource_alias`, `updated_at`
+2. The registry freezes `output` before passing it as `ctx.output` on each `execute()` call
+3. Fire events in the exact order from the Event Ordering Contract in this memo. Two conditionals:
+   - If `page:should-sync` returns falsy: skip the entire page — return `null` immediately, no DB write
+   - If `publish:check` returns falsy: skip `publish:date` only — `publish_at` stays null in the output, but slug / content / cover all still process normally. The page lands in the DB as a dark draft, fully populated, ready to go live the moment it passes `publish:check` on the next sync
+4. For `content:preprocess`: fetch raw blocks via `notionClient.getBlocks(page.id)`, pass as `input` when firing the event, use the return value (`MdBlock[]`) to do the fixed markdown bridge — convert `MdBlock[]` to string — then pass that string as `input` to `content:text`. This bridge step is the only logic that lives between two events in the sequence.
+5. After `page:after`: validate that `output.title` and `output.slug` are non-null (required fields); log and return `null` if not
+6. Perform Supabase upsert with the assembled `output`
+7. `onBeforeSync` / `onAfterSync` are called by the coordinator one level up, not by the transformer
+
+All helper methods (`resolveSlug`, `extractCoreMetadata`, `processCoverImage`, `processContentAndUploadImages`, `buildMetadata`, `ensureUniqueSlug`, `shouldExclude`, `shouldPublish`) are **deleted** — their logic migrates into default hooks.
+
+Note: the transformer reads return values from `execute()` in two cases — `page:should-sync` and `publish:check` return booleans that gate further processing; `content:preprocess` returns `MdBlock[]` needed for the bridge step. All other `execute()` calls ignore the return value since results land in `output` automatically.
+
+#### `src/lib/hooks/default-hooks.ts`
+
+Rewrite all existing hooks to match new event names. Add new default hooks:
+
+- `symbiont:page:before` — no-op (RunAll)
+- `symbiont:page:should-sync` — returns `true` by default (AndAll; all pages sync unless a user hook says otherwise)
+- `symbiont:page:after` — no-op (RunAll)
+- `symbiont:publish:check` — query Notion Status property definition, check `'Complete'` group, return `false` if no Status property exists; cache the DB schema lookup per sync run via a module-scoped Map keyed by `dataSourceId`
+- `symbiont:slug:extract` — reads `ctx.config.slugProperty` from Notion if configured
+- `symbiont:slug:generate` — checks `ctx.output.slug` first; returns `null` if already set by `slug:extract`. Otherwise generates from title using `createSlug()`. This is the correct pattern for avoiding silent overwrite: the default hook defers to whatever an earlier event already resolved
+- `symbiont:slug:conflict` — reads `ctx.config.onSlugConflict`, performs uniqueness check via `ctx.services.supabase`; default `'auto-rename'`
+- `symbiont:slug:sync` — writes resolved slug back to Notion via `ctx.services.notionClient` if `ctx.config.slugProperty` is set (RunAll, side effect)
+- `symbiont:content:preprocess` — calls n2m to convert `ctx.input` (`BlockObjectResponse[]`) to `MdBlock[]` and returns the result; FirstWins. An `override`-priority hook can return a custom `MdBlock[]` and the default never runs.
+- `symbiont:content:text` — default hook is pass-through (returns `ctx.input` as-is); Pipeline. Note: the `MdBlock[]` → string conversion is done by the transformer as a fixed bridge step *before* this event fires — `content:text` always receives a string as `ctx.input`, never blocks. User hooks that want to transform the raw markdown string (strip sections, rewrite headings, etc.) register here with `priority: 'override'`
+- `symbiont:content:media` — uploads inline images to Supabase Storage, rewrites URLs; uses `ctx.services.supabase`; Pipeline
+- `symbiont:content:postprocess` — no-op Pipeline
+- `symbiont:content:sync` — writes the final markdown (with Supabase-permanentized image URLs) back to Notion as blocks using the martian fork (`packages/markdown-to-notion`); this is an **idempotency mechanism**, not bidirectional content sync — without it, Notion still holds expiring CDN image URLs and every subsequent sync re-uploads the same images. Default behavior is always-on (RunAll). Uses `ctx.services.notionClient`.
+- `symbiont:cover:extract` — reads `ctx.config.coverProperty` from Notion files property if configured; if null, falls back to scanning `ctx.output.content` for the first image URL. Fallback logic is in the same default hook — no separate event needed
+- `symbiont:cover:process` — uploads cover image to Supabase Storage, rewrites URL; uses `ctx.services.supabase`; Pipeline
+- `symbiont:cover:sync` — no-op by default (RunAll); user hooks can write processed URL back to Notion
+- Remove `page:exclude`, `page:validate`, `slug:validate`, `slug:transform`, `content:fetch`, `content:transform`, `content:images`, `sync:slug`, `sync:content`, `sync:images`, `cover:fallback` — these event names no longer exist
+
