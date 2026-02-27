@@ -1,7 +1,7 @@
 import type { PageObjectResponse } from '@notionhq/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { HookEvent, Hook, HookContext, HookExecutionState, EventSignatures } from './types.js';
-import type { DatabaseBlueprint } from '../types.js';
+import type { HookEvent, Hook, HookContext, HookExecutionState } from './types.js';
+import type { DatabaseBlueprint, DatabasePage } from '../types.js';
 import { HOOK_EVENTS, CompositionStrategy } from './types.js';
 
 /**
@@ -115,26 +115,28 @@ export class HookRegistry {
 	 * Execute all hooks for a given event.
 	 * 
 	 * The execution strategy is determined by the event's composition strategy.
+	 * After composition, writes result to output[field] if field is defined.
 	 * 
 	 * @param event - The hook event to execute
+	 * @param output - Mutable output object being assembled
 	 * @param page - The Notion page being processed
-	 * @param input - Optional pipeline input (for events that declare it)
+	 * @param input - Optional pipeline input (for Pipeline events, slug:conflict, content:preprocess)
 	 * @returns Composed result from all hooks
 	 */
 	async execute<E extends HookEvent>(
 		event: E,
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
-		...args: EventSignatures[E]['input'] extends never ? [] : [EventSignatures[E]['input']]
-	): Promise<EventSignatures[E]['output'] | null> {
+		input?: unknown
+	): Promise<unknown> {
 		const hooks = this.hooks.get(event) || [];
-		const input = args.length > 0 ? args[0] : undefined;
 
 		if (hooks.length === 0) {
 			this.logger.debug({
 				event: 'no_hooks_registered',
 				hookEvent: event
 			});
-			return null as any;
+			return null;
 		}
 
 		this.logger.debug({
@@ -155,23 +157,41 @@ export class HookRegistry {
 			state.abortReason = reason;
 		};
 
-		const strategy = HOOK_EVENTS[event]?.strategy || CompositionStrategy.FirstWins;
+		const eventDef = HOOK_EVENTS[event];
+		const strategy = eventDef.strategy;
+		const field = eventDef.field;
 
 		// Execute based on composition strategy
+		let result: unknown;
 		switch (strategy) {
 			case CompositionStrategy.FirstWins:
-				return await this.executeFirstWins(hooks, page, input, state, abort) as any;
+				result = await this.executeFirstWins(hooks, output, page, input, state, abort);
+				break;
 			case CompositionStrategy.Collect:
-				return await this.executeCollect(hooks, page, input, state, abort) as any;
+				result = await this.executeCollect(hooks, output, page, input, state, abort);
+				break;
 			case CompositionStrategy.OrAll:
-				return await this.executeOrAll(hooks, page, input, state, abort) as any;
+				result = await this.executeOrAll(hooks, output, page, input, state, abort);
+				break;
 			case CompositionStrategy.AndAll:
-				return await this.executeAndAll(hooks, page, input, state, abort) as any;
+				result = await this.executeAndAll(hooks, output, page, input, state, abort);
+				break;
 			case CompositionStrategy.RunAll:
-				return await this.executeRunAll(hooks, page, input, state, abort) as any;
+				result = await this.executeRunAll(hooks, output, page, input, state, abort);
+				break;
+			case CompositionStrategy.Pipeline:
+				result = await this.executePipeline(hooks, output, page, input, state, abort);
+				break;
 			default:
 				throw new Error(`Unknown composition strategy: ${strategy}`);
 		}
+
+		// Write result to output[field] if field is defined and result is non-null
+		if (field && result !== null && result !== undefined) {
+			(output as any)[field] = result;
+		}
+
+		return result;
 	}
 
 	/**
@@ -180,6 +200,7 @@ export class HookRegistry {
 	 */
 	private async executeFirstWins(
 		hooks: Hook[],
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -191,20 +212,20 @@ export class HookRegistry {
 			}
 
 			try {
-				const context = this.buildContext(page, input, state, abort);
-				const output = await hook.fn(context);
+				const context = this.buildContext(output, page, input, state, abort);
+				const result = await hook.fn(context);
 
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				if (output !== null && output !== undefined) {
+				if (result !== null && result !== undefined) {
 					this.logger.debug({
 						event: 'hook_executed_first_wins',
 						hookName: hook.name,
 						hasResult: true
 					});
-					return output;
+					return result;
 				}
 
 				this.logger.debug({
@@ -227,6 +248,7 @@ export class HookRegistry {
 	 */
 	private async executeCollect(
 		hooks: Hook[],
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -241,14 +263,14 @@ export class HookRegistry {
 			}
 
 			try {
-				const context = this.buildContext(page, input, state, abort);
-				const output = await hook.fn(context);
+				const context = this.buildContext(output, page, input, state, abort);
+				const hookResult = await hook.fn(context);
 
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				if (output === null || output === undefined) {
+				if (hookResult === null || hookResult === undefined) {
 					this.logger.debug({
 						event: 'hook_returned_null',
 						hookName: hook.name
@@ -258,18 +280,18 @@ export class HookRegistry {
 
 				// Determine result type on first non-null output
 				if (resultType === null) {
-					resultType = Array.isArray(output) ? 'array' : 'object';
+					resultType = Array.isArray(hookResult) ? 'array' : 'object';
 				}
 
 				// Compose based on type
 				if (resultType === 'array') {
-					result = result === null ? output : [...result, ...output];
+					result = result === null ? hookResult : [...result, ...hookResult];
 					this.logger.debug({
 						event: 'hook_executed_concatenated',
 						hookName: hook.name
 					});
 				} else {
-					result = { ...result, ...output };
+					result = { ...result, ...hookResult };
 					this.logger.debug({
 						event: 'hook_executed_merged',
 						hookName: hook.name
@@ -291,6 +313,7 @@ export class HookRegistry {
 	 */
 	private async executeOrAll(
 		hooks: Hook[],
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -304,20 +327,20 @@ export class HookRegistry {
 			}
 
 			try {
-				const context = this.buildContext(page, input, state, abort);
-				const output = await hook.fn(context);
+				const context = this.buildContext(output, page, input, state, abort);
+				const result = await hook.fn(context);
 
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				if (output === true) {
+				if (result === true) {
 					hasTrue = true;
 					this.logger.debug({
 						event: 'hook_voted_true',
 						hookName: hook.name
 					});
-				} else if (output === false) {
+				} else if (result === false) {
 					this.logger.debug({
 						event: 'hook_voted_false',
 						hookName: hook.name
@@ -344,6 +367,7 @@ export class HookRegistry {
 	 */
 	private async executeAndAll(
 		hooks: Hook[],
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -357,20 +381,20 @@ export class HookRegistry {
 			}
 
 			try {
-				const context = this.buildContext(page, input, state, abort);
-				const output = await hook.fn(context);
+				const context = this.buildContext(output, page, input, state, abort);
+				const result = await hook.fn(context);
 
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
 				}
 
-				if (output === false) {
+				if (result === false) {
 					hasFalse = true;
 					this.logger.debug({
 						event: 'hook_voted_false',
 						hookName: hook.name
 					});
-				} else if (output === true) {
+				} else if (result === true) {
 					this.logger.debug({
 						event: 'hook_voted_true',
 						hookName: hook.name
@@ -397,6 +421,7 @@ export class HookRegistry {
 	 */
 	private async executeRunAll(
 		hooks: Hook[],
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -408,7 +433,7 @@ export class HookRegistry {
 			}
 
 			try {
-				const context = this.buildContext(page, input, state, abort);
+				const context = this.buildContext(output, page, input, state, abort);
 				await hook.fn(context);
 
 				if (state.aborted) {
@@ -428,9 +453,62 @@ export class HookRegistry {
 	}
 
 	/**
+	 * Execute hooks with pipeline strategy.
+	 * Chain: each hook's return becomes next hook's input; null = pass-through.
+	 */
+	private async executePipeline(
+		hooks: Hook[],
+		output: Partial<DatabasePage>,
+		page: PageObjectResponse,
+		initialValue: unknown,
+		state: HookExecutionState,
+		abort: (reason: string) => void
+	): Promise<unknown> {
+		let currentValue = initialValue;
+
+		for (const hook of hooks) {
+			if (state.aborted) {
+				this.throwAbort(hook, state);
+			}
+
+			try {
+				const context = this.buildContext(output, page, currentValue, state, abort);
+				const result = await hook.fn(context);
+
+				if (state.aborted) {
+					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
+				// null = pass-through (keep current value)
+				if (result !== null && result !== undefined) {
+					currentValue = result;
+					this.logger.debug({
+						event: 'pipeline_hook_transformed',
+						hookName: hook.name,
+						hasResult: true
+					});
+				} else {
+					this.logger.debug({
+						event: 'pipeline_hook_passthrough',
+						hookName: hook.name
+					});
+				}
+			} catch (error) {
+				if (!this.handleHookError(hook, error, state)) {
+					throw error;
+				}
+			}
+		}
+
+		return currentValue;
+	}
+
+	/**
 	 * Build hook context.
+	 * Freezes output to make it read-only for hooks.
 	 */
 	private buildContext(
+		output: Partial<DatabasePage>,
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
@@ -438,10 +516,11 @@ export class HookRegistry {
 	): HookContext {
 		return {
 			page,
+			output: Object.freeze({ ...output }), // Freeze to prevent mutation
+			input,
 			config: this.config,
 			logger: this.logger,
 			services: this.services,
-			input,
 			abort
 		};
 	}

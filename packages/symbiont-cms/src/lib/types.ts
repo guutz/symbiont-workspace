@@ -75,11 +75,13 @@ type DatabasePageRaw = Database['public']['Tables']['pages']['Row'];
  * - tags: string[] (array of tag names)
  * - authors: string[] (array of author names)
  * - meta: Record<string, any> (flexible metadata object)
+ * - cover: string (cover image URL) - schema debt: should be dedicated column, currently in meta
  */
 export interface DatabasePage extends Omit<DatabasePageRaw, 'tags' | 'authors' | 'meta'> {
 	tags: string[] | null;
 	authors: string[] | null;
 	meta: Record<string, any> | null;
+	cover?: string | null; // Optional until schema migration adds dedicated column
 }
 
 /**
@@ -146,8 +148,35 @@ export interface DatabaseBlueprint {
     // SLUG CONFIGURATION
     // ============================================
 
-    /** Notion property name to sync generated slugs back to */
-    slugSyncProperty?: string | null;
+    /**
+     * Notion property name to read authored slug from AND write final slug back to.
+     * Renamed from slugSyncProperty for clarity.
+     */
+    slugProperty?: string | null;
+
+    /**
+     * Strategy for handling slug conflicts.
+     * - 'auto-rename': Append -2, -3, etc. until unique (default)
+     * - 'error': Throw error and skip page
+     * - 'use-page-id': Append short page ID
+     */
+    onSlugConflict?: 'auto-rename' | 'error' | 'use-page-id';
+
+    // ============================================
+    // LIFECYCLE CALLBACKS
+    // ============================================
+
+    /**
+     * Called once per sync run before processing any pages.
+     * Use for setup tasks like cache warming or external API calls.
+     */
+    onBeforeSync?: () => Promise<void>;
+
+    /**
+     * Called once per sync run after processing all pages.
+     * Use for cleanup tasks like cache invalidation or notifications.
+     */
+    onAfterSync?: () => Promise<void>;
 
     // ============================================
     // METADATA - Optional property mappings

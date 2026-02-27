@@ -1,6 +1,7 @@
 import type { PageObjectResponse } from '@notionhq/client';
+import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DatabaseBlueprint } from '../types.js';
+import type { DatabaseBlueprint, DatabasePage } from '../types.js';
 import type { Database } from '../database.types.js';
 
 /**
@@ -16,12 +17,25 @@ export enum CompositionStrategy {
 	/** Run all; false if any hook returns false (boolean AND) */
 	AndAll,
 	/** Run all; ignore return values entirely (side effects) */
-	RunAll
+	RunAll,
+	/** Chain: each hook's return becomes next hook's input; null = pass-through */
+	Pipeline
 }
 
-/** Helper to define a hook event with typed input/output and a composition strategy. */
-function e<TInput, TOutput>(strategy: CompositionStrategy) {
-	return { input: null as unknown as TInput, output: null as unknown as TOutput, strategy };
+/**
+ * MdBlock type from notion-to-md library.
+ * Represents a block of markdown content with type and parent info.
+ */
+export type MdBlock = {
+	type: string;
+	parent: string;
+	children?: MdBlock[];
+	[key: string]: any;
+};
+
+/** Helper to define a hook event with typed return, composition strategy, and optional field. */
+function e<TReturn>(strategy: CompositionStrategy, field?: keyof DatabasePage) {
+	return { output: null as unknown as TReturn, strategy, field };
 }
 
 const S = CompositionStrategy;
@@ -30,46 +44,46 @@ const S = CompositionStrategy;
  * Hook event definitions - THE SINGLE SOURCE OF TRUTH
  * 
  * Each event has:
- * - input: Type of input value passed to hooks (never if no input)
- * - output: Type of value returned by hooks
+ * - output: Type of value returned by hooks (TReturn)
  * - strategy: How to compose results from multiple hooks
+ * - field: Optional keyof DatabasePage where result is written
+ * 
+ * Events are fired in order by the transformer. See Event Ordering Contract in design memo.
  */
 export const HOOK_EVENTS = {
-	// Page lifecycle
-	'page:exclude': e<never, boolean>(S.OrAll),
-	'page:validate': e<never, boolean>(S.AndAll),
+	// ── Page Lifecycle ─────────────────────────────────────────────────
+	'page:before': e<void>(S.RunAll),
+	'page:should-sync': e<boolean>(S.AndAll), // flow control — no field
+	'page:after': e<void>(S.RunAll),
 
-	// Metadata extraction
-	'metadata:title': e<never, string>(S.FirstWins),
-	'metadata:tags': e<never, string[]>(S.Collect),
-	'metadata:authors': e<never, string[]>(S.Collect),
-	'metadata:summary': e<never, string>(S.FirstWins),
-	'metadata:custom': e<never, Record<string, unknown>>(S.Collect),
+	// ── Publishing ─────────────────────────────────────────────────────
+	'publish:check': e<boolean>(S.AndAll), // flow control — no field
+	'publish:date': e<string | Date>(S.FirstWins, 'publish_at'),
 
-	// Publishing
-	'publish:check': e<never, boolean>(S.AndAll),
-	'publish:date': e<never, string>(S.FirstWins),
+	// ── Slug Pipeline ──────────────────────────────────────────────────
+	'slug:extract': e<string>(S.FirstWins, 'slug'),
+	'slug:generate': e<string>(S.FirstWins, 'slug'),
+	'slug:conflict': e<string>(S.FirstWins, 'slug'), // receives current slug as input, returns resolved slug
+	'slug:sync': e<void>(S.RunAll), // side effect — no field
 
-	// Slug handling
-	'slug:extract': e<never, string>(S.FirstWins),
-	'slug:generate': e<never, string>(S.FirstWins),
-	'slug:validate': e<never, boolean>(S.AndAll),
-	'slug:transform': e<never, string>(S.FirstWins),
+	// ── Metadata Extraction ────────────────────────────────────────────
+	'metadata:title': e<string>(S.FirstWins, 'title'),
+	'metadata:tags': e<string[]>(S.Collect, 'tags'),
+	'metadata:authors': e<string[]>(S.Collect, 'authors'),
+	'metadata:summary': e<string>(S.FirstWins, 'summary'),
+	'metadata:custom': e<Record<string, unknown>>(S.Collect, 'meta'), // merged into output.meta
 
-	// Content pipeline
-	'content:fetch': e<never, string>(S.FirstWins),
-	'content:transform': e<string, string>(S.FirstWins),
-	'content:images': e<string, string>(S.RunAll),
+	// ── Content Pipeline ───────────────────────────────────────────────
+	'content:preprocess': e<MdBlock[]>(S.FirstWins), // ctx.input = BlockObjectResponse[]; no field
+	'content:text': e<string>(S.Pipeline, 'content'),
+	'content:media': e<string>(S.Pipeline, 'content'),
+	'content:postprocess': e<string>(S.Pipeline, 'content'),
+	'content:sync': e<void>(S.RunAll), // side effect — no field
 
-	// Cover image pipeline
-	'cover:extract': e<never, string>(S.FirstWins),
-	'cover:fallback': e<never, string>(S.FirstWins),
-	'cover:process': e<string | null, string | null>(S.RunAll),
-
-	// Sync back to Notion
-	'sync:slug': e<string, void>(S.RunAll),
-	'sync:content': e<string, void>(S.RunAll),
-	'sync:images': e<unknown, void>(S.RunAll),
+	// ── Cover Pipeline (config-gated via coverProperty) ────────────────
+	'cover:extract': e<string>(S.FirstWins, 'cover'), // default hook falls back to scanning content
+	'cover:process': e<string>(S.Pipeline, 'cover'),
+	'cover:sync': e<void>(S.RunAll) // side effect — no field
 } as const;
 
 /**
@@ -77,27 +91,27 @@ export const HOOK_EVENTS = {
  */
 export type HookEvent = keyof typeof HOOK_EVENTS;
 
-/**
- * Event signatures: input and output types for each event.
- * Derived from HOOK_EVENTS.
- */
-export type EventSignatures = {
-	[K in HookEvent]: {
-		input: typeof HOOK_EVENTS[K]['input'];
-		output: typeof HOOK_EVENTS[K]['output'];
-	}
-};
-
 
 /**
  * Context object passed to each hook function.
  * 
  * Contains everything a hook needs to operate: the page being processed,
- * configuration, logging, services for side effects, and control flow.
+ * accumulated output so far, configuration, logging, services, and control flow.
  */
 export type HookContext = {
-	/** The Notion page being processed */
+	/** The Notion page being processed (raw source, never mutated) */
 	page: PageObjectResponse;
+
+	/** Accumulated output so far (read-only view of DatabasePage being assembled) */
+	output: Readonly<Partial<DatabasePage>>;
+
+	/**
+	 * Pipeline input value (for Pipeline events and slug:conflict).
+	 * - Pipeline events: current value in the transform chain
+	 * - slug:conflict: current slug needing validation
+	 * - content:preprocess: BlockObjectResponse[] from Notion
+	 */
+	input?: unknown;
 
 	/** The database configuration */
 	config: DatabaseBlueprint;
@@ -125,12 +139,6 @@ export type HookContext = {
 		supabase?: SupabaseClient<Database>;
 		[key: string]: unknown; // custom services
 	};
-
-	/**
-	 * Pipeline input value (for events that operate on data flow).
-	 * Present only for events that declare it in EventSignatures.
-	 */
-	input?: unknown;
 
 	/** Stop processing this page with a reason */
 	abort: (reason: string) => void;
