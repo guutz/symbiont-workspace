@@ -66,6 +66,12 @@ export class NotionToDatabaseSync {
 		});
 
 		try {
+			// 0. Call onBeforeSync lifecycle callback
+			if (this.config.onBeforeSync) {
+				this.logger.debug({ event: 'calling_onBeforeSync' });
+				await this.config.onBeforeSync();
+			}
+
 			// 1. Wipe existing pages if requested
 			if (options.wipe) {
 				const deletedCount = await this.pageCrud.deleteForSource(this.config.dataSourceId);
@@ -139,6 +145,12 @@ export class NotionToDatabaseSync {
 					});
 					failed++;
 				}
+			}
+
+			// 5. Call onAfterSync lifecycle callback
+			if (this.config.onAfterSync) {
+				this.logger.debug({ event: 'calling_onAfterSync' });
+				await this.config.onAfterSync();
 			}
 
 			const duration = Date.now() - startTime;

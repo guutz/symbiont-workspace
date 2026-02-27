@@ -30,7 +30,7 @@ export const symbiont = createSymbiontClient({
 
 			hooks: techHooks,
 
-			slugSyncProperty: 'Website Slug',
+			slugProperty: 'Website Slug',
 			tagsProperty: 'Tags',
 			authorsProperty: 'Authors',
 			coverProperty: 'Cover Photo',
