@@ -451,17 +451,17 @@ export const defaultContentMediaHook: Hook<string> = {
 			const imageUrl = match[2];
 
 			// Skip if already a Supabase URL
-			if (!needsUploadToSupabase(imageUrl, supabase)) {
+			if (!needsUploadToSupabase(imageUrl)) {
 				continue;
 			}
 
 			try {
-				const uploadedUrl = await uploadImageToSupabase({
-					imageUrl,
+				const result = await uploadImageToSupabase(imageUrl, {
 					supabase,
 					pageId: ctx.page.id
 				});
 
+				const uploadedUrl = result.newUrl;
 				if (uploadedUrl) {
 					processedContent = processedContent.replace(fullMatch, `![${altText}](${uploadedUrl})`);
 					ctx.logger.debug({
@@ -577,17 +577,17 @@ export const defaultCoverProcessHook: Hook<string> = {
 		}
 
 		// Skip if already a Supabase URL
-		if (!needsUploadToSupabase(coverUrl, supabase)) {
+		if (!needsUploadToSupabase(coverUrl)) {
 			return coverUrl;
 		}
 
 		try {
-			const uploadedUrl = await uploadImageToSupabase({
-				imageUrl: coverUrl,
+			const result = await uploadImageToSupabase(coverUrl, {
 				supabase,
 				pageId: ctx.page.id
 			});
 
+			const uploadedUrl = result.newUrl;
 			if (uploadedUrl) {
 				ctx.logger.debug({
 					event: 'cover_image_uploaded',

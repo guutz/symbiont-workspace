@@ -92,7 +92,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.register(hook);
 
-			const result = await registry.execute('publish:date', {} as any);
+			const result = await registry.execute('publish:date', {}, {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 		});
@@ -123,7 +123,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {} as any);
+			const result = await registry.execute('publish:date', {}, {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 			expect(executionOrder).toEqual(['hook1']); // Only first hook ran
@@ -155,7 +155,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {} as any);
+			const result = await registry.execute('publish:date', {}, {} as any);
 
 			expect(result).toBe('2024-01-01T00:00:00Z');
 			expect(executionOrder).toEqual(['hook1', 'hook2']); // Both ran
@@ -179,7 +179,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:date', {} as any);
+			const result = await registry.execute('publish:date', {}, {} as any);
 
 			expect(result).toBeNull();
 		});
@@ -210,7 +210,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {} as any);
+			const result = await registry.execute('metadata:custom', {}, {} as any);
 
 			expect(result).toEqual({
 				field1: 'value1',
@@ -243,7 +243,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {} as any);
+			const result = await registry.execute('metadata:custom', {}, {} as any);
 
 			expect(result).toEqual({
 				field1: 'value1',
@@ -269,7 +269,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:custom', {} as any);
+			const result = await registry.execute('metadata:custom', {}, {} as any);
 
 			expect(result).toEqual({ field: 'second' });
 		});
@@ -294,7 +294,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:tags', {} as any);
+			const result = await registry.execute('metadata:tags', {}, {} as any);
 
 			expect(result).toEqual(['tag1', 'tag2', 'tag3', 'tag4']);
 		});
@@ -323,7 +323,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('metadata:tags', {} as any);
+			const result = await registry.execute('metadata:tags', {}, {} as any);
 
 			expect(result).toEqual(['tag1', 'tag2']);
 		});
@@ -331,7 +331,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 	describe('control flow', () => {
 		it('should return null if no hooks registered', async () => {
-			const result = await registry.execute('publish:check', {} as any);
+			const result = await registry.execute('publish:check', {}, {} as any);
 
 			expect(result).toBeNull();
 		});
@@ -349,7 +349,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			registry.register(hook);
 
 			await expect(
-				registry.execute('publish:check', {} as any)
+				registry.execute('publish:check', {}, {} as any)
 			).rejects.toThrow('Hook failed');
 		});
 
@@ -374,7 +374,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 
 			registry.registerMany(hooks);
 
-			const result = await registry.execute('publish:check', {} as any);
+			const result = await registry.execute('publish:check', {}, {} as any);
 
 			expect(result).toBe(true); // Second hook ran
 		});
@@ -407,7 +407,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			registry.registerMany(hooks);
 
 			await expect(
-				registry.execute('publish:check', {} as any)
+				registry.execute('publish:check', {}, {} as any)
 			).rejects.toThrow('Page is invalid');
 
 			expect(executionOrder).toEqual(['hook1']); // Only first hook ran
