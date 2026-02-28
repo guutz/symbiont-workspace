@@ -66,6 +66,12 @@ export class NotionToDatabaseSync {
 		});
 
 		try {
+			// 0. Call onBeforeSync lifecycle callback
+			if (this.config.onBeforeSync) {
+				this.logger.debug({ event: 'calling_onBeforeSync' });
+				await this.config.onBeforeSync();
+			}
+
 			// 1. Wipe existing pages if requested
 			if (options.wipe) {
 				const deletedCount = await this.pageCrud.deleteForSource(this.config.dataSourceId);
@@ -141,6 +147,12 @@ export class NotionToDatabaseSync {
 				}
 			}
 
+			// 5. Call onAfterSync lifecycle callback
+			if (this.config.onAfterSync) {
+				this.logger.debug({ event: 'calling_onAfterSync' });
+				await this.config.onAfterSync();
+			}
+
 			const duration = Date.now() - startTime;
 			
 			this.logger.info({ 
@@ -196,15 +208,6 @@ export class NotionToDatabaseSync {
 			pageId: page.id 
 		});
 
-		// 0. Check exclusion rule first (before any expensive operations)
-		if (this.shouldExclude(page)) {
-			this.logger.info({ 
-				event: 'page_excluded_by_rule',
-				pageId: page.id
-			});
-			return false; // Excluded
-		}
-
 		// 1. Check if page needs updating (compare timestamps)
 		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
 
@@ -236,10 +239,10 @@ export class NotionToDatabaseSync {
 			}
 		}
 
-		// 2. Build page data (applies all business logic - expensive)
+		// 2. Build page data (applies all business logic including exclusion via hooks)
 		const pageData = await this.pageTransformer.transformPage(page);
 
-		// 3. Skip if not publishable
+		// 3. Skip if excluded or not publishable
 		if (!pageData) {
 			this.logger.debug({ 
 				event: 'page_skipped',
@@ -277,15 +280,5 @@ export class NotionToDatabaseSync {
 		}
 
 		return undefined;
-	}
-
-	/**
-	 * Check if page should be excluded from sync
-	 */
-	private shouldExclude(page: PageObjectResponse): boolean {
-		if (!this.config.excludeRule) {
-			return false; // No exclusion rule defined
-		}
-		return this.config.excludeRule(page);
 	}
 }

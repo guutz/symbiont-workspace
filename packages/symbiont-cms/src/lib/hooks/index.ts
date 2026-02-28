@@ -3,9 +3,9 @@
  * 
  * Provides a WordPress-inspired extensibility model with:
  * - Lifecycle events for page transformation
- * - Priority-based execution order
+ * - Event-based composition strategies
  * - Default hooks with sensible behavior
- * - Type-safe hook definitions
+ * - Type-safe hook definitions with named priorities
  */
 
 export * from './types.js';

@@ -1,31 +1,29 @@
 import type { PageObjectResponse } from '@notionhq/client';
-import type { DatabaseBlueprint } from '../../types.js';
-import type { DatabasePage } from '../../types.js';
-import { createSlug } from '../utils/slug.js';
+import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DatabaseBlueprint, DatabasePage } from '../../types.js';
+import type { Database } from '../../database.types.js';
+import type { MdBlock } from '../../hooks/types.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
-import { uploadImageToSupabase, needsUploadToSupabase } from '../bucket/image-upload.js';
-import { convertMarkdownToNotionBlocks } from './markdown-to-blocks.js';
 import { HookRegistry } from '../../hooks/registry.js';
 import { defaultHooks } from '../../hooks/default-hooks.js';
 
 /**
- * NotionPageToDatabasePageTransformer - Business logic for transforming Notion pages into database page data
+ * NotionPageToDatabasePageTransformer
+ * 
+ * Thin event sequencer that fires hooks in order and assembles DatabasePage.
+ * Per design memo (2026-02-21-hook-events-design-memo.md).
  * 
  * Responsibilities:
- * - Apply publishing rules via hooks
- * - Extract metadata (title, tags, authors, custom metadata)
- * - Resolve slugs (handle conflicts, sync back to Notion)
- * - Orchestrate content fetching
- * - Process and upload images to Supabase Storage
+ * 1. Maintain mutable output object (DatabasePage being assembled)
+ * 2. Fire events in exact order from Event Ordering Contract
+ * 3. Handle conditionals: page:should-sync, publish:check
+ * 4. Bridge step: convert MdBlock[] to string after content:preprocess
+ * 5. Perform final Supabase upsert
  * 
- * This is where all the sync rules from DatabaseBlueprint are applied.
- * 
- * Hook System:
- * - Registers default hooks + user hooks
- * - Executes hooks at appropriate lifecycle events
- * - Data flows through hooks: each hook receives data from previous hook
+ * All business logic lives in hooks. This class just sequences events.
  */
 export class NotionPageToDatabasePageTransformer {
 	private logger: ReturnType<typeof createLogger>;
@@ -35,8 +33,7 @@ export class NotionPageToDatabasePageTransformer {
 		private config: DatabaseBlueprint,
 		private notionClient: NotionClient,
 		private pageCrud: DatabasePageCRUD,
-		private supabaseUrl: string,
-		private serviceRoleKey: string
+		private supabase: SupabaseClient<Database>
 	) {
 		this.logger = createLogger({
 			operation: 'page_transformer',
@@ -44,8 +41,15 @@ export class NotionPageToDatabasePageTransformer {
 			dataSourceId: this.config.dataSourceId
 		});
 
-		// Initialize hook registry
-		this.hookRegistry = new HookRegistry(this.logger);
+		// Initialize hook registry with config and services
+		this.hookRegistry = new HookRegistry(
+			this.logger,
+			this.config,
+			{
+				notionClient: this.notionClient,
+				supabase: this.supabase
+			}
+		);
 
 		// Register default hooks
 		this.hookRegistry.registerMany(defaultHooks);
@@ -63,14 +67,10 @@ export class NotionPageToDatabasePageTransformer {
 	}
 	
 	/**
-	 * Construct a complete DatabasePage object from a Notion page
+	 * Transform a Notion page into a DatabasePage.
+	 * Follows Event Ordering Contract from design memo.
 	 * 
-	 * Always syncs the page to the database, but sets publish_at to null
-	 * if the page doesn't pass the publish:check hook. This allows the database
-	 * to handle filtering of non-public pages.
-	 * 
-	 * For non-public pages, slug generation is skipped (slug set to null)
-	 * since the page may not be finished yet (including title).
+	 * @returns DatabasePage ready for upsert, or null if page should be skipped
 	 */
 	async transformPage(page: PageObjectResponse): Promise<DatabasePage | null> {
 		this.logger.debug({
@@ -78,511 +78,167 @@ export class NotionPageToDatabasePageTransformer {
 			pageId: page.id
 		});
 
-		// 0. Check if page should be excluded from sync
-		const shouldExclude = await this.shouldExclude(page);
-		if (shouldExclude) {
-			this.logger.info({
-				event: 'page_excluded',
-				pageId: page.id
-			});
-			return null;
-		}
-
-		// 1. Extract core metadata (title, tags, authors, summary)
-		const coreMeta = this.extractCoreMetadata(page);
-
-		// 2. Check publishing rules
-		const isPublic = await this.shouldPublish(page);
-		const publishDate = isPublic ? await this.getPublishDate(page) : null;
-
-		// 3. Resolve slug (only for public posts)
-		const slug = isPublic ? await this.resolveSlug(page, coreMeta.title) : null;
-
-		// 4. Process cover image (upload + sync back to Notion)
-		// TODO: maybe combine this with metadata extraction and have some kind of flag in config that it is an image to be uploaded?
-		const coverUrl = await this.processCoverImage(page);
-
-		// 5. Get content and process inline images (upload + sync back to Notion)
-		const processedContent = await this.processContentAndUploadImages(page);
-
-		// 6. Build complete metadata object
-		const meta = await this.buildMetadata(page, { coverUrl });
-
-		// 7. Construct final page data
-		const pageData: DatabasePage = {
+		// Initialize mutable output with required fields
+		const output: Partial<DatabasePage> = {
 			page_id: page.id,
 			datasource_id: this.config.dataSourceId,
 			datasource_alias: this.config.alias,
-			title: coreMeta.title,
-			slug,
-			content: processedContent,
-			summary: coreMeta.summary,
-			publish_at: publishDate,
-			updated_at: page.last_edited_time,
-			tags: coreMeta.tags.length > 0 ? coreMeta.tags : null,
-			authors: coreMeta.authors.length > 0 ? coreMeta.authors : null,
-			meta
+			updated_at: page.last_edited_time
 		};
 
-		this.logger.info({
-			event: 'page_transformed',
-			pageId: page.id,
-			slug,
-			title: coreMeta.title,
-			isPublic
-		});
-
-		return pageData;
-	}
-
-	/**
-	 * Process cover image: upload to Supabase and sync URL back to Notion
-	 * Falls back to extracting first image from content if no cover is set
-	 */
-	private async processCoverImage(page: PageObjectResponse): Promise<string | null> {
-		if (!this.config.coverProperty) {
-			return null;
-		}
-
 		try {
-			const coverProp = page.properties[this.config.coverProperty];
-			
-			// No cover image in property - try to find one in content
-			if (coverProp?.type !== 'files' || coverProp.files.length === 0) {
-				return await this.extractCoverFromContent(page);
-			}
+			// ── Page Lifecycle ─────────────────────────────────────────
 
-			const file = coverProp.files[0];
-			
-			// Handle Notion-hosted files (need re-upload)
-			if (file.type === 'file') {
-				const originalUrl = file.file?.url;
-				if (!originalUrl) return null;
+			// page:before
+			await this.hookRegistry.execute('page:before', output, page);
 
-				// Upload to Supabase if needed
-				if (needsUploadToSupabase(originalUrl)) {
-					const result = await uploadImageToSupabase(originalUrl, {
-						supabaseUrl: this.supabaseUrl,
-						serviceRoleKey: this.serviceRoleKey,
-						pageId: page.id
-					});
-					
-					this.logger.info({
-						event: 'cover_image_uploaded',
-						pageId: page.id,
-						originalUrl,
-						newUrl: result.newUrl,
-						filename: result.filename
-					});
-
-					// Sync permanent URL back to Notion
-					await this.notionClient.updateFileProperty(
-						page.id,
-						this.config.coverProperty,
-						result.newUrl
-					);
-
-					return result.newUrl;
-				}
-
-				return originalUrl; // Already on Supabase
-			}
-			
-			// Handle external files
-			if (file.type === 'external') {
-				const externalUrl = file.external?.url;
-				if (!externalUrl) return null;
-
-				// Check if external URL needs to be uploaded
-				if (needsUploadToSupabase(externalUrl)) {
-					const result = await uploadImageToSupabase(externalUrl, {
-						supabaseUrl: this.supabaseUrl,
-						serviceRoleKey: this.serviceRoleKey,
-						pageId: page.id
-					});
-					
-					this.logger.info({
-						event: 'cover_image_external_uploaded',
-						pageId: page.id,
-						originalUrl: externalUrl,
-						newUrl: result.newUrl,
-						filename: result.filename
-					});
-
-					// Sync permanent URL back to Notion
-					await this.notionClient.updateFileProperty(
-						page.id,
-						this.config.coverProperty,
-						result.newUrl
-					);
-
-					return result.newUrl;
-				}
-
-				// Already a permanent URL
+			// page:should-sync (flow control)
+			const shouldSync = await this.hookRegistry.execute('page:should-sync', output, page);
+			if (!shouldSync) {
 				this.logger.info({
-					event: 'cover_image_external',
-					pageId: page.id,
-					coverUrl: externalUrl
+					event: 'page_skipped_should_not_sync',
+					pageId: page.id
 				});
-				return externalUrl;
+				return null;
 			}
 
-			return null;
-		} catch (error: any) {
-			this.logger.warn({
-				event: 'cover_image_upload_failed',
-				pageId: page.id,
-				error: error?.message
-			});
-			return null;
-		}
-	}
+			// ── Publishing ─────────────────────────────────────────────
 
-	/**
-	 * Extract first image from page content to use as cover
-	 */
-	private async extractCoverFromContent(page: PageObjectResponse): Promise<string | null> {
-		try {
-			// Get content as markdown
-			const content = await this.notionClient.pageToMarkdown(page.id);
-			
-			// Find first image in content
-			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/;
-			const match = content.match(imageRegex);
-			
-			if (!match) return null;
-			
-			const [, alt, url] = match;
-			
-			// Upload to Supabase if needed
-			if (needsUploadToSupabase(url)) {
-				const result = await uploadImageToSupabase(url, {
-					supabaseUrl: this.supabaseUrl,
-					serviceRoleKey: this.serviceRoleKey,
-					pageId: page.id,
-					altText: alt || undefined
-				});
-				
-				this.logger.info({
-					event: 'cover_image_extracted_from_content',
-					pageId: page.id,
-					originalUrl: url,
-					newUrl: result.newUrl,
-					filename: result.filename
-				});
-				
-				return result.newUrl;
+			// publish:check (flow control)
+			const publishable = await this.hookRegistry.execute('publish:check', output, page);
+
+			// publish:date (only if publishable)
+			if (publishable) {
+				await this.hookRegistry.execute('publish:date', output, page);
 			}
-			
-			// Use URL as-is if already permanent
-			this.logger.info({
-				event: 'cover_image_extracted_from_content',
-				pageId: page.id,
-				coverUrl: url
-			});
-			return url;
-		} catch (error: any) {
-			this.logger.warn({
-				event: 'cover_image_content_extraction_failed',
-				pageId: page.id,
-				error: error?.message
-			});
-			return null;
-		}
-	}
+			// If not publishable, publish_at stays null (dark draft)
 
-	/**
-	 * Process content and images: upload to Supabase and sync markdown back to Notion
-	 */
-	private async processContentAndUploadImages(page: PageObjectResponse): Promise<string> {
-		// Get content as markdown
-		const content = await this.notionClient.pageToMarkdown(page.id);
-		
-		// Find and process all images
-		let processedContent = content;
-		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-		const imagePromises: Promise<void>[] = [];
-		let match;
+			// ── Slug Pipeline ──────────────────────────────────────────
 
-		while ((match = imageRegex.exec(content)) !== null) {
-			const [fullMatch, alt, url] = match;
-			
-			if (needsUploadToSupabase(url)) {
-				const imagePromise = uploadImageToSupabase(url, {
-					supabaseUrl: this.supabaseUrl,
-					serviceRoleKey: this.serviceRoleKey,
-					pageId: page.id,
-					altText: alt || undefined
-				}).then((uploaded) => {
-					processedContent = processedContent.replace(fullMatch, `![${alt}](${uploaded.newUrl})`);
-					this.logger.info({
-						event: 'content_image_uploaded',
-						pageId: page.id,
-						filename: uploaded.filename
-					});
-				}).catch((error) => {
-					this.logger.warn({
-						event: 'content_image_upload_failed',
-						pageId: page.id,
-						url,
-						error: error.message
-					});
-				});
-				
-				imagePromises.push(imagePromise);
+			// slug:extract
+			await this.hookRegistry.execute('slug:extract', output, page);
+
+			// slug:generate
+			await this.hookRegistry.execute('slug:generate', output, page);
+
+			// slug:conflict (receives current slug as input, returns resolved slug)
+			const candidateSlug = output.slug;
+			if (candidateSlug) {
+				await this.hookRegistry.execute('slug:conflict', output, page, candidateSlug);
 			}
-		}
 
-		// Wait for all uploads
-		await Promise.all(imagePromises);
+			// slug:sync
+			await this.hookRegistry.execute('slug:sync', output, page);
 
-		// Sync updated content back to Notion if images changed
-		// TODO: Decide if we want to keep images that are in Notion CDN, in Notion CDN -- or replace all images in Notion with Supabase URLs (current behavior)
-		// As is, Martian convertMarkdownToNotionBlocks does not rebuild Notion internal image blocks correctly, so that would need to be fixed first
-		if (processedContent !== content) {
-			try {
-				const blocks = convertMarkdownToNotionBlocks(processedContent, {
-					strictImageUrls: false,
-					truncate: true,
-					onLimitExceeded: (err) => this.logger.warn({
-						event: 'notion_content_limit_exceeded',
-						pageId: page.id,
-						error: err.message
-					})
-				});
+			// ── Metadata Extraction ────────────────────────────────────
 
-				await this.notionClient.updatePageBlocks(page.id, blocks);
-				
-				this.logger.info({
-					event: 'notion_content_images_synced',
-					pageId: page.id,
-					message: 'Updated Notion page with Supabase image URLs'
-				});
-			} catch (error: any) {
+			// metadata:title
+			await this.hookRegistry.execute('metadata:title', output, page);
+
+			// metadata:tags
+			await this.hookRegistry.execute('metadata:tags', output, page);
+
+			// metadata:authors
+			await this.hookRegistry.execute('metadata:authors', output, page);
+
+			// metadata:summary
+			await this.hookRegistry.execute('metadata:summary', output, page);
+
+			// metadata:custom (merged into output.meta)
+			await this.hookRegistry.execute('metadata:custom', output, page);
+
+			// ── Content Pipeline ───────────────────────────────────────
+
+			// Fetch raw blocks from Notion
+			const blocks = await this.notionClient.getBlocks(page.id);
+
+			// content:preprocess (ctx.input = BlockObjectResponse[]; returns MdBlock[])
+			const mdBlocks = await this.hookRegistry.execute('content:preprocess', output, page, blocks) as MdBlock[];
+
+			// Bridge step: Convert MdBlock[] to markdown string (fixed, not hookable)
+			const rawMarkdown = this.mdBlocksToString(mdBlocks);
+
+			// content:text (Pipeline: transform raw markdown string)
+			await this.hookRegistry.execute('content:text', output, page, rawMarkdown);
+
+			// content:media (Pipeline: upload inline images, rewrite URLs)
+			await this.hookRegistry.execute('content:media', output, page, output.content);
+
+			// content:postprocess (Pipeline: final transforms)
+			await this.hookRegistry.execute('content:postprocess', output, page, output.content);
+
+			// content:sync (write final content back to Notion)
+			await this.hookRegistry.execute('content:sync', output, page);
+
+			// ── Cover Pipeline ─────────────────────────────────────────
+
+			// cover:extract (falls back to content scan if no coverProperty)
+			await this.hookRegistry.execute('cover:extract', output, page);
+
+			// cover:process (Pipeline: upload cover image)
+			if (output.cover) {
+				await this.hookRegistry.execute('cover:process', output, page, output.cover);
+			}
+
+			// cover:sync (write cover back to Notion)
+			await this.hookRegistry.execute('cover:sync', output, page);
+
+			// ── Page Lifecycle End ─────────────────────────────────────
+
+			// page:after
+			await this.hookRegistry.execute('page:after', output, page);
+
+			// ── Validation ─────────────────────────────────────────────
+
+			// Validate required fields
+			if (!output.title || !output.slug) {
 				this.logger.warn({
-					event: 'notion_content_sync_failed',
+					event: 'page_missing_required_fields',
 					pageId: page.id,
-					error: error?.message
+					hasTitle: !!output.title,
+					hasSlug: !!output.slug
 				});
+				return null;
 			}
-		}
 
-		return processedContent;
-	}
+			// ── Persist ────────────────────────────────────────────────
 
-	/**
-	 * Build complete metadata object from all sources
-	 * 
-	 * Merges:
-	 * - System-managed fields (cover URL, etc.)
-	 * - Custom user-extracted metadata (via metadata:custom hook)
-	 * 
-	 * This makes it easy to add more system fields in the future
-	 * (e.g., processing status, image count, word count, etc.)
-	 */
-	private async buildMetadata(
-		page: PageObjectResponse,
-		systemFields: { coverUrl: string | null }
-	): Promise<Record<string, any> | null> {
-		// Start with system-managed fields
-		const metadata: Record<string, any> = {};
+			// Upsert to Supabase
+			await this.pageCrud.upsert(output as DatabasePage);
 
-		// Add cover URL if present
-		if (systemFields.coverUrl) {
-			metadata.cover = systemFields.coverUrl;
-		}
-
-		// Get custom metadata via hooks (auto-merged by registry)
-		const customMeta = await this.hookRegistry.execute<Record<string, any>>(
-			'metadata:custom',
-			{
-				page,
-				config: this.config,
-				logger: this.logger
-			}
-		);
-
-		// Merge hook result with system fields
-		if (customMeta) {
-			Object.assign(metadata, customMeta);
-		}
-
-		// Return null if empty (cleaner than empty object in database)
-		return Object.keys(metadata).length > 0 ? metadata : null;
-	}
-
-	/**
-	 * Extract core metadata (title, tags, authors)
-	 */
-	private extractCoreMetadata(page: PageObjectResponse): {
-		title: string;
-		tags: string[];
-		authors: string[];
-		summary: string;
-	} {
-		const title = this.notionClient.getTitleProperty(page);
-
-		const tags = this.config.tagsProperty
-			? this.notionClient.getPropertyValues(page, this.config.tagsProperty)
-			: [];
-
-		const authors = this.config.authorsProperty
-			? this.notionClient.getPropertyValues(page, this.config.authorsProperty)
-			: [];
-
-		const summary = this.config.summaryProperty
-			? this.notionClient.getPropertyValues(page, this.config.summaryProperty)?.[0] || ''
-			: '';
-
-		return { title, tags, authors, summary };
-	}
-
-	/**
-	 * Resolve slug with conflict handling and sync-back
-	 * Uses slug:extract and slug:generate hooks
-	 */
-	private async resolveSlug(page: PageObjectResponse, title: string): Promise<string> {
-		// 1. Extract custom slug via hooks
-		const customSlug = await this.hookRegistry.execute<string | null>('slug:extract', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
-
-		// 2. Check if page already exists in DB
-		const existingPage = await this.pageCrud.getByNotionPageId(page.id);
-
-		// 3. Determine final slug
-		let slug: string;
-		let slugChanged = false;
-
-		if (existingPage && existingPage.slug) {
-			// Existing page with slug - handle slug changes
-			if (customSlug && customSlug !== existingPage.slug) {
-				// User changed slug in Notion - validate uniqueness
-				slug = await this.ensureUniqueSlug(customSlug, page.id);
-				slugChanged = true;
-				this.logger.info({
-					event: 'slug_updated',
-					pageId: page.id,
-					oldSlug: existingPage.slug,
-					newSlug: slug
-				});
-			} else {
-				// No change - keep existing slug
-				slug = existingPage.slug;
-				slugChanged = false;
-			}
-		} else {
-			// New page or existing page without slug - generate via hooks
-			// In the new extractor pattern, slug:generate extracts title directly from page
-			const baseSlug = await this.hookRegistry.execute<string>(
-				'slug:generate',
-				{
-					page,
-					config: this.config,
-					logger: this.logger
-				}
-			);
-
-			// If custom slug was extracted, use it instead of generated
-			const finalBaseSlug = customSlug || baseSlug;
-			slug = await this.ensureUniqueSlug(finalBaseSlug);
-			slugChanged = true;
 			this.logger.info({
-				event: 'slug_generated',
+				event: 'page_transformed',
 				pageId: page.id,
-				slug,
-				customSlug: !!customSlug
+				slug: output.slug,
+				title: output.title,
+				isPublic: !!output.publish_at
 			});
-		}
 
-		// 4. Sync back to Notion ONLY if slug is new or changed
-		if (this.config.slugSyncProperty && slugChanged) {
-			// Also check if Notion already has the correct slug to avoid unnecessary updates
-			if (customSlug !== slug) {
-				await this.notionClient.updateProperty(page.id, this.config.slugSyncProperty, slug);
-				this.logger.debug({
-					event: 'slug_synced_to_notion',
-					pageId: page.id,
-					slug
-				});
-			}
-		}
+			return output as DatabasePage;
 
-		return slug;
+		} catch (error: any) {
+			this.logger.error({
+				event: 'transform_page_failed',
+				pageId: page.id,
+				error: error?.message,
+				stack: error?.stack
+			});
+			throw error;
+		}
 	}
 
 	/**
-	 * Ensure slug is unique by appending numbers if needed
+	 * Bridge step: Convert MdBlock[] to markdown string.
+	 * This is the fixed step between content:preprocess and content:text.
+	 * Not hookable per design memo.
 	 */
-	private async ensureUniqueSlug(baseSlug: string, excludePageId?: string): Promise<string> {
-		const existingPage = await this.pageCrud.getBySlug(baseSlug, this.config.dataSourceId);
-
-		// If no conflict, or conflict is with the same page, use base slug
-		if (!existingPage || existingPage.page_id === excludePageId) {
-			return baseSlug;
+	private mdBlocksToString(mdBlocks: MdBlock[]): string {
+		if (!mdBlocks || mdBlocks.length === 0) {
+			return '';
 		}
 
-		// Auto-resolve conflicts: try -2, -3, -4, etc.
-		for (let i = 2; i <= 100; i++) {
-			const numberedSlug = `${baseSlug}-${i}`;
-			const conflict = await this.pageCrud.getBySlug(numberedSlug, this.config.dataSourceId);
-
-			if (!conflict || conflict.page_id === excludePageId) {
-				this.logger.warn({
-					event: 'slug_conflict_resolved',
-					requestedSlug: baseSlug,
-					finalSlug: numberedSlug
-				});
-				return numberedSlug;
-			}
-		}
-
-		// Fallback: use random string
-		const randomSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
-		this.logger.warn({
-			event: 'slug_conflict_random_fallback',
-			requestedSlug: baseSlug,
-			finalSlug: randomSlug
-		});
-		return randomSlug;
-	}
-
-	/**
-	 * Check if page should be excluded from sync (apply page:exclude hook)
-	 */
-	private async shouldExclude(page: PageObjectResponse): Promise<boolean> {
-		const shouldExclude = await this.hookRegistry.execute<boolean>('page:exclude', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
-		return shouldExclude || false; // Default to false if no hooks return a value
-	}
-
-	/**
-	 * Check if page should be published (apply publish:check hook)
-	 */
-	private async shouldPublish(page: PageObjectResponse): Promise<boolean> {
-		const shouldPublish = await this.hookRegistry.execute<boolean>('publish:check', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
-		return shouldPublish || false; // Default to false if no hooks return a value
-	}
-
-	/**
-	 * Get publish date (apply publish:date hook)
-	 */
-	private async getPublishDate(page: PageObjectResponse): Promise<string | null> {
-		const publishDate = await this.hookRegistry.execute<string>('publish:date', {
-			page,
-			config: this.config,
-			logger: this.logger
-		});
-		return publishDate;
+		// Use n2m's toMarkdownString method
+		const mdResult = this.notionClient.n2m.toMarkdownString(mdBlocks as any);
+		return typeof mdResult === 'string' ? mdResult : mdResult?.parent ?? '';
 	}
 }

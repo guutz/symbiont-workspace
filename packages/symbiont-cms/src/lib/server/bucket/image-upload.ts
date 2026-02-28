@@ -10,14 +10,12 @@
  * - Store original URL in file metadata for reference
  */
 
-import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface UploadImageOptions {
-	supabaseUrl: string;
-	serviceRoleKey: string;
+	supabase: SupabaseClient;
 	pageId: string;
-	altText?: string; // Optional alt text from markdown for filename
 }
 
 export interface UploadImageResult {
@@ -61,7 +59,7 @@ function getExtensionFromUrl(urlOrFilename: string): string {
  * - Original filename/URL preserved in file metadata
  */
 function resolveFilename(url: string, buffer: Buffer): string {
-	const hash = crypto.createHash('sha256')
+	const hash = createHash('sha256')
 		.update(buffer)
 		.digest('hex')
 		.substring(0, 12);
@@ -77,9 +75,7 @@ export async function uploadImageToSupabase(
 	url: string,
 	options: UploadImageOptions
 ): Promise<UploadImageResult> {
-	const { supabaseUrl, serviceRoleKey, pageId, altText } = options;
-	
-	const supabase = createClient(supabaseUrl, serviceRoleKey);
+	const { supabase, pageId } = options;
 	
 	// Download image
 	const response = await fetch(url);
@@ -89,7 +85,7 @@ export async function uploadImageToSupabase(
 	const arrayBuffer = await response.arrayBuffer();
 	const buffer = Buffer.from(arrayBuffer);
 	
-	// Resolve filename (with optional alt text)
+	// Resolve filename using content hash
 	const filename = resolveFilename(url, buffer);
 	const path = `${pageId}/${filename}`;
 	

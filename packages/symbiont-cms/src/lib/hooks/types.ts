@@ -1,79 +1,117 @@
 import type { PageObjectResponse } from '@notionhq/client';
+import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DatabaseBlueprint } from '../types.js';
+import type { DatabaseBlueprint, DatabasePage } from '../types.js';
 import type { Database } from '../database.types.js';
 
 /**
- * Hook lifecycle events in the page transformation pipeline.
- * These are built-in event types that Symbiont defines.
+ * Composition strategy for hook execution.
  */
-export type HookEvent =
-	// Early validation
-	| 'page:exclude' // Should page be excluded from sync?
-	| 'page:validate' // Is page data valid?
+export enum CompositionStrategy {
+	/** Stop at first non-null result (strings, numbers, dates) */
+	FirstWins,
+	/** Accumulate all results; registry infers merge (objects) or concat (arrays) */
+	Collect,
+	/** Run all; true if any hook returns true (boolean OR) */
+	OrAll,
+	/** Run all; false if any hook returns false (boolean AND) */
+	AndAll,
+	/** Run all; ignore return values entirely (side effects) */
+	RunAll,
+	/** Chain: each hook's return becomes next hook's input; null = pass-through */
+	Pipeline
+}
 
-	// Metadata extraction
-	| 'metadata:title' // Extract/transform title
-	| 'metadata:tags' // Extract/transform tags
-	| 'metadata:authors' // Extract/transform authors
-	| 'metadata:summary' // Extract/transform summary
-	| 'metadata:custom' // Extract custom metadata (user-defined data)
+/**
+ * MdBlock type from notion-to-md library.
+ * Represents a block of markdown content with type and parent info.
+ */
+export type MdBlock = {
+	type: string;
+	parent: string;
+	children?: MdBlock[];
+	[key: string]: any;
+};
 
-	// Publishing logic
-	| 'publish:check' // Should page be published?
-	| 'publish:date' // Determine publish date
+/** Helper to define a hook event with typed return, composition strategy, and optional field. */
+function e<TReturn>(strategy: CompositionStrategy, field?: keyof DatabasePage) {
+	return { output: null as unknown as TReturn, strategy, field };
+}
 
-	// Slug handling
-	| 'slug:extract' // Extract custom slug from Notion
-	| 'slug:generate' // Generate slug from title
-	| 'slug:validate' // Validate slug uniqueness
-	| 'slug:transform' // Transform slug (sanitization, etc.)
+const S = CompositionStrategy;
 
-	// Content processing
-	| 'content:fetch' // Fetch page content
-	| 'content:transform' // Transform markdown content
-	| 'content:images' // Process inline images
+/**
+ * Hook event definitions - THE SINGLE SOURCE OF TRUTH
+ * 
+ * Each event has:
+ * - output: Type of value returned by hooks (TReturn)
+ * - strategy: How to compose results from multiple hooks
+ * - field: Optional keyof DatabasePage where result is written
+ * 
+ * Events are fired in order by the transformer. See Event Ordering Contract in design memo.
+ */
+export const HOOK_EVENTS = {
+	// ── Page Lifecycle ─────────────────────────────────────────────────
+	'page:before': e<void>(S.RunAll),
+	'page:should-sync': e<boolean>(S.AndAll), // flow control — no field
+	'page:after': e<void>(S.RunAll),
 
-	// Cover image
-	| 'cover:extract' // Extract cover image
-	| 'cover:process' // Upload/process cover image
+	// ── Publishing ─────────────────────────────────────────────────────
+	'publish:check': e<boolean>(S.AndAll), // flow control — no field
+	'publish:date': e<string | Date>(S.FirstWins, 'publish_at'),
 
-	// Sync back to Notion
-	| 'sync:slug' // Sync slug back to Notion
-	| 'sync:content' // Sync content back to Notion
-	| 'sync:images'; // Sync image URLs back to Notion
+	// ── Slug Pipeline ──────────────────────────────────────────────────
+	'slug:extract': e<string>(S.FirstWins, 'slug'),
+	'slug:generate': e<string>(S.FirstWins, 'slug'),
+	'slug:conflict': e<string>(S.FirstWins, 'slug'), // receives current slug as input, returns resolved slug
+	'slug:sync': e<void>(S.RunAll), // side effect — no field
+
+	// ── Metadata Extraction ────────────────────────────────────────────
+	'metadata:title': e<string>(S.FirstWins, 'title'),
+	'metadata:tags': e<string[]>(S.Collect, 'tags'),
+	'metadata:authors': e<string[]>(S.Collect, 'authors'),
+	'metadata:summary': e<string>(S.FirstWins, 'summary'),
+	'metadata:custom': e<Record<string, unknown>>(S.Collect, 'meta'), // merged into output.meta
+
+	// ── Content Pipeline ───────────────────────────────────────────────
+	'content:preprocess': e<MdBlock[]>(S.FirstWins), // ctx.input = BlockObjectResponse[]; no field
+	'content:text': e<string>(S.Pipeline, 'content'),
+	'content:media': e<string>(S.Pipeline, 'content'),
+	'content:postprocess': e<string>(S.Pipeline, 'content'),
+	'content:sync': e<void>(S.RunAll), // side effect — no field
+
+	// ── Cover Pipeline (config-gated via coverProperty) ────────────────
+	'cover:extract': e<string>(S.FirstWins, 'cover'), // default hook falls back to scanning content
+	'cover:process': e<string>(S.Pipeline, 'cover'),
+	'cover:sync': e<void>(S.RunAll) // side effect — no field
+} as const;
+
+/**
+ * Hook event names derived from HOOK_EVENTS.
+ */
+export type HookEvent = keyof typeof HOOK_EVENTS;
+
 
 /**
  * Context object passed to each hook function.
  * 
- * **Hook Philosophy: Extractors, Not Transformers**
- * 
- * Hooks are independent extractors that read from `ctx.page` and return values.
- * They do NOT transform data flowing through them (no `ctx.data`).
- * 
- * The HookRegistry automatically composes results based on return type:
- * - **Primitives** (string, number, Date, boolean): First non-null wins
- * - **Objects**: Merge all non-null results
- * - **Arrays**: Concatenate all non-null results
- * 
- * @example Extractor pattern (correct)
- * ```typescript
- * fn: async (ctx) => {
- *   return parseDate(ctx.page.properties.Date);
- * }
- * ```
- * 
- * @example Return null to skip
- * ```typescript
- * fn: async (ctx) => {
- *   if (!hasCustomDate(ctx.page)) return null; // Falls through to next hook
- *   return extractCustomDate(ctx.page);
- * }
- * ```
+ * Contains everything a hook needs to operate: the page being processed,
+ * accumulated output so far, configuration, logging, services, and control flow.
  */
 export type HookContext = {
-	/** The Notion page being processed */
+	/** The Notion page being processed (raw source, never mutated) */
 	page: PageObjectResponse;
+
+	/** Accumulated output so far (read-only view of DatabasePage being assembled) */
+	output: Readonly<Partial<DatabasePage>>;
+
+	/**
+	 * Pipeline input value (for Pipeline events and slug:conflict).
+	 * - Pipeline events: current value in the transform chain
+	 * - slug:conflict: current slug needing validation
+	 * - content:preprocess: BlockObjectResponse[] from Notion
+	 */
+	input?: unknown;
 
 	/** The database configuration */
 	config: DatabaseBlueprint;
@@ -86,14 +124,21 @@ export type HookContext = {
 		error: (data: any) => void;
 	};
 
-	/** Optional Supabase client for advanced use cases */
-	supabase?: SupabaseClient<Database>;
-
-	/** Internal flag to track abort state */
-	aborted: boolean;
-
-	/** Abort reason if aborted */
-	abortReason?: string;
+	/**
+	 * Services for side-effect operations.
+	 * Always present as an object (individual fields may be undefined).
+	 * 
+	 * Built-in services:
+	 * - notionClient: For syncing data back to Notion
+	 * - supabase: Supabase client for storage operations
+	 * 
+	 * Custom services can be added via index signature.
+	 */
+	services: {
+		notionClient?: any; // Use 'any' to avoid circular dependency
+		supabase?: SupabaseClient<Database>;
+		[key: string]: unknown; // custom services
+	};
 
 	/** Stop processing this page with a reason */
 	abort: (reason: string) => void;
@@ -102,23 +147,11 @@ export type HookContext = {
 /**
  * Hook function signature.
  * 
- * Hooks are extractors that read from `ctx.page` and return a value or `null`.
- * - Return your extracted value if you have data to contribute
- * - Return `null` if you have nothing to contribute (registry continues to next hook)
+ * Hooks read from `ctx.page` (and optionally `ctx.input`) and return a value or `null`.
+ * - Return your value if you have data to contribute
+ * - Return `null` if you have nothing to contribute (continues to next hook)
  * 
- * The registry automatically composes results:
- * - **Primitives**: First non-null wins (stops processing)
- * - **Objects**: Merged together
- * - **Arrays**: Concatenated together
- * 
- * @example
- * ```typescript
- * // Custom date extraction
- * fn: async (ctx) => {
- *   const date = ctx.page.properties.Date?.date?.start;
- *   return date ? new Date(date).toISOString() : null;
- * }
- * ```
+ * The registry composes results based on the event's composition strategy.
  */
 export type HookFunction<TOutput = any> = (
 	context: HookContext
@@ -128,22 +161,10 @@ export type HookFunction<TOutput = any> = (
  * Hook definition.
  * Associates a function with an event and priority.
  * 
- * Hooks execute in priority order (lower = earlier):
- * - **1-20**: Pre-processing (debug logging, property inspection)
- * - **30-40**: Custom logic (runs before defaults)
- * - **50**: Default hooks (Symbiont's built-in behavior)
- * - **60-70**: Post-processing (validation, computed fields)
- * - **80-99**: Final validation (error checking, warnings)
- * 
- * @example
- * ```typescript
- * {
- *   name: 'caltech:publish-date',
- *   event: 'publish:date',
- *   priority: 40,
- *   fn: async (ctx) => parseIssueDate(ctx.page) || null
- * }
- * ```
+ * Priority values:
+ * - 'override': Runs before Symbiont's defaults (wins for first-wins events)
+ * - 'fallback': Runs after Symbiont's defaults (only reached if defaults return null)
+ * - omitted: Same order as built-in defaults
  */
 export interface Hook<TOutput = any> {
 	/** User-defined name for this hook (for logging/debugging) */
@@ -153,20 +174,19 @@ export interface Hook<TOutput = any> {
 	event: HookEvent;
 
 	/**
-	 * Priority for execution order (lower runs first)
-	 * Default: 50
-	 * Suggested ranges:
-	 * - 1-20: Pre-processing (debug logging)
-	 * - 30-40: Custom logic (before defaults)
-	 * - 50: Default hooks
-	 * - 60-70: Post-processing (validation)
-	 * - 80-99: Final validation
+	 * Priority for execution order.
+	 * - 'override': Runs before defaults
+	 * - 'fallback': Runs after defaults
+	 * - omitted: Same level as defaults
 	 */
-	priority?: number;
+	priority?: 'override' | 'fallback';
 
 	/**
-	 * Whether to continue execution if this hook throws an error
+	 * Whether to continue execution if this hook throws an error.
 	 * Default: false (stop on error)
+	 * 
+	 * Set to true for best-effort side effects (notifications, analytics)
+	 * that shouldn't break the sync if they fail.
 	 */
 	continueOnError?: boolean;
 

@@ -1,6 +1,8 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
+import { createClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint } from '../../types.js';
+import type { Database } from '../../database.types.js';
 import type { SymbiontClient } from '../../client.js';
 import { requireEnvVar } from '../utils/env.js';
 import { NotionClient } from '../notion/client.js';
@@ -16,7 +18,15 @@ import { NotionToDatabaseSync } from './notion-to-database-sync.js';
  * - Database client setup
  * - Class instantiation in the correct order
  * 
- * @param client - Symbiont client instance
+ * **Supabase Client Pattern**:
+ * - User's SymbiontClient contains a public/anon Supabase client (read-only)
+ * - Coordinator creates a service role Supabase client (admin, write access)
+ * - Service role client is used for:
+ *   - Image uploads to storage
+ *   - Database mutations (upsert/delete pages)
+ *   - Sync operations requiring write access
+ * 
+ * @param client - Symbiont client instance (contains public Supabase client)
  * @param config - Database configuration blueprint
  * 
  * @example
@@ -66,19 +76,34 @@ export function createNotionToDatabaseSyncCoordinator(
 	// Create Notion client layer (Notion API)
 	const notionClient = new NotionClient(notion, n2m);
 
-	// Create page CRUD layer (Database) with Supabase admin client
-	const pageCrud = new DatabasePageCRUD(
+	// Create Supabase admin client for sync operations
+	// This is the SINGLE service role client used for all sync operations:
+	// - Image uploads to storage
+	// - Database mutations (upsert/delete pages)
+	// - Passed to DatabasePageCRUD and NotionPageToDatabasePageTransformer
+	// This is separate from the user's public client in SymbiontClient
+	const supabase = createClient<Database>(
 		client.config.supabase.url,
-		serviceRoleKey
+		serviceRoleKey,
+		{
+			auth: {
+				autoRefreshToken: false,
+				persistSession: false,
+				detectSessionInUrl: false
+			}
+		}
 	);
 
+	// Create page CRUD layer (Database) with service role client
+	const pageCrud = new DatabasePageCRUD(supabase);
+
 	// Create transformation layer (Notion page to website page)
+	// Receives admin Supabase client for image uploads
 	const transformer = new NotionPageToDatabasePageTransformer(
 		config,
 		notionClient,
 		pageCrud,
-		client.config.supabase.url,
-		serviceRoleKey
+		supabase
 	);
 
 	// Create sync coordinator (coordination layer)

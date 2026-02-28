@@ -1,17 +1,11 @@
-import type { Hook } from 'symbiont-cms';
+import type { Hook, HookContext } from 'symbiont-cms';
 import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
 
 /**
  * California Tech custom hooks for Symbiont CMS.
  * 
- * **Extractor Pattern:**
- * - Hooks read from `ctx.page` and return values or `null`
- * - No `ctx.data`, no `ctx.skip()` - registry handles composition
- * - Return `null` to let next hook run (for primitives like dates)
- * - Objects are auto-merged by registry
- * 
  * These hooks customize page processing for the California Tech newspaper:
- * - Exclude Print Only and Advertisement articles
+ * - Exclude Print Only and Advertisement articles from sync
  * - Only publish articles with Status = "Published"
  * - Parse dates from Issue property with PST timezone
  * - Extract custom slug from Website Slug property
@@ -21,13 +15,16 @@ import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser
  * Exclude pages with "Print Only" or "Advertisement" tags from sync.
  * These articles should not appear on the website.
  * 
- * Priority: 40 (before default)
+ * Uses page:should-sync event (AndAll strategy):
+ * - Return false to exclude the page from sync
+ * - Return true to allow sync
+ * - Return null for no opinion
  */
 export const excludePrintOnlyHook: Hook<boolean> = {
 	name: 'tech:exclude:print-only',
-	event: 'page:exclude',
-	priority: 40,
-	fn: async (ctx) => {
+	event: 'page:should-sync',
+	priority: 'override',
+	fn: async (ctx: HookContext) => {
 		const tags = ctx.page.properties.Tags;
 		// @ts-ignore - Notion types are complex, this is safe at runtime
 		const shouldExclude = tags?.multi_select?.some(
@@ -40,9 +37,10 @@ export const excludePrintOnlyHook: Hook<boolean> = {
 				pageId: ctx.page.id,
 				reason: 'Print Only or Advertisement tag'
 			});
+			return false; // Don't sync this page
 		}
 
-		return shouldExclude;
+		return true; // Allow sync
 	}
 };
 
@@ -51,13 +49,16 @@ export const excludePrintOnlyHook: Hook<boolean> = {
  * Only pages with Status = "Published" are public.
  * Also excludes Print Only and Advertisement articles.
  * 
- * Priority: 40 (before default)
+ * Uses publish:check event (AndAll strategy):
+ * - Return false to prevent publishing (page syncs but publish_at is null)
+ * - Return true to allow publishing
+ * - Return null for no opinion
  */
 export const publishCheckHook: Hook<boolean> = {
 	name: 'tech:publish:check',
 	event: 'publish:check',
-	priority: 40,
-	fn: async (ctx) => {
+	priority: 'override',
+	fn: async (ctx: HookContext) => {
 		const status = ctx.page.properties.Status;
 		const tags = ctx.page.properties.Tags;
 
@@ -88,22 +89,16 @@ export const publishCheckHook: Hook<boolean> = {
 /**
  * Parse publish date from Issue property or Website Publish Date.
  * 
- * **Extractor Pattern:**
- * - Returns parsed date if found
- * - Returns `null` if no custom date (falls through to default hook)
- * 
  * Priority order:
  * 1. Issue property (e.g., "January 20, 2023") - parsed with PST timezone
  * 2. Website Publish Date property
  * 3. Return null → falls through to default (last_edited_time)
- * 
- * Priority: 40 (before default)
  */
-export const publishDateHook: Hook<string | null> = {
+export const publishDateHook: Hook<string | Date> = {
 	name: 'tech:publish:date:issue-based',
 	event: 'publish:date',
-	priority: 40,
-	fn: async (ctx) => {
+	priority: 'override',
+	fn: async (ctx: HookContext) => {
 		// @ts-ignore
 		const issueProperty = ctx.page.properties.Issue?.select?.name;
 
@@ -148,17 +143,13 @@ export const publishDateHook: Hook<string | null> = {
 /**
  * Extract custom slug from Website Slug property.
  * 
- * **Extractor Pattern:**
- * - Returns custom slug if found
- * - Returns `null` if not present (falls through to auto-generation)
- * 
- * Priority: 40 (before default)
+ * Returns custom slug if found, otherwise null to allow auto-generation.
  */
-export const slugExtractHook: Hook<string | null> = {
+export const slugExtractHook: Hook<string> = {
 	name: 'tech:slug:extract',
 	event: 'slug:extract',
-	priority: 40,
-	fn: async (ctx) => {
+	priority: 'override',
+	fn: async (ctx: HookContext) => {
 		// @ts-ignore
 		const slugProperty = ctx.page.properties['Website Slug']?.rich_text;
 		const customSlug = slugProperty?.[0]?.plain_text?.trim() || null;
@@ -183,8 +174,8 @@ export const archiveIssueHooks: Hook[] = [
 	{
 		name: 'archives:date',
 		event: 'slug:extract',
-		priority: 40,
-		fn: async (ctx) => {
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			// Slug from date property (e.g. "2024-10-21")
 			const dateSlug = (ctx.page.properties.date as any)?.date?.start;
 			if (dateSlug) {
@@ -192,13 +183,14 @@ export const archiveIssueHooks: Hook[] = [
 				const date = new Date(dateSlug);
 				return date.toISOString().split('T')[0];
 			}
+			return null;
 		}
 	},
 	{
 		name: 'archives:metadata:resolver',
 		event: 'metadata:custom',
-		priority: 40,
-		fn: async (ctx) => {
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			// Extract resolver URL for Caltech archives
 			const resolverUrl = (ctx.page.properties.resolver_url as any)?.url;
 			
@@ -217,9 +209,9 @@ export const websitePagesHooks: Hook[] = [
 	// Exclude "Draft" pages - don't sync at all, keeps previous live version
 	{
 		name: 'pages:exclude:draft',
-		event: 'page:exclude',
-		priority: 40,
-		fn: async (ctx) => {
+		event: 'page:should-sync',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			const status = (ctx.page.properties.Status as any)?.select?.name;
 			const shouldExclude = status === 'Draft';
 			
@@ -230,9 +222,10 @@ export const websitePagesHooks: Hook[] = [
 					title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
 					reason: 'Status is Draft - not syncing'
 				});
+				return false; // Don't sync
 			}
 			
-			return shouldExclude;
+			return true; // Allow sync
 		}
 	},
 	
@@ -240,8 +233,8 @@ export const websitePagesHooks: Hook[] = [
 	{
 		name: 'pages:publish:not-shown',
 		event: 'publish:check',
-		priority: 40,
-		fn: async (ctx) => {
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			const status = (ctx.page.properties.Status as any)?.select?.name;
 			
 			if (status === 'Not shown') {
@@ -260,11 +253,12 @@ export const websitePagesHooks: Hook[] = [
 	},
 	
 	// Validate that Redirect pages have either a redirect link or file
+	// Note: page:validate event no longer exists, using page:before for validation warnings
 	{
 		name: 'pages:validate:redirects',
-		event: 'page:validate',
-		priority: 40,
-		fn: async (ctx) => {
+		event: 'page:before',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			const type = (ctx.page.properties.Type as any)?.select?.name;
 			
 			if (type === 'Redirect') {
@@ -281,8 +275,7 @@ export const websitePagesHooks: Hook[] = [
 				}
 			}
 			
-			// Validation hooks don't exclude, just warn
-			return null;
+			// page:before hooks are RunAll, no return value needed
 		}
 	},
 	
@@ -290,8 +283,8 @@ export const websitePagesHooks: Hook[] = [
 	{
 		name: 'pages:metadata:page-type',
 		event: 'metadata:custom',
-		priority: 40,
-		fn: async (ctx) => {
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
 			const type = (ctx.page.properties.Type as any)?.select?.name || 'Content';
 			const status = (ctx.page.properties.Status as any)?.select?.name || 'Live';
 			const redirectLink = (ctx.page.properties['Redirect Link'] as any)?.url;

@@ -15,7 +15,7 @@ import { createLogger } from '../utils/logger.js';
 export class NotionClient {
 	private logger = createLogger({ operation: 'notion_client' });
 
-	constructor(private notion: Client, private n2m: NotionToMarkdown) {}
+	constructor(private notion: Client, public n2m: NotionToMarkdown) {}
 
 	/**
 	 * Fetch a single page by ID
@@ -388,5 +388,47 @@ export class NotionClient {
 		return uniqueIdProp.unique_id.prefix 
 			? `${uniqueIdProp.unique_id.prefix}-${uniqueIdProp.unique_id.number}`
 			: String(uniqueIdProp.unique_id.number);
+	}
+
+	/**
+	 * Get raw blocks from a Notion page.
+	 * Returns BlockObjectResponse[] for content:preprocess hook.
+	 */
+	async getBlocks(pageId: string): Promise<any[]> {
+		this.logger.debug({ event: 'fetch_blocks', pageId });
+
+		try {
+			const response = await this.notion.blocks.children.list({ block_id: pageId });
+			return response.results as any[];
+		} catch (error: any) {
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Get database schema (for publish:check hook to find Status property).
+	 * Returns the full database object with properties definition.
+	 */
+	async getDatabaseSchema(databaseId: string): Promise<any> {
+		this.logger.debug({ event: 'fetch_database_schema', databaseId });
+
+		try {
+			const response = await this.notion.databases.retrieve({ database_id: databaseId });
+			return response;
+		} catch (error: any) {
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+			throw error;
+		}
 	}
 }
