@@ -16,6 +16,8 @@ import { HOOK_EVENTS, CompositionStrategy } from './types.js';
  */
 export class HookRegistry {
 	private hooks: Map<HookEvent, Hook[]> = new Map();
+	/** Per-page mutable store, reset at the start of each page via beginPage(). */
+	private pageStore: Record<string, unknown> = {};
 	private logger: {
 		debug: (data: any) => void;
 		info: (data: any) => void;
@@ -504,6 +506,13 @@ export class HookRegistry {
 	}
 
 	/**
+	 * Reset the per-page store. Call this at the start of each page's transform run.
+	 */
+	beginPage(): void {
+		this.pageStore = {};
+	}
+
+	/**
 	 * Build hook context.
 	 * Freezes output to make it read-only for hooks.
 	 */
@@ -521,7 +530,8 @@ export class HookRegistry {
 			config: this.config,
 			logger: this.logger,
 			services: this.services,
-			abort
+			abort,
+			store: this.pageStore // shared mutable bag — same object reference across all events
 		};
 	}
 

@@ -507,7 +507,7 @@ export const defaultContentSyncHook: Hook<void> = {
 
 		try {
 			// Convert markdown back to Notion blocks
-			const blocks = await convertMarkdownToNotionBlocks(finalContent);
+			const blocks = convertMarkdownToNotionBlocks(finalContent);
 			
 			// Update Notion page with new blocks
 			await notionClient.updatePageBlocks(ctx.page.id, blocks);

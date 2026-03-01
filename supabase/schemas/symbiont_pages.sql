@@ -57,6 +57,7 @@ CREATE TABLE public.pages (
     meta jsonb DEFAULT jsonb_build_object(),
     content text,
     summary text,
+    cover text,
     updated_at timestamp with time zone NOT NULL,
     datasource_id text NOT NULL,
     datasource_alias text NOT NULL

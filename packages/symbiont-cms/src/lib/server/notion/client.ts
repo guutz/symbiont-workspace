@@ -134,6 +134,54 @@ export class NotionClient {
 	}
 
 	/**
+	 * Update a URL property on a Notion page
+	 * Used to sync public CDN/storage URLs back to Notion url-type properties
+	 */
+	async updateUrlProperty(
+		pageId: string,
+		propertyName: string,
+		url: string
+	): Promise<void> {
+		this.logger.debug({
+			event: 'update_url_property',
+			pageId,
+			propertyName,
+			url
+		});
+
+		try {
+			await this.notion.pages.update({
+				page_id: pageId,
+				properties: {
+					[propertyName]: {
+						url
+					}
+				}
+			});
+			this.logger.info({
+				event: 'url_property_updated',
+				pageId,
+				propertyName
+			});
+		} catch (error: any) {
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+
+			this.logger.warn({
+				event: 'update_url_property_failed',
+				pageId,
+				propertyName,
+				error: error?.message
+			});
+			// Non-blocking — same pattern as updateProperty
+		}
+	}
+
+	/**
 	 * Update a file property on a Notion page with an external URL
 	 * Used to sync uploaded image URLs (Supabase/Nhost) back to Notion
 	 */

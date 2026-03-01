@@ -142,6 +142,17 @@ export type HookContext = {
 
 	/** Stop processing this page with a reason */
 	abort: (reason: string) => void;
+
+	/**
+	 * Mutable key-value bag that persists across ALL hook events for a single page's
+	 * processing run. Use this to pass computed values from one event to a later event
+	 * without relying on ctx.page being re-fetched.
+	 *
+	 * Example: an `archives:pdf` hook on `content:postprocess` uploads a PDF and
+	 * writes `ctx.store.pdfPublicUrl = result.newUrl`; a later `archives:cover` hook
+	 * on `cover:extract` reads `ctx.store.pdfPublicUrl` to generate the thumbnail.
+	 */
+	store: Record<string, unknown>;
 };
 
 /**

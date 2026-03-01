@@ -1,5 +1,28 @@
 import type { Hook, HookContext } from 'symbiont-cms';
+import { uploadFileToSupabase, uploadBufferToSupabase } from 'symbiont-cms/server';
 import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
+import { pdf } from 'pdf-to-img';
+import { createHash } from 'crypto';
+
+/**
+ * Render the first page of a remote PDF as a PNG buffer.
+ * Uses pdf-to-img which runs fully in-process (no external tools needed).
+ */
+async function generateThumbnailBuffer(pdfUrl: string): Promise<Buffer> {
+  // Fetch and convert to data URL (required by pdf-to-img)
+  const response = await fetch(pdfUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
+  const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
+
+  // Render first page at scale 1 (thumbnail quality)
+  const document = await pdf(dataUrl, { scale: 1 });
+  const firstPage = await document.getPage(1);
+  return Buffer.from(firstPage);
+}
 
 /**
  * California Tech custom hooks for Symbiont CMS.
@@ -25,8 +48,7 @@ export const excludePrintOnlyHook: Hook<boolean> = {
 	event: 'page:should-sync',
 	priority: 'override',
 	fn: async (ctx: HookContext) => {
-		const tags = ctx.page.properties.Tags;
-		// @ts-ignore - Notion types are complex, this is safe at runtime
+		const tags = ctx.page.properties.Tags as any;
 		const shouldExclude = tags?.multi_select?.some(
 			(tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement'
 		) ?? false;
@@ -59,13 +81,11 @@ export const publishCheckHook: Hook<boolean> = {
 	event: 'publish:check',
 	priority: 'override',
 	fn: async (ctx: HookContext) => {
-		const status = ctx.page.properties.Status;
-		const tags = ctx.page.properties.Tags;
+		const status = ctx.page.properties.Status as any;
+		const tags = ctx.page.properties.Tags as any;
 
-		// @ts-ignore - Notion types are complex, this is safe at runtime
 		const isPublished = status?.status?.name === 'Published';
 
-		// @ts-ignore
 		const hasPrintOnlyTag = tags?.multi_select?.some(
 			(tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement'
 		) ?? false;
@@ -76,7 +96,6 @@ export const publishCheckHook: Hook<boolean> = {
 			ctx.logger.debug({
 				event: 'publish_check_failed',
 				pageId: ctx.page.id,
-				// @ts-ignore - Notion types are complex
 				status: status?.status?.name,
 				hasPrintOnlyTag
 			});
@@ -99,8 +118,7 @@ export const publishDateHook: Hook<string | Date> = {
 	event: 'publish:date',
 	priority: 'override',
 	fn: async (ctx: HookContext) => {
-		// @ts-ignore
-		const issueProperty = ctx.page.properties.Issue?.select?.name;
+		const issueProperty = (ctx.page.properties.Issue as any)?.select?.name;
 
 		// Try Issue property first
 		if (issueProperty) {
@@ -117,8 +135,7 @@ export const publishDateHook: Hook<string | Date> = {
 		}
 
 		// Try Website Publish Date property
-		// @ts-ignore
-		const websiteDate = ctx.page.properties['Website Publish Date']?.date?.start;
+		const websiteDate = (ctx.page.properties['Website Publish Date'] as any)?.date?.start;
 		if (websiteDate) {
 			const parsed = parseWebsitePublishDate(websiteDate);
 			if (parsed) {
@@ -137,32 +154,6 @@ export const publishDateHook: Hook<string | Date> = {
 			pageId: ctx.page.id
 		});
 		return null;
-	}
-};
-
-/**
- * Extract custom slug from Website Slug property.
- * 
- * Returns custom slug if found, otherwise null to allow auto-generation.
- */
-export const slugExtractHook: Hook<string> = {
-	name: 'tech:slug:extract',
-	event: 'slug:extract',
-	priority: 'override',
-	fn: async (ctx: HookContext) => {
-		// @ts-ignore
-		const slugProperty = ctx.page.properties['Website Slug']?.rich_text;
-		const customSlug = slugProperty?.[0]?.plain_text?.trim() || null;
-
-		if (customSlug) {
-			ctx.logger.debug({
-				event: 'slug_extracted_from_property',
-				pageId: ctx.page.id,
-				slug: customSlug
-			});
-		}
-
-		return customSlug;
 	}
 };
 
@@ -191,12 +182,129 @@ export const archiveIssueHooks: Hook[] = [
 		event: 'metadata:custom',
 		priority: 'override',
 		fn: async (ctx: HookContext) => {
-			// Extract resolver URL for Caltech archives
-			const resolverUrl = (ctx.page.properties.resolver_url as any)?.url;
+			// Prefer the URL uploaded this run (stashed by archives:pdf on page:before);
+			// fall back to whatever URL is already on the Notion page snapshot.
+			// On first sync the Notion property won't be set yet, so ctx.store is the
+			// only reliable source.
+			const resolverUrl =
+				(ctx.store.pdfPublicUrl as string | undefined) ??
+				(ctx.page.properties['PDF URL'] as any)?.url;
 			
 			return {
 				resolver_url: resolverUrl || null
 			};
+		}
+	},
+	{
+		name: 'archives:pdf',
+		event: 'page:before',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
+			// If page has a file in the `PDF` property, upload to Supabase and set `PDF URL` property with public URL
+			const pdfFile = (ctx.page.properties.PDF as any)?.files?.[0];
+			if (pdfFile) {
+				const pdfUrl = pdfFile.type === 'external' ? pdfFile.external?.url : pdfFile.file?.url;
+				if (pdfUrl && ctx.services.supabase) {
+					// Build deterministic storage path from the issue date
+					const dateStart = (ctx.page.properties.date as any)?.date?.start;
+					const isoDate = dateStart
+						? new Date(dateStart).toISOString().split('T')[0]
+						: null;
+					const storagePath = isoDate ? `issues/${isoDate}.pdf` : undefined;
+
+					try {
+						const uploadResult = await uploadFileToSupabase(pdfUrl, {
+							supabase: ctx.services.supabase,
+							pageId: ctx.page.id,
+							contentType: 'application/pdf',
+							storagePath
+						});
+						// Stash public URL in store so cover:extract can read it
+						// without requiring ctx.page to be re-fetched from Notion
+						ctx.store.pdfPublicUrl = uploadResult.newUrl;
+						ctx.logger.debug({
+							event: 'uploaded_pdf_to_supabase',
+							pageId: ctx.page.id,
+							pdfUrl,
+							publicUrl: uploadResult.newUrl
+						});
+						// Write the Supabase public URL back to the Notion 'PDF URL' url property
+						await ctx.services.notionClient.updateUrlProperty(ctx.page.id, 'PDF URL', uploadResult.newUrl);
+					} catch (error) {
+						ctx.logger.error({
+							event: 'pdf_upload_failed',
+							pageId: ctx.page.id,
+							pdfUrl,
+							error: error instanceof Error ? error.message : String(error)
+						});
+					}
+				}
+			}
+		}
+	},
+	{
+		name: 'archives:cover',
+		event: 'cover:extract',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
+			// Prefer the URL stashed in store by archives:pdf this same run;
+			// fall back to the PDF URL property already on the Notion page
+			const pdfUrl: string | undefined =
+				(ctx.store.pdfPublicUrl as string | undefined) ??
+				(ctx.page.properties['PDF URL'] as any)?.url;
+			if (pdfUrl) {
+				if (!ctx.services.supabase) {
+					ctx.logger.error({
+						event: 'supabase_client_unavailable',
+						pageId: ctx.page.id,
+						pdfUrl
+					});
+					return null;
+				}
+				try {
+					const thumbnailBuffer = await generateThumbnailBuffer(pdfUrl);
+					// Derive a stable filename from a hash of the source PDF URL
+					const hash = createHash('sha256').update(pdfUrl).digest('hex').substring(0, 12);
+					const filename = `${hash}_cover.png`;
+					ctx.logger.debug({
+						event: 'generated_thumbnail_from_pdf',
+						pageId: ctx.page.id,
+						pdfUrl,
+						filename
+					});
+					try {
+						const uploadResult = await uploadBufferToSupabase(thumbnailBuffer, {
+							supabase: ctx.services.supabase,
+							pageId: ctx.page.id,
+							filename,
+							contentType: 'image/png'
+						});
+						ctx.logger.debug({
+							event: 'uploaded_thumbnail_to_supabase',
+							pageId: ctx.page.id,
+							pdfUrl,
+							thumbnailUrl: uploadResult.newUrl
+						});
+						return uploadResult.newUrl;
+					} catch (uploadError) {
+						ctx.logger.error({
+							event: 'thumbnail_upload_failed',
+							pageId: ctx.page.id,
+							pdfUrl,
+							error: uploadError instanceof Error ? uploadError.message : String(uploadError)
+						});
+					}
+				} catch (error) {
+					ctx.logger.error({
+						event: 'thumbnail_generation_failed',
+						pageId: ctx.page.id,
+						pdfUrl,
+						error: error instanceof Error ? error.message : String(error)
+					});
+				}
+			}
+			
+			return null;
 		}
 	}
 ];
@@ -313,6 +421,5 @@ export const websitePagesHooks: Hook[] = [
 export const techHooks: Hook[] = [
 	excludePrintOnlyHook,
 	publishCheckHook,
-	publishDateHook,
-	slugExtractHook
+	publishDateHook
 ];

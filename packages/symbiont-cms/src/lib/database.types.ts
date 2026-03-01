@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           authors: Json | null
           content: string | null
+          cover: string | null
           datasource_alias: string
           datasource_id: string
           meta: Json | null
@@ -32,6 +33,7 @@ export type Database = {
         Insert: {
           authors?: Json | null
           content?: string | null
+          cover?: string | null
           datasource_alias: string
           datasource_id: string
           meta?: Json | null
@@ -46,6 +48,7 @@ export type Database = {
         Update: {
           authors?: Json | null
           content?: string | null
+          cover?: string | null
           datasource_alias?: string
           datasource_id?: string
           meta?: Json | null

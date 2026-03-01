@@ -1,5 +1,4 @@
 import type { PageObjectResponse } from '@notionhq/client';
-import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint, DatabasePage } from '../../types.js';
 import type { Database } from '../../database.types.js';
@@ -85,6 +84,9 @@ export class NotionPageToDatabasePageTransformer {
 			datasource_alias: this.config.alias,
 			updated_at: page.last_edited_time
 		};
+
+		// Reset per-page store so hooks can communicate across events
+		this.hookRegistry.beginPage();
 
 		try {
 			// ── Page Lifecycle ─────────────────────────────────────────

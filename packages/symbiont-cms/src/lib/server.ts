@@ -24,8 +24,8 @@ export { createLogger } from './server/utils/logger.js';
 export { createSlug } from './server/utils/slug.js';
 
 // Image processing utilities
-export { uploadImageToSupabase, needsUploadToSupabase, getImageUrl } from './server/bucket/image-upload.js';
-export type { UploadImageOptions, UploadImageResult } from './server/bucket/image-upload.js';
+export { uploadImageToSupabase, uploadFileToSupabase, uploadBufferToSupabase, needsUploadToSupabase, getImageUrl } from './server/bucket/image-upload.js';
+export type { UploadImageOptions, UploadFileOptions, UploadBufferOptions, UploadImageResult } from './server/bucket/image-upload.js';
 
 // Markdown to Notion conversion
 export { convertMarkdownToNotionBlocks } from './server/notion/markdown-to-blocks.js';

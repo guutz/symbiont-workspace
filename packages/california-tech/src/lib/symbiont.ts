@@ -1,6 +1,9 @@
 import { createSymbiontClient } from 'symbiont-cms';
 import { techHooks, archiveIssueHooks, websitePagesHooks } from './hooks/tech-hooks.js';
 
+export const SUPABASE_URL = 'https://xguzskbxiptvhbyggkpl.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6L-isfCogfHJxcnTT9WseA_U4GUHcAB';
+
 /**
  * Symbiont CMS client for California Tech
  * 
@@ -11,8 +14,8 @@ import { techHooks, archiveIssueHooks, websitePagesHooks } from './hooks/tech-ho
  */
 export const symbiont = createSymbiontClient({
 	supabase: {
-		url: 'https://xguzskbxiptvhbyggkpl.supabase.co',
-		publishableKey: 'sb_publishable_6L-isfCogfHJxcnTT9WseA_U4GUHcAB'
+		url: SUPABASE_URL,
+		publishableKey: SUPABASE_PUBLISHABLE_KEY
 	},
 
 	markdown: {
