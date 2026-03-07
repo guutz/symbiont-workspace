@@ -467,7 +467,7 @@ export class NotionClient {
 		this.logger.debug({ event: 'fetch_database_schema', databaseId });
 
 		try {
-			const response = await this.notion.databases.retrieve({ database_id: databaseId });
+			const response = await this.notion.dataSources.retrieve({ data_source_id: databaseId });
 			return response;
 		} catch (error: any) {
 			if (error.code === 'unauthorized' || error.status === 401) {

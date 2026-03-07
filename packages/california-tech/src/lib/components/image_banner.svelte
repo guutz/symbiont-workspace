@@ -28,7 +28,7 @@
     height?: string | number;
   } = $props();
 
-  let asset: Asset.Image | undefined = $assets.get(src);
+  const asset = $derived($assets.get(src) as Asset.Image | undefined);
   const derivedWidth = $derived(asset?.width ?? width);
   const derivedHeight = $derived(asset?.height ?? height);
 </script>

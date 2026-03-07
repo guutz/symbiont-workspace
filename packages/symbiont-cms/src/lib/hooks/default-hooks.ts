@@ -1,8 +1,8 @@
 import type { Hook, MdBlock } from './types.js';
-import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import { createSlug } from '../server/utils/slug.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../server/bucket/image-upload.js';
 import { convertMarkdownToNotionBlocks } from '../server/notion/markdown-to-blocks.js';
+import { blocksAreEquivalent } from '../server/notion/blocks-diff.js';
 import { NotionToMarkdown } from 'notion-to-md';
 
 /**
@@ -160,8 +160,14 @@ export const defaultSlugGenerateHook: Hook<string> = {
 			return null;
 		}
 
-		// Generate from title
-		const title = ctx.output.title || 'untitled';
+		// Find the title-type property regardless of its name (databases may call it
+		// 'Name', 'Article Title', etc. — only one property per page has type 'title').
+		const titleProp = Object.values(ctx.page.properties).find(
+			(p: any) => p.type === 'title'
+		) as any;
+		const pageTitle = titleProp?.title?.map((t: any) => t.plain_text).join('') || null;
+		const title = pageTitle || ctx.output.title;
+		if (!title) return null;
 		return createSlug(title);
 	}
 };
@@ -181,16 +187,38 @@ export const defaultSlugConflictHook: Hook<string> = {
 		const dataSourceId = ctx.config.dataSourceId;
 		const strategy = ctx.config.onSlugConflict || 'auto-rename';
 
-		// Check for conflict
-		const { data: existingPage } = await supabase
-			.from('pages')
-			.select('page_id, slug')
-			.eq('slug', candidateSlug)
-			.eq('datasource_id', dataSourceId)
-			.maybeSingle();
+		// Sync-scoped slug map: loaded once per sync, then mutated in-memory.
+		// Key: slug string → Value: page_id that owns it.
+		// This collapses O(N) per-page DB roundtrips down to a single query.
+		const cacheKey = `slugMap:${dataSourceId}`;
+		if (!ctx.syncStore[cacheKey]) {
+			const { data: allPages } = await supabase
+				.from('pages')
+				.select('page_id, slug')
+				.eq('datasource_id', dataSourceId);
+
+			const map = new Map<string, string>(
+				(allPages ?? [])
+					.filter((p: any) => p.slug)
+					.map((p: any) => [p.slug as string, p.page_id as string])
+			);
+			ctx.syncStore[cacheKey] = map;
+
+			ctx.logger.debug({
+				event: 'slug_map_loaded',
+				dataSourceId,
+				existingSlugs: map.size
+			});
+		}
+
+		const slugMap = ctx.syncStore[cacheKey] as Map<string, string>;
+
+		// Resolve the slug using only in-memory lookups from here on.
+		const existingPageId = slugMap.get(candidateSlug);
 
 		// No conflict, or conflict is with the same page
-		if (!existingPage || existingPage.page_id === pageId) {
+		if (!existingPageId || existingPageId === pageId) {
+			slugMap.set(candidateSlug, pageId);
 			return candidateSlug;
 		}
 
@@ -199,27 +227,25 @@ export const defaultSlugConflictHook: Hook<string> = {
 			case 'error':
 				throw new Error(`Slug conflict: "${candidateSlug}" already exists`);
 
-			case 'use-page-id':
-				return `${candidateSlug}-${pageId.slice(0, 8)}`;
+			case 'use-page-id': {
+				const resolved = `${candidateSlug}-${pageId.slice(0, 8)}`;
+				slugMap.set(resolved, pageId);
+				return resolved;
+			}
 
 			case 'auto-rename':
-			default:
+			default: {
 				// Try -2, -3, etc. up to 100 attempts
 				for (let i = 2; i <= 100; i++) {
 					const numberedSlug = `${candidateSlug}-${i}`;
-					const { data: conflict } = await supabase
-						.from('pages')
-						.select('page_id')
-						.eq('slug', numberedSlug)
-						.eq('datasource_id', dataSourceId)
-						.maybeSingle();
-
-					if (!conflict || conflict.page_id === pageId) {
+					const occupant = slugMap.get(numberedSlug);
+					if (!occupant || occupant === pageId) {
 						ctx.logger.warn({
 							event: 'slug_conflict_auto_renamed',
 							originalSlug: candidateSlug,
 							finalSlug: numberedSlug
 						});
+						slugMap.set(numberedSlug, pageId);
 						return numberedSlug;
 					}
 				}
@@ -231,7 +257,9 @@ export const defaultSlugConflictHook: Hook<string> = {
 					originalSlug: candidateSlug,
 					finalSlug: randomSlug
 				});
+				slugMap.set(randomSlug, pageId);
 				return randomSlug;
+			}
 		}
 	}
 };
@@ -252,13 +280,31 @@ export const defaultSlugSyncHook: Hook<void> = {
 			return null;
 		}
 
+		// Don't write slug back to Notion for unpublished pages (no publish_at yet)
+		if (!ctx.output.publish_at) {
+			return null;
+		}
+
+		// Skip the Notion API write if the slug already matches what's on the page.
+		// The page object was fetched at sync time and already contains the current
+		// property values, so we can compare in-memory without an extra API call.
+		const existingSlugProp = ctx.page.properties[slugProperty];
+		const existingSlug = existingSlugProp && 'rich_text' in existingSlugProp
+			? (existingSlugProp as any).rich_text?.map((rt: any) => rt.plain_text).join('')
+			: null;
+
+		if (existingSlug === finalSlug) {
+			ctx.logger.debug({
+				event: 'slug_sync_skipped_no_change',
+				pageId: ctx.page.id,
+				slug: finalSlug
+			});
+			return null;
+		}
+
 		// Write slug back to Notion
 		try {
-			await notionClient.updateProperty(ctx.page.id, {
-				[slugProperty]: {
-					rich_text: [{ text: { content: finalSlug } }]
-				}
-			});
+			await notionClient.updateProperty(ctx.page.id, slugProperty, finalSlug);
 			
 			ctx.logger.debug({
 				event: 'slug_synced_to_notion',
@@ -372,13 +418,6 @@ export const defaultContentPreprocessHook: Hook<MdBlock[]> = {
 	name: 'symbiont:content:preprocess',
 	event: 'content:preprocess',
 	fn: async (ctx) => {
-		// ctx.input contains BlockObjectResponse[] from Notion
-		const blocks = ctx.input as BlockObjectResponse[];
-		
-		if (!blocks || blocks.length === 0) {
-			return [];
-		}
-
 		const notionClient = ctx.services.notionClient;
 		if (!notionClient || !notionClient.n2m) {
 			ctx.logger.warn({
@@ -389,30 +428,14 @@ export const defaultContentPreprocessHook: Hook<MdBlock[]> = {
 		}
 
 		try {
-			// Use n2m to convert blocks to MdBlock[]
-			// Note: n2m.pageToMarkdown() fetches blocks itself, but we already have them.
-			// We'll use a workaround: n2m's blockToMarkdown for each block
-			const mdBlocks: MdBlock[] = [];
-			
-			for (const block of blocks) {
-				try {
-					const mdBlock = await notionClient.n2m.blockToMarkdown(block);
-					if (mdBlock) {
-						mdBlocks.push(mdBlock as MdBlock);
-					}
-				} catch (error) {
-					ctx.logger.warn({
-						event: 'block_conversion_failed',
-						blockId: (block as any).id,
-						error: error instanceof Error ? error.message : String(error)
-					});
-				}
-			}
-
-			return mdBlocks;
+			// Use pageToMarkdown so nested / child blocks are fetched recursively.
+			// blockToMarkdown only works on top-level blocks and loses all nested content.
+			const mdBlocks = await notionClient.n2m.pageToMarkdown(ctx.page.id);
+			return mdBlocks as MdBlock[];
 		} catch (error) {
 			ctx.logger.error({
 				event: 'content_preprocess_failed',
+				pageId: ctx.page.id,
 				error: error instanceof Error ? error.message : String(error)
 			});
 			return [];
@@ -456,10 +479,7 @@ export const defaultContentMediaHook: Hook<string> = {
 			}
 
 			try {
-				const result = await uploadImageToSupabase(imageUrl, {
-					supabase,
-					pageId: ctx.page.id
-				});
+				const result = await uploadImageToSupabase(imageUrl, { supabase });
 
 				const uploadedUrl = result.newUrl;
 				if (uploadedUrl) {
@@ -500,21 +520,37 @@ export const defaultContentSyncHook: Hook<void> = {
 	fn: async (ctx) => {
 		const notionClient = ctx.services.notionClient;
 		const finalContent = ctx.output.content;
-		
+
 		if (!notionClient || !finalContent) {
 			return null;
 		}
 
 		try {
-			// Convert markdown back to Notion blocks
-			const blocks = convertMarkdownToNotionBlocks(finalContent);
-			
-			// Update Notion page with new blocks
-			await notionClient.updatePageBlocks(ctx.page.id, blocks);
-			
+			// Convert markdown to Notion blocks
+			const newBlocks = convertMarkdownToNotionBlocks(finalContent);
+
+			// Fetch what's already in Notion so we can diff
+			const existingBlocks = await notionClient.getBlocks(ctx.page.id);
+
+			// Skip the expensive delete-all → re-append cycle when nothing changed.
+			// blocksAreEquivalent() is conservative: it returns false (i.e. "needs
+			// update") for file images, nested blocks, or unknown block types.
+			if (blocksAreEquivalent(existingBlocks, newBlocks)) {
+				ctx.logger.debug({
+					event: 'content_sync_skipped_no_change',
+					pageId: ctx.page.id,
+					blockCount: newBlocks.length
+				});
+				return null;
+			}
+
+			// Blocks differ — update Notion page
+			await notionClient.updatePageBlocks(ctx.page.id, newBlocks);
+
 			ctx.logger.debug({
 				event: 'content_synced_to_notion',
-				pageId: ctx.page.id
+				pageId: ctx.page.id,
+				blockCount: newBlocks.length
 			});
 		} catch (error) {
 			ctx.logger.warn({
@@ -554,8 +590,20 @@ export const defaultCoverExtractHook: Hook<string> = {
 
 		// Fallback: scan content for first image
 		const content = ctx.output.content;
+		ctx.logger.debug({
+			event: 'cover_extract_fallback',
+			pageId: ctx.page.id,
+			hasContent: !!content,
+			contentLength: content?.length ?? 0
+		});
 		if (content) {
 			const imageMatch = content.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+			ctx.logger.debug({
+				event: 'cover_extract_content_scan',
+				pageId: ctx.page.id,
+				imageFound: !!imageMatch,
+				imageUrl: imageMatch?.[2] ?? null
+			});
 			if (imageMatch) {
 				return imageMatch[2]; // Return the URL
 			}
@@ -582,10 +630,7 @@ export const defaultCoverProcessHook: Hook<string> = {
 		}
 
 		try {
-			const result = await uploadImageToSupabase(coverUrl, {
-				supabase,
-				pageId: ctx.page.id
-			});
+			const result = await uploadImageToSupabase(coverUrl, { supabase });
 
 			const uploadedUrl = result.newUrl;
 			if (uploadedUrl) {

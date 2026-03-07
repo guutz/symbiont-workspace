@@ -12,7 +12,12 @@ export * from './index.js';
 // ============================================================================
 
 // Webhook handlers & sync
-export { handlePollBlogRequest, handleNotionWebhookRequest } from './server/webhook.js';
+export { handlePollBlogRequest, handleNotionWebhookRequest, syncFromNotion } from './server/webhook.js';
+export type { SyncFromNotionResult } from './server/webhook.js';
+
+// Storage cleanup
+export { cleanupUnusedMedia } from './server/bucket/storage-cleanup.js';
+export type { MediaCleanupResult } from './server/bucket/storage-cleanup.js';
 
 // Markdown processing
 export { renderMarkdownToHtml, renderSummaryToHtml } from './server/markdown/to-html-renderer.js';

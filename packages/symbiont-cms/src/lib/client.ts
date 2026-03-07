@@ -145,8 +145,8 @@ export function createSymbiontClient(config: SymbiontConfig): SymbiontClient {
 			
 			const { data, error } = await client.from(PAGES_TABLE)
 				.select('*')
-				.eq('datasource_alias', sourceAlias)
-				.eq('slug', slug)
+				.like('datasource_alias', sourceAlias)
+				.like('slug', slug)
 				.maybeSingle();
 			
 			if (error) {
@@ -165,7 +165,7 @@ export function createSymbiontClient(config: SymbiontConfig): SymbiontClient {
 			
 			const { data, error } = await client.from(PAGES_TABLE)
 				.select('*')
-				.eq('datasource_alias', sourceAlias)
+				.like('datasource_alias', sourceAlias)
 				.order('publish_at', { ascending: false })
 				.range(offset, offset + limit - 1);
 			

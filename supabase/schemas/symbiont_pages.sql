@@ -58,6 +58,7 @@ CREATE TABLE public.pages (
     content text,
     summary text,
     cover text,
+    last_synced_at timestamp with time zone,
     updated_at timestamp with time zone NOT NULL,
     datasource_id text NOT NULL,
     datasource_alias text NOT NULL

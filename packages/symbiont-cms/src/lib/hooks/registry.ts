@@ -18,6 +18,12 @@ export class HookRegistry {
 	private hooks: Map<HookEvent, Hook[]> = new Map();
 	/** Per-page mutable store, reset at the start of each page via beginPage(). */
 	private pageStore: Record<string, unknown> = {};
+	/**
+	 * Sync-scoped mutable store: persists for the entire sync (never reset between pages).
+	 * Lives as long as this registry instance (one per datasource sync invocation).
+	 * Use for sync-level caches, e.g. the slug-conflict map.
+	 */
+	private syncStore: Record<string, unknown> = {};
 	private logger: {
 		debug: (data: any) => void;
 		info: (data: any) => void;
@@ -531,7 +537,8 @@ export class HookRegistry {
 			logger: this.logger,
 			services: this.services,
 			abort,
-			store: this.pageStore // shared mutable bag — same object reference across all events
+			store: this.pageStore,    // per-page bag
+			syncStore: this.syncStore // sync-scoped bag
 		};
 	}
 

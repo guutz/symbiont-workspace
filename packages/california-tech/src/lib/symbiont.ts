@@ -47,6 +47,7 @@ export const symbiont = createSymbiontClient({
 		{
 			alias: 'tech-website-pages',
 			dataSourceId: '3061cbde-6d28-8081-8ddb-000bbc2f76e1',
+			slugProperty: 'Slug',
 			hooks: websitePagesHooks
 		}
 	]

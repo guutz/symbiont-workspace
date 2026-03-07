@@ -33,7 +33,7 @@ import { imgLazyload } from '@mdit/plugin-img-lazyload';
 import { imgSize } from '@mdit/plugin-img-size';
 import { mark } from '@mdit/plugin-mark';
 import { spoiler } from '@mdit/plugin-spoiler';
-import { katex, loadMhchem } from '@mdit/plugin-katex';
+import { katex } from '@mdit/plugin-katex';
 
 // Prism.js for syntax highlighting
 
@@ -93,7 +93,7 @@ export async function renderMarkdownToHtml(
   }
 
   // Add KaTeX plugin (always enabled like QWER - only ~23KB CSS)
-  await loadMhchem(); // Load mhchem extension for chemistry formulas
+  // Note: mhchem is auto-bundled in @mdit/plugin-katex v0.24+
   md.use(katex, {
     throwOnError: false,
     errorColor: '#cc0000',

@@ -14,10 +14,10 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
 	const post = await symbiont.getPageBySlug(date, { fetch, alias: 'tech-archives' });
 
 	if (!post) {
-		return new Response(`No issue not found for ${date}`, { status: 404 });
+		return new Response(`No issue found for ${date}`, { status: 404 });
 	}
 
-	const resolverUrl: string | undefined = post.metadata?.resolver_url;
+	const resolverUrl: string | undefined = post.meta?.resolver_url;
 	if (!resolverUrl?.endsWith('.pdf')) {
 		// No PDF — redirect to whatever resolver URL we have, or 404
 		return resolverUrl

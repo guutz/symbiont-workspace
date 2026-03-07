@@ -151,11 +151,9 @@ export class NotionPageToDatabasePageTransformer {
 
 			// ── Content Pipeline ───────────────────────────────────────
 
-			// Fetch raw blocks from Notion
-			const blocks = await this.notionClient.getBlocks(page.id);
-
-			// content:preprocess (ctx.input = BlockObjectResponse[]; returns MdBlock[])
-			const mdBlocks = await this.hookRegistry.execute('content:preprocess', output, page, blocks) as MdBlock[];
+			// content:preprocess — hook is responsible for fetching content (e.g. via n2m.pageToMarkdown)
+			// ctx.input is unused here; the hook has ctx.page.id and ctx.services.notionClient
+			const mdBlocks = await this.hookRegistry.execute('content:preprocess', output, page) as MdBlock[];
 
 			// Bridge step: Convert MdBlock[] to markdown string (fixed, not hookable)
 			const rawMarkdown = this.mdBlocksToString(mdBlocks);
@@ -204,6 +202,11 @@ export class NotionPageToDatabasePageTransformer {
 			}
 
 			// ── Persist ────────────────────────────────────────────────
+
+			// Stamp the time we finished processing (after all Notion write-backs).
+			// The skip check in processPage compares against this, not updated_at,
+			// so our own write-backs (slug sync, PDF URL, etc.) don't cause a re-sync loop.
+			output.last_synced_at = new Date().toISOString();
 
 			// Upsert to Supabase
 			await this.pageCrud.upsert(output as DatabasePage);

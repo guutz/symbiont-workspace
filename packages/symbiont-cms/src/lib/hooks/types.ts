@@ -74,7 +74,7 @@ export const HOOK_EVENTS = {
 	'metadata:custom': e<Record<string, unknown>>(S.Collect, 'meta'), // merged into output.meta
 
 	// ── Content Pipeline ───────────────────────────────────────────────
-	'content:preprocess': e<MdBlock[]>(S.FirstWins), // ctx.input = BlockObjectResponse[]; no field
+	'content:preprocess': e<MdBlock[]>(S.FirstWins), // hook fetches content itself (n2m); ctx.input unused; no field
 	'content:text': e<string>(S.Pipeline, 'content'),
 	'content:media': e<string>(S.Pipeline, 'content'),
 	'content:postprocess': e<string>(S.Pipeline, 'content'),
@@ -109,7 +109,7 @@ export type HookContext = {
 	 * Pipeline input value (for Pipeline events and slug:conflict).
 	 * - Pipeline events: current value in the transform chain
 	 * - slug:conflict: current slug needing validation
-	 * - content:preprocess: BlockObjectResponse[] from Notion
+	 * - content:preprocess: unused (hook fetches via n2m internally)
 	 */
 	input?: unknown;
 
@@ -153,6 +153,16 @@ export type HookContext = {
 	 * on `cover:extract` reads `ctx.store.pdfPublicUrl` to generate the thumbnail.
 	 */
 	store: Record<string, unknown>;
+
+	/**
+	 * Mutable key-value bag that persists for the ENTIRE SYNC (across all pages).
+	 * Unlike `store`, this is NOT reset between pages — it lives as long as the
+	 * HookRegistry instance (one per datasource sync invocation).
+	 *
+	 * Use this for sync-scoped caches, e.g. the slug conflict map so we only
+	 * query existing slugs from the database once instead of once per page.
+	 */
+	syncStore: Record<string, unknown>;
 };
 
 /**

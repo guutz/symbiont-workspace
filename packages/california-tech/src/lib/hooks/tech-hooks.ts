@@ -1,5 +1,5 @@
 import type { Hook, HookContext } from 'symbiont-cms';
-import { uploadFileToSupabase, uploadBufferToSupabase } from 'symbiont-cms/server';
+import { uploadFileToSupabase, uploadBufferToSupabase, createSlug } from 'symbiont-cms/server';
 import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
 import { pdf } from 'pdf-to-img';
 import { createHash } from 'crypto';
@@ -157,24 +157,79 @@ export const publishDateHook: Hook<string | Date> = {
 	}
 };
 
+
 /**
  * Archive issue hooks for tech-archives database.
  * Handles date-based slugs and resolver URLs.
  */
 export const archiveIssueHooks: Hook[] = [
 	{
-		name: 'archives:date',
+		// Skip duplicate archive issues: if this date's slug already belongs to a
+		// different Notion page, it's a duplicate entry — don't sync it.
+		name: 'archives:dedup',
+		event: 'page:should-sync',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
+			const supabase = ctx.services.supabase;
+			if (!supabase) return true;
+			const dateStart = (ctx.page.properties.Date as any)?.date?.start;
+			if (!dateStart) return true;
+			const date = new Date(dateStart.trim());
+			if (isNaN(date.getTime())) return true;
+			const slug = date.toISOString().split('T')[0];
+			const { data: existing } = await supabase
+				.from('pages')
+				.select('page_id')
+				.eq('slug', slug)
+				.eq('datasource_id', ctx.config.dataSourceId)
+				.maybeSingle();
+			if (existing && existing.page_id !== ctx.page.id) {
+				ctx.logger.info({
+					event: 'archive_duplicate_skipped',
+					pageId: ctx.page.id,
+					duplicateOfPageId: existing.page_id,
+					slug
+				});
+				return false;
+			}
+			return true;
+		}
+	},
+	{
+		name: 'archives:slug:date',
 		event: 'slug:extract',
 		priority: 'override',
 		fn: async (ctx: HookContext) => {
 			// Slug from date property (e.g. "2024-10-21")
-			const dateSlug = (ctx.page.properties.date as any)?.date?.start;
-			if (dateSlug) {
-				// parse ISO 8601 and return YYYY-MM-DD slug
-				const date = new Date(dateSlug);
-				return date.toISOString().split('T')[0];
+			const dateStart = (ctx.page.properties.Date as any)?.date?.start;
+			if (!dateStart) return null;
+			const date = new Date(dateStart.trim());
+			if (isNaN(date.getTime())) {
+				ctx.logger.warn({
+					event: 'archives_invalid_date_slug',
+					pageId: ctx.page.id,
+					dateStart
+				});
+				return null;
 			}
-			return null;
+			return date.toISOString().split('T')[0];
+		}
+	},
+	{
+		name: 'archives:date',
+		event: 'publish:date',
+		priority: 'override',
+		fn: async (ctx: HookContext) => {
+			// Publish date directly from the ISO Date property value.
+			// Don't use parseTechIssueDate here — that function is for human-readable
+			// strings like "January 20, 2023" and breaks on full ISO datetimes.
+			const dateStart = (ctx.page.properties.Date as any)?.date?.start;
+			if (!dateStart) return null;
+			const date = new Date(dateStart.trim());
+			if (isNaN(date.getTime())) return null;
+			// Emit at 07:00 PST (14:00 UTC) to match legacy behaviour
+			const iso = date.toISOString().split('T')[0];
+			return new Date(`${iso}T14:00:00.000Z`).toISOString();
 		}
 	},
 	{
@@ -206,7 +261,7 @@ export const archiveIssueHooks: Hook[] = [
 				const pdfUrl = pdfFile.type === 'external' ? pdfFile.external?.url : pdfFile.file?.url;
 				if (pdfUrl && ctx.services.supabase) {
 					// Build deterministic storage path from the issue date
-					const dateStart = (ctx.page.properties.date as any)?.date?.start;
+					const dateStart = (ctx.page.properties.Date as any)?.date?.start;
 					const isoDate = dateStart
 						? new Date(dateStart).toISOString().split('T')[0]
 						: null;
@@ -215,7 +270,7 @@ export const archiveIssueHooks: Hook[] = [
 					try {
 						const uploadResult = await uploadFileToSupabase(pdfUrl, {
 							supabase: ctx.services.supabase,
-							pageId: ctx.page.id,
+
 							contentType: 'application/pdf',
 							storagePath
 						});
@@ -247,13 +302,32 @@ export const archiveIssueHooks: Hook[] = [
 		event: 'cover:extract',
 		priority: 'override',
 		fn: async (ctx: HookContext) => {
+			// If this page already has a cover in the database, skip thumbnail generation.
+			const supabase = ctx.services.supabase;
+			if (supabase) {
+				const { data: existingRow } = await supabase
+					.from('pages')
+					.select('cover')
+					.eq('page_id', ctx.page.id)
+					.maybeSingle();
+
+				if (existingRow?.cover) {
+					ctx.logger.debug({
+						event: 'cover_already_exists_skipping',
+						pageId: ctx.page.id,
+						cover: existingRow.cover
+					});
+					return existingRow.cover as string;
+				}
+			}
+
 			// Prefer the URL stashed in store by archives:pdf this same run;
 			// fall back to the PDF URL property already on the Notion page
 			const pdfUrl: string | undefined =
 				(ctx.store.pdfPublicUrl as string | undefined) ??
 				(ctx.page.properties['PDF URL'] as any)?.url;
 			if (pdfUrl) {
-				if (!ctx.services.supabase) {
+				if (!supabase) {
 					ctx.logger.error({
 						event: 'supabase_client_unavailable',
 						pageId: ctx.page.id,
@@ -274,8 +348,7 @@ export const archiveIssueHooks: Hook[] = [
 					});
 					try {
 						const uploadResult = await uploadBufferToSupabase(thumbnailBuffer, {
-							supabase: ctx.services.supabase,
-							pageId: ctx.page.id,
+							supabase,
 							filename,
 							contentType: 'image/png'
 						});
@@ -338,27 +411,27 @@ export const websitePagesHooks: Hook[] = [
 	},
 	
 	// "Not shown" pages: sync to DB but set published_at to null
-	{
-		name: 'pages:publish:not-shown',
-		event: 'publish:check',
-		priority: 'override',
-		fn: async (ctx: HookContext) => {
-			const status = (ctx.page.properties.Status as any)?.select?.name;
+	// {
+	// 	name: 'pages:publish:not-shown',
+	// 	event: 'publish:check',
+	// 	priority: 'override',
+	// 	fn: async (ctx: HookContext) => {
+	// 		const status = (ctx.page.properties.Status as any)?.select?.name;
 			
-			if (status === 'Not shown') {
-				ctx.logger.info({
-					event: 'page_unpublished',
-					pageId: ctx.page.id,
-					title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
-					reason: 'Status is Not shown - setting published_at to null'
-				});
-				return false; // published_at will be null
-			}
+	// 		if (status === 'Not shown') {
+	// 			ctx.logger.info({
+	// 				event: 'page_unpublished',
+	// 				pageId: ctx.page.id,
+	// 				title: (ctx.page.properties.Title as any)?.title?.[0]?.plain_text,
+	// 				reason: 'Status is Not shown - setting published_at to null'
+	// 			});
+	// 			return false; // published_at will be null
+	// 		}
 			
-			// Live pages are published
-			return status === 'Live';
-		}
-	},
+	// 		// Live pages are published
+	// 		return status === 'Live';
+	// 	}
+	// },
 	
 	// Validate that Redirect pages have either a redirect link or file
 	// Note: page:validate event no longer exists, using page:before for validation warnings

@@ -81,7 +81,6 @@ export interface DatabasePage extends Omit<DatabasePageRaw, 'tags' | 'authors' |
 	tags: string[] | null;
 	authors: string[] | null;
 	meta: Record<string, any> | null;
-	cover?: string | null; // Optional until schema migration adds dedicated column
 }
 
 /**
@@ -102,7 +101,6 @@ export interface WebsitePage extends Omit<DatabasePage, 'page_id' | 'datasource_
     summary_html?: string;
     description?: string;
     language?: string;
-    cover?: string;
 
     // Allow any other properties from your schema
     [key: string]: any;

@@ -213,22 +213,25 @@ export class NotionToDatabaseSync {
 
 		if (existingPage && existingPage.updated_at) {
 			const notionTime = new Date(page.last_edited_time).getTime();
-			const dbTime = new Date(existingPage.updated_at).getTime();
+			// Use last_synced_at when available: it's stamped after all Notion write-backs
+			// complete, so it's always >= any last_edited_time bump we caused ourselves.
+			const syncRef = (existingPage as any).last_synced_at ?? existingPage.updated_at;
+			const dbTime = new Date(syncRef).getTime();
 			const diff = notionTime - dbTime;
 
-			this.logger.debug({ 
+			this.logger.info({ 
 				event: 'timestamp_comparison',
 				pageId: page.id,
 				notionTime: page.last_edited_time,
-				dbTime: existingPage.updated_at,
+				dbTime: syncRef,
 				notionTimeMs: notionTime,
 				dbTimeMs: dbTime,
 				diffMs: diff,
-				willSkip: dbTime >= notionTime - 1000
+				willSkip: dbTime >= notionTime - 10000
 			});
 
-			// Skip if DB is up to date (allowing 1 second tolerance for clock drift)
-			if (dbTime >= notionTime - 1000) {
+			// Skip if DB is up to date (allowing 10 second tolerance for clock drift)
+			if (dbTime >= notionTime - 10000) {
 				this.logger.info({ 
 					event: 'page_already_up_to_date',
 					pageId: page.id,

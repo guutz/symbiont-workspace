@@ -21,6 +21,7 @@ export type Database = {
           cover: string | null
           datasource_alias: string
           datasource_id: string
+          last_synced_at: string | null
           meta: Json | null
           page_id: string
           publish_at: string | null
@@ -36,6 +37,7 @@ export type Database = {
           cover?: string | null
           datasource_alias: string
           datasource_id: string
+          last_synced_at?: string | null
           meta?: Json | null
           page_id: string
           publish_at?: string | null
@@ -51,6 +53,7 @@ export type Database = {
           cover?: string | null
           datasource_alias?: string
           datasource_id?: string
+          last_synced_at?: string | null
           meta?: Json | null
           page_id?: string
           publish_at?: string | null

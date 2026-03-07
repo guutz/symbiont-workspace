@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { Database } from '../../database.types.js';
 import type { SymbiontClient } from '../../client.js';
@@ -28,6 +28,9 @@ import { NotionToDatabaseSync } from './notion-to-database-sync.js';
  * 
  * @param client - Symbiont client instance (contains public Supabase client)
  * @param config - Database configuration blueprint
+ * @param adminSupabase - Optional pre-created service role Supabase client.
+ *   Pass this when the caller already holds an admin client (e.g. syncFromNotion)
+ *   to avoid creating redundant client instances.
  * 
  * @example
  * const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
@@ -35,10 +38,10 @@ import { NotionToDatabaseSync } from './notion-to-database-sync.js';
  */
 export function createNotionToDatabaseSyncCoordinator(
 	client: SymbiontClient,
-	config: DatabaseBlueprint
+	config: DatabaseBlueprint,
+	adminSupabase?: SupabaseClient<Database>
 ): NotionToDatabaseSync {
 	const notionToken = requireEnvVar("NOTION_TOKEN");
-	const serviceRoleKey = requireEnvVar("SUPABASE_SERVICE_ROLE_KEY");
 	
 	// Initialize Notion client with resolved token
 	const notion = new Client({ auth: notionToken });
@@ -76,15 +79,11 @@ export function createNotionToDatabaseSyncCoordinator(
 	// Create Notion client layer (Notion API)
 	const notionClient = new NotionClient(notion, n2m);
 
-	// Create Supabase admin client for sync operations
-	// This is the SINGLE service role client used for all sync operations:
-	// - Image uploads to storage
-	// - Database mutations (upsert/delete pages)
-	// - Passed to DatabasePageCRUD and NotionPageToDatabasePageTransformer
-	// This is separate from the user's public client in SymbiontClient
-	const supabase = createClient<Database>(
+	// Use the provided admin client, or create one if not supplied.
+	// Admin client has service role access for storage writes and DB mutations.
+	const supabase: SupabaseClient<Database> = adminSupabase ?? createClient<Database>(
 		client.config.supabase.url,
-		serviceRoleKey,
+		requireEnvVar("SUPABASE_SERVICE_ROLE_KEY"),
 		{
 			auth: {
 				autoRefreshToken: false,
