@@ -203,6 +203,31 @@ export interface DatabaseBlueprint {
      * - Custom function for per-page logic
      */
     contentSourceRule?: 'NOTION' | 'WEB_EDITOR' | ((page: PageObjectResponse) => 'NOTION' | 'WEB_EDITOR');
+
+    // ============================================
+    // SYNC STRATEGY
+    // ============================================
+
+    /**
+     * Strategy for writing content back to Notion pages.
+     * - 'patch': Surgical diff-and-patch — only modified blocks are updated
+     *   (preserves Notion block IDs, comments, and internal references).
+     * - 'replace': Nuke-and-repave — all blocks are deleted then rewritten.
+     *   Use this to opt out of the diff algorithm for a specific datasource.
+     *
+     * Default: 'patch'
+     */
+    syncStrategy?: 'patch' | 'replace';
+
+    /**
+     * When `syncStrategy` is `'patch'`, this is the fraction of blocks that
+     * must change before the patcher gives up and falls back to full replace.
+     * A value of `0.6` means "if more than 60% of blocks changed, just
+     * replace everything".
+     *
+     * Range: 0–1. Default: 0.6.
+     */
+    forceFullReplaceThreshold?: number;
 }
 
 /**
