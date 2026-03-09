@@ -357,8 +357,7 @@ export function diffBlocks(
 			for (let k = 0; k < matchInDesired; k++) {
 				ops.push({ op: 'insert', afterId: lastAnchorId, block: df[j + k].raw });
 				stats.inserted++;
-				// Each inserted block becomes the new anchor for the next insert.
-				lastAnchorId = null; // inserted blocks have no existing ID; subsequent inserts use position:end batching
+				// Subsequent inserts with no anchor will be appended to the end of the page.
 			}
 			j += matchInDesired;
 		} else {
@@ -382,7 +381,7 @@ export function diffBlocks(
 	while (j < df.length) {
 		ops.push({ op: 'insert', afterId: lastAnchorId, block: df[j].raw });
 		stats.inserted++;
-		lastAnchorId = null;
+		lastAnchorId = null; // subsequent drain inserts go to end (afterId=null)
 		j++;
 	}
 

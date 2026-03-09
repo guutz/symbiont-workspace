@@ -355,7 +355,7 @@ export class NotionClient {
 		});
 
 		let applied = 0;
-		let failed  = 0;
+		let failed = 0;
 
 		// ── Step 1: Updates ──────────────────────────────────────────────────
 		for (const op of diff.operations) {
@@ -382,7 +382,6 @@ export class NotionClient {
 		while (k < insertOps.length) {
 			const anchor = insertOps[k].afterId;
 			const batch: any[] = [];
-			let batchStart = k;
 
 			while (k < insertOps.length && insertOps[k].afterId === anchor && batch.length < 100) {
 				batch.push(insertOps[k].block);
@@ -407,9 +406,6 @@ export class NotionClient {
 					error: e?.message,
 				});
 				failed += batch.length;
-				// Skip any remaining inserts that were grouped with this anchor
-				// (they've already been advanced past above).
-				void batchStart;
 			}
 		}
 
