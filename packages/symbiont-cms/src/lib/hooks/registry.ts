@@ -205,6 +205,8 @@ export class HookRegistry {
 	/**
 	 * Execute hooks with first-wins strategy.
 	 * Stop at first non-null result.
+	 * Returning `false` is a stop-with-null sentinel: the chain is halted and
+	 * the composed result is `null` (output field is left unset).
 	 */
 	private async executeFirstWins(
 		hooks: Hook[],
@@ -225,6 +227,15 @@ export class HookRegistry {
 
 				if (state.aborted) {
 					throw new Error(`Hook aborted: ${state.abortReason}`);
+				}
+
+				// `false` = "my definitive answer is nothing" — stop the chain, leave field unset
+				if (result === false) {
+					this.logger.debug({
+						event: 'hook_returned_false_stop',
+						hookName: hook.name
+					});
+					return null;
 				}
 
 				if (result !== null && result !== undefined) {

@@ -54,7 +54,10 @@ function parseInline(
       return [notion.richText(element.value, copy)];
 
     case 'inlineMath':
-      return [notion.richText(element.value, {...copy, type: 'equation'})];
+      // Single $...$ is treated as plain text — only $$...$$ block math becomes
+      // a Notion equation block. Restore the dollar-sign delimiters so the
+      // original text is preserved verbatim.
+      return ensureLength(`$${element.value}$`, copy);
 
     default:
       return [];

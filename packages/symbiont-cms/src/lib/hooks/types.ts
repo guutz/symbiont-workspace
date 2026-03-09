@@ -171,12 +171,15 @@ export type HookContext = {
  * Hooks read from `ctx.page` (and optionally `ctx.input`) and return a value or `null`.
  * - Return your value if you have data to contribute
  * - Return `null` if you have nothing to contribute (continues to next hook)
+ * - Return `false` (FirstWins events only) to stop the chain and produce a null result —
+ *   meaning "my definitive answer is nothing", not "I don't know". Downstream hooks are
+ *   skipped and the output field is left unset (null).
  * 
  * The registry composes results based on the event's composition strategy.
  */
 export type HookFunction<TOutput = any> = (
 	context: HookContext
-) => Promise<TOutput | null> | TOutput | null;
+) => Promise<TOutput | null | false> | TOutput | null | false;
 
 /**
  * Hook definition.

@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { slide } from 'svelte/transition';
   import type { TOC } from '$lib/types/toc';
   import { tocCur } from '$stores/toc';
   import Self from '$lib/components/toc_content.svelte';
 
   let { content, expanded = false, depth = 1 }: { content: TOC.Heading; expanded?: boolean; depth?: number } = $props();
-  let isExpanded = $state(expanded);
+  let isExpanded = $state(untrack(() => expanded));
 
   function handleClick() {
     // Use the slug directly as a hash to navigate

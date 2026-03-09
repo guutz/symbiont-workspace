@@ -659,7 +659,50 @@ export const defaultCoverSyncHook: Hook<void> = {
 	name: 'symbiont:cover:sync',
 	event: 'cover:sync',
 	fn: async (ctx) => {
-		// No-op by default (users can implement custom sync logic)
+		const coverProperty = ctx.config.coverProperty;
+		const notionClient = ctx.services.notionClient;
+
+		if (!coverProperty || !notionClient) {
+			return null;
+		}
+
+		const finalCover = ctx.output.cover;
+		if (!finalCover) {
+			return null;
+		}
+
+		// Skip the Notion API write if the cover already matches what's on the page.
+		const existingCoverProp = ctx.page.properties[coverProperty];
+		const existingCoverUrl = existingCoverProp && 'files' in existingCoverProp
+			? ((existingCoverProp as any).files?.[0]?.file?.url
+				?? (existingCoverProp as any).files?.[0]?.external?.url
+				?? null)
+			: null;
+
+		if (existingCoverUrl === finalCover) {
+			ctx.logger.debug({
+				event: 'cover_sync_skipped_no_change',
+				pageId: ctx.page.id,
+				cover: finalCover
+			});
+			return null;
+		}
+
+		try {
+			await notionClient.updateFileProperty(ctx.page.id, coverProperty, finalCover);
+			ctx.logger.debug({
+				event: 'cover_synced_to_notion',
+				pageId: ctx.page.id,
+				cover: finalCover
+			});
+		} catch (error) {
+			ctx.logger.warn({
+				event: 'cover_sync_failed',
+				pageId: ctx.page.id,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+
 		return null;
 	}
 };

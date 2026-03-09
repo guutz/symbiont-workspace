@@ -148,12 +148,16 @@ export const publishDateHook: Hook<string | Date> = {
 			}
 		}
 
-		// Return null to fall through to default hook (last_edited_time)
+		// Neither property has a date — definitively no publish date.
+		// Return `false` (not `null`) so the chain stops here and does NOT fall
+		// through to the default hook (which would set publish_at = last_edited_time).
 		ctx.logger.debug({
-			event: 'publish_date_fallback_to_default',
-			pageId: ctx.page.id
+			event: 'publish_date_not_found',
+			pageId: ctx.page.id,
+			issueProperty,
+			websiteDate
 		});
-		return null;
+		return false;
 	}
 };
 
