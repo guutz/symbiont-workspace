@@ -3,10 +3,32 @@ import * as notion from '../notion';
 import path from 'path';
 import {URL} from 'url';
 import {isSupportedCodeLang, LIMITS} from '../notion';
+import unified from 'unified';
+import markdownParse from 'remark-parse';
+import gfm from 'remark-gfm';
 
 function ensureLength(text: string, copy?: object) {
   const chunks = text.match(/[^]{1,2000}/g) || [];
   return chunks.flatMap((item: string) => notion.richText(item, copy));
+}
+
+/**
+ * Re-parses a raw string as inline markdown (without remark-math) so that
+ * constructs like links that were captured inside $...$ by remark-math are
+ * correctly converted to Notion rich text instead of being emitted verbatim.
+ */
+function parseInlineString(
+  text: string,
+  options?: notion.RichTextOptions,
+): notion.RichText[] {
+  const root = (unified().use(markdownParse).use(gfm) as any).parse(text) as md.Root;
+  const firstParagraph = root.children?.[0];
+  if (!firstParagraph || firstParagraph.type !== 'paragraph') {
+    return ensureLength(text, options);
+  }
+  return (firstParagraph as md.Paragraph).children.flatMap(child =>
+    parseInline(child, options),
+  );
 }
 
 function ensureCodeBlockLanguage(lang?: string) {
@@ -53,11 +75,18 @@ function parseInline(
       copy.annotations.code = true;
       return [notion.richText(element.value, copy)];
 
-    case 'inlineMath':
+    case 'inlineMath': {
       // Single $...$ is treated as plain text — only $$...$$ block math becomes
-      // a Notion equation block. Restore the dollar-sign delimiters so the
-      // original text is preserved verbatim.
-      return ensureLength(`$${element.value}$`, copy);
+      // a Notion equation block. Re-parse the inner value as inline markdown
+      // (without remark-math) so nested constructs like links are preserved,
+      // then wrap with literal '$' text nodes to restore the delimiters.
+      const inner = parseInlineString(element.value, copy);
+      return [
+        notion.richText('$', copy),
+        ...inner,
+        notion.richText('$', copy),
+      ];
+    }
 
     default:
       return [];
