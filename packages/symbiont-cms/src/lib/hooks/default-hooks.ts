@@ -443,7 +443,7 @@ export const defaultContentTextHook: Hook<string> = {
 	name: 'symbiont:content:text',
 	event: 'content:text',
 	fn: async (ctx) => {
-		// Pass-through by default (transformer converts MdBlock[] to string before this)
+		// Pass-through by default — raw markdown string from content:preprocess
 		return ctx.input as string;
 	}
 };

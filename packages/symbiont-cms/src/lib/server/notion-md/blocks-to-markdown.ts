@@ -39,14 +39,34 @@ export function clearBlockTransformers(): void {
 
 // ── Core converter ───────────────────────────────────────────────────────────
 
+/**
+ * Callback that fetches the direct children of a Notion block by its ID.
+ *
+ * `blocksToMarkdown` calls this whenever it encounters a block that may have
+ * children (lists, quotes, callouts, toggles, tables, column layouts, synced
+ * blocks). The caller is responsible for pagination — the callback must return
+ * **all** children for the given blockId in a single call.
+ *
+ * `NotionClient.getBlocks(blockId)` already handles pagination and is the
+ * intended implementation for production use.
+ *
+ * `blocksToMarkdown` is intentionally recursive: child blocks are processed
+ * with `depth + 1` and their markdown is indented/prefixed accordingly. The
+ * recursion depth is bounded by the Notion block nesting limit (~3 levels for
+ * most block types).
+ */
 type FetchChildrenFn = (blockId: string) => Promise<any[]>;
 
 /**
  * Convert an array of Notion blocks to a markdown string.
  *
- * @param blocks - Top-level blocks from a Notion page
- * @param fetchChildren - Callback to fetch child blocks of a given block ID
- * @param depth - Current indentation depth (used for nested lists/toggles)
+ * Recursively fetches and converts child blocks via `fetchChildren`.
+ *
+ * @param blocks - Notion block objects (top-level or already-fetched children)
+ * @param fetchChildren - Async callback to fetch child blocks for a block ID.
+ *   Called for any block where `has_children: true`. Must return all children
+ *   (handle pagination internally). Pass `async () => []` in tests.
+ * @param depth - Current nesting depth (internal, default 0; drives indentation)
  */
 export async function blocksToMarkdown(
 	blocks: any[],
@@ -275,6 +295,15 @@ async function blockToMarkdown(
 		}
 
 		// ── Link to page: emit sentinel URL ──────────────────────────────────
+		// `notion://page/{id}` is a deferred-resolution sentinel — NOT a real URL.
+		// It is written here and can be rewritten to a public slug (or stripped to
+		// plain text) by the `resolveNotionPageLinks` content transform, which runs
+		// as a `content:postprocess` hook with access to the Supabase pages table.
+		// Inline page/database mention rich_text items also emit this same sentinel
+		// via richTextToMarkdown() → rich-text.ts.
+		// If no resolution hook is registered, the sentinel is stored as-is and
+		// renders as a broken link — fine for drafts, but configure the hook for
+		// any production site that uses cross-page links.
 		case 'link_to_page': {
 			const linkType = content?.type;
 			const pageId =

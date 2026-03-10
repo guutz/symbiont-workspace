@@ -28,7 +28,24 @@ function serializeRichText(rt: NotionRichText): string {
 	}
 
 	if (rt.type === 'mention') {
-		// Mention types (user, page, date, database) - use plain_text fallback
+		const mention = rt.mention;
+		if (!mention) return rt.plain_text ?? '';
+
+		// Page and database mentions: emit a sentinel URL so a content:postprocess
+		// hook can resolve them to public slugs (see resolveNotionPageLinks).
+		if (mention.type === 'page' && mention.page?.id) {
+			const cleanId = mention.page.id.replace(/-/g, '');
+			const label = rt.plain_text ?? 'Page link';
+			return `[${label}](notion://page/${cleanId})`;
+		}
+		if (mention.type === 'database' && mention.database?.id) {
+			const cleanId = mention.database.id.replace(/-/g, '');
+			const label = rt.plain_text ?? 'Database link';
+			return `[${label}](notion://page/${cleanId})`;
+		}
+
+		// All other mention types (user, date, link_preview, template_mention):
+		// fall back to the plain_text the API always provides.
 		return rt.plain_text ?? '';
 	}
 

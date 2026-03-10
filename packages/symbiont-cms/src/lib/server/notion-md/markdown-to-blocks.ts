@@ -104,7 +104,6 @@ function blockquote(text: any[] = [], children: any[] = []): any {
 		type: 'quote',
 		quote: {
 			rich_text: text.length ? text : [richText('')],
-			// @ts-expect-error children are not typed here
 			children,
 		},
 	};
@@ -200,7 +199,6 @@ function callout(
 		callout: {
 			rich_text: text.length ? text : [richText('')],
 			icon: { type: 'emoji', emoji },
-			// @ts-expect-error children typing
 			children,
 			color,
 		},

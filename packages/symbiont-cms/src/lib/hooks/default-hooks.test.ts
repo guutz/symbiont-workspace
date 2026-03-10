@@ -28,6 +28,8 @@ describe('Default Hooks (Extractor Pattern)', () => {
 		logger: mockLogger,
 		services: {},
 		abort: () => {},
+		store: {},
+		syncStore: {},
 		...overrides
 	});
 
