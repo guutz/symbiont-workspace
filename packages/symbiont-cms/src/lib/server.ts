@@ -33,7 +33,7 @@ export { uploadImageToSupabase, uploadFileToSupabase, uploadBufferToSupabase, ne
 export type { UploadImageOptions, UploadFileOptions, UploadBufferOptions, UploadImageResult } from './server/bucket/image-upload.js';
 
 // Markdown to Notion conversion
-export { convertMarkdownToNotionBlocks } from './server/notion/markdown-to-blocks.js';
+export { convertMarkdownToNotionBlocks } from './server/notion-md/markdown-to-blocks.js';
 
 // Markdown image utilities
 export { extractImageUrls, replaceImageUrls } from './server/markdown/image-url-extractor.js';

@@ -30,7 +30,7 @@
  * ```typescript
  * import { NotionClient, DatabasePageCRUD, NotionPageToDatabasePageTransformer } from 'symbiont-cms/server';
  * 
- * const notionClient = new NotionClient(notion, n2m);
+ * const notionClient = new NotionClient(notion);
  * const pageCrud = new DatabasePageCRUD(supabaseUrl, serviceRoleKey);
  * const transformer = new NotionPageToDatabasePageTransformer(config, notionClient, pageCrud);
  * 

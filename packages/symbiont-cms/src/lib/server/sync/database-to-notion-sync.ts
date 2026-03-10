@@ -1,7 +1,7 @@
 import type { DatabaseBlueprint } from '../../types.js';
 import type { NotionClient } from '../notion/client.js';
 import type { DatabasePageCRUD } from '../database/page-crud.js';
-import { convertMarkdownToNotionBlocks } from '../notion/markdown-to-blocks.js';
+import { convertMarkdownToNotionBlocks } from '../notion-md/markdown-to-blocks.js';
 import { createLogger } from '../utils/logger.js';
 
 export interface PublishToNotionOptions {

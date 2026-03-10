@@ -1,5 +1,4 @@
 import type { PageObjectResponse } from '@notionhq/client';
-import type { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint, DatabasePage } from '../types.js';
 import type { Database } from '../database.types.js';
@@ -21,17 +20,6 @@ export enum CompositionStrategy {
 	/** Chain: each hook's return becomes next hook's input; null = pass-through */
 	Pipeline
 }
-
-/**
- * MdBlock type from notion-to-md library.
- * Represents a block of markdown content with type and parent info.
- */
-export type MdBlock = {
-	type: string;
-	parent: string;
-	children?: MdBlock[];
-	[key: string]: any;
-};
 
 /** Helper to define a hook event with typed return, composition strategy, and optional field. */
 function e<TReturn>(strategy: CompositionStrategy, field?: keyof DatabasePage) {
@@ -74,7 +62,7 @@ export const HOOK_EVENTS = {
 	'metadata:custom': e<Record<string, unknown>>(S.Collect, 'meta'), // merged into output.meta
 
 	// ── Content Pipeline ───────────────────────────────────────────────
-	'content:preprocess': e<MdBlock[]>(S.FirstWins), // hook fetches content itself (n2m); ctx.input unused; no field
+	'content:preprocess': e<string>(S.FirstWins), // hook fetches content itself (pageToMarkdown); ctx.input unused; no field
 	'content:text': e<string>(S.Pipeline, 'content'),
 	'content:media': e<string>(S.Pipeline, 'content'),
 	'content:postprocess': e<string>(S.Pipeline, 'content'),
@@ -109,7 +97,7 @@ export type HookContext = {
 	 * Pipeline input value (for Pipeline events and slug:conflict).
 	 * - Pipeline events: current value in the transform chain
 	 * - slug:conflict: current slug needing validation
-	 * - content:preprocess: unused (hook fetches via n2m internally)
+	 * - content:preprocess: unused (hook fetches via pageToMarkdown internally)
 	 */
 	input?: unknown;
 

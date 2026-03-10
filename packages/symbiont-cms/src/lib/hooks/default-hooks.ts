@@ -1,9 +1,8 @@
-import type { Hook, MdBlock } from './types.js';
+import type { Hook } from './types.js';
 import { createSlug } from '../server/utils/slug.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../server/bucket/image-upload.js';
-import { convertMarkdownToNotionBlocks } from '../server/notion/markdown-to-blocks.js';
+import { convertMarkdownToNotionBlocks } from '../server/notion-md/markdown-to-blocks.js';
 import { diffBlocks } from '../server/notion/blocks-diff.js';
-import { NotionToMarkdown } from 'notion-to-md';
 
 /**
  * Default hooks implementing Symbiont's opinionated behavior.
@@ -414,31 +413,28 @@ export const defaultCustomMetadataHook: Hook<Record<string, unknown>> = {
 
 // ── Content Pipeline ───────────────────────────────────────────────
 
-export const defaultContentPreprocessHook: Hook<MdBlock[]> = {
+export const defaultContentPreprocessHook: Hook<string> = {
 	name: 'symbiont:content:preprocess',
 	event: 'content:preprocess',
 	fn: async (ctx) => {
 		const notionClient = ctx.services.notionClient;
-		if (!notionClient || !notionClient.n2m) {
+		if (!notionClient) {
 			ctx.logger.warn({
-				event: 'content_preprocess_no_n2m',
-				message: 'NotionClient missing n2m instance'
+				event: 'content_preprocess_no_notion_client',
+				message: 'NotionClient not available in services'
 			});
-			return [];
+			return '';
 		}
 
 		try {
-			// Use pageToMarkdown so nested / child blocks are fetched recursively.
-			// blockToMarkdown only works on top-level blocks and loses all nested content.
-			const mdBlocks = await notionClient.n2m.pageToMarkdown(ctx.page.id);
-			return mdBlocks as MdBlock[];
+			return await notionClient.pageToMarkdown(ctx.page.id);
 		} catch (error) {
 			ctx.logger.error({
 				event: 'content_preprocess_failed',
 				pageId: ctx.page.id,
 				error: error instanceof Error ? error.message : String(error)
 			});
-			return [];
+			return '';
 		}
 	}
 };

@@ -4,7 +4,7 @@
  * Renders markdown to HTML using markdown-it with custom renderers and plugins.
  * 
  * **IMPORTANT**: This renderer must maintain compatibility with:
- * - Notion markdown (via notion-to-md library)
+ * - Notion markdown (via the built-in notion-md module)
  * - Tiptap markdown (future implementation)
  * 
  * See `.docs/markdown-compatibility.md` for the full markdown syntax contract

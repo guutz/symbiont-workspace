@@ -2,7 +2,6 @@ import type { PageObjectResponse } from '@notionhq/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint, DatabasePage } from '../../types.js';
 import type { Database } from '../../database.types.js';
-import type { MdBlock } from '../../hooks/types.js';
 import { NotionClient } from './client.js';
 import { DatabasePageCRUD } from '../database/page-crud.js';
 import { createLogger } from '../utils/logger.js';
@@ -151,12 +150,9 @@ export class NotionPageToDatabasePageTransformer {
 
 			// ── Content Pipeline ───────────────────────────────────────
 
-			// content:preprocess — hook is responsible for fetching content (e.g. via n2m.pageToMarkdown)
-			// ctx.input is unused here; the hook has ctx.page.id and ctx.services.notionClient
-			const mdBlocks = await this.hookRegistry.execute('content:preprocess', output, page) as MdBlock[];
-
-			// Bridge step: Convert MdBlock[] to markdown string (fixed, not hookable)
-			const rawMarkdown = this.mdBlocksToString(mdBlocks);
+			// content:preprocess — hook is responsible for fetching content (via pageToMarkdown)
+			// Returns a markdown string directly.
+			const rawMarkdown = (await this.hookRegistry.execute('content:preprocess', output, page) as string) ?? '';
 
 			// content:text (Pipeline: transform raw markdown string)
 			await this.hookRegistry.execute('content:text', output, page, rawMarkdown);
@@ -232,18 +228,4 @@ export class NotionPageToDatabasePageTransformer {
 		}
 	}
 
-	/**
-	 * Bridge step: Convert MdBlock[] to markdown string.
-	 * This is the fixed step between content:preprocess and content:text.
-	 * Not hookable per design memo.
-	 */
-	private mdBlocksToString(mdBlocks: MdBlock[]): string {
-		if (!mdBlocks || mdBlocks.length === 0) {
-			return '';
-		}
-
-		// Use n2m's toMarkdownString method
-		const mdResult = this.notionClient.n2m.toMarkdownString(mdBlocks as any);
-		return typeof mdResult === 'string' ? mdResult : mdResult?.parent ?? '';
-	}
 }
