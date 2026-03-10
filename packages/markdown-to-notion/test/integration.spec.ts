@@ -233,22 +233,53 @@ const hello = "hello";
       expect(actual).toStrictEqual(expected);
     });
 
-    it('should parse math', () => {
+    it('should parse block math ($$) as equation block and treat inline $…$ as plain text', () => {
+      // Block-level $$…$$ → Notion equation block (kept as before).
+      // Inline single-dollar $…$ → plain text with the dollar signs preserved.
+      // This prevents coincidental dollar signs (prices, variables) from being
+      // converted to Notion inline-equation rich text objects.
       const text = fs.readFileSync('test/fixtures/math.md').toString();
       const actual = markdownToBlocks(text);
 
       const expected = [
         notion.paragraph([
           notion.richText('Lift('),
-          notion.richText('L', {type: 'equation'}),
+          notion.richText('$L$'),
           notion.richText(') can be determined by Lift Coefficient ('),
-          notion.richText('C_L', {type: 'equation'}),
+          notion.richText('$C_L$'),
           notion.richText(') like the following\nequation.'),
         ]),
         notion.equation('L = \\frac{1}{2} \\rho v^2 S C_L\\\\\ntest'),
       ];
 
       expect(actual).toStrictEqual(expected);
+    });
+
+    it('should not convert coincidental dollar signs to inline equations', () => {
+      // Regression test: two dollar signs in one paragraph (e.g. prices) must
+      // NOT produce equation-typed rich text objects — they should remain plain
+      // text with the dollar signs intact.
+      const text = 'The article cost $5 and $10 respectively.';
+      const actual = markdownToBlocks(text);
+
+      // remark-math sees "$5 and $" as an inlineMath node; our patch restores
+      // the delimiters so the output is plain text, not an equation.
+      const expected = [
+        notion.paragraph([
+          notion.richText('The article cost '),
+          notion.richText('$5 and $'),
+          notion.richText('10 respectively.'),
+        ]),
+      ];
+
+      expect(actual).toStrictEqual(expected);
+      // Crucially, none of the rich text objects should be of type 'equation'.
+      const block = actual[0] as {
+        type: string;
+        paragraph: {rich_text: {type: string}[]};
+      };
+      const richTexts = block.paragraph.rich_text;
+      expect(richTexts.every(rt => rt.type !== 'equation')).toBe(true);
     });
 
     it('should split paragraphs on hard line breaks', () => {
