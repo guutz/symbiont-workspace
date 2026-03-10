@@ -1,6 +1,7 @@
 import { Client, type PageObjectResponse } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import { createLogger } from '../utils/logger.js';
+import type { DiffResult, EditOperation } from './blocks-diff.js';
 
 /**
  * NotionClient - Pure Notion API interactions
@@ -16,6 +17,40 @@ export class NotionClient {
 	private logger = createLogger({ operation: 'notion_client' });
 
 	constructor(private notion: Client, public n2m: NotionToMarkdown) {}
+
+	// ── Rate-limit-aware retry wrapper ──────────────────────────────────────
+
+	/**
+	 * Wrap a single Notion API call with retry logic for 429 (rate-limited)
+	 * responses. Reads the `Retry-After` header when present and falls back to
+	 * exponential backoff (1 s, 2 s, 4 s) for up to 3 attempts.
+	 *
+	 * All other errors are re-thrown immediately.
+	 */
+	private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+		const MAX_RETRIES = 3;
+		let attempt = 0;
+		while (true) {
+			try {
+				return await fn();
+			} catch (error: any) {
+				const isRateLimit = error?.status === 429 || error?.code === 'rate_limited';
+				if (!isRateLimit || attempt >= MAX_RETRIES - 1) {
+					throw error;
+				}
+				const retryAfter =
+					(error?.headers?.['retry-after'] ?? error?.headers?.['Retry-After']) as string | undefined;
+				const waitMs = retryAfter ? Number(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+				this.logger.warn({
+					event: 'rate_limited',
+					attempt: attempt + 1,
+					waitMs,
+				});
+				await new Promise((resolve) => setTimeout(resolve, waitMs));
+				attempt++;
+			}
+		}
+	}
 
 	/**
 	 * Fetch a single page by ID
@@ -254,14 +289,20 @@ export class NotionClient {
 		});
 
 		try {
-			// Delete existing blocks
-			const existingBlocks = await this.notion.blocks.children.list({ block_id: pageId });
-			
-			for (const block of existingBlocks.results) {
-				if ('type' in block) {
-					await this.notion.blocks.delete({ block_id: block.id });
+			// Delete existing blocks (paginated — pages with >100 blocks need multiple passes)
+			let deleteCursor: string | undefined;
+			do {
+				const existingPage = await this.notion.blocks.children.list({
+					block_id: pageId,
+					start_cursor: deleteCursor,
+				});
+				for (const block of existingPage.results) {
+					if ('type' in block) {
+						await this.notion.blocks.delete({ block_id: block.id });
+					}
 				}
-			}
+				deleteCursor = existingPage.has_more ? (existingPage.next_cursor ?? undefined) : undefined;
+			} while (deleteCursor);
 
 			// Add new blocks (100 blocks per request max)
 			const chunkSize = 100;
@@ -282,6 +323,134 @@ export class NotionClient {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * Apply a surgical diff edit script to a Notion page.
+	 *
+	 * Operations are applied in an atomicity-safe order:
+	 * 1. Updates  — non-destructive, page always coherent.
+	 * 2. Inserts  — additive; no data loss if interrupted.
+	 * 3. Replaces — insert new block, then delete old block (paired).
+	 * 4. Deletes  — soft-deletes; stale blocks cleaned up on next sync if
+	 *               interrupted.
+	 *
+	 * Each operation is individually try/caught: a failure in one operation
+	 * logs a warning and continues, leaving the page in a superset state that
+	 * is safe and will be corrected on the next sync.
+	 *
+	 * Adjacent inserts that share the same `afterId` anchor are batched into a
+	 * single append call (up to 100 blocks per request).
+	 *
+	 * @returns `{ applied, failed }` counts for observability.
+	 */
+	async patchPageBlocks(
+		pageId: string,
+		diff: DiffResult,
+	): Promise<{ applied: number; failed: number }> {
+		this.logger.debug({
+			event: 'patch_page_blocks',
+			pageId,
+			...diff.stats,
+		});
+
+		let applied = 0;
+		let failed = 0;
+
+		// ── Step 1: Updates ──────────────────────────────────────────────────
+		for (const op of diff.operations) {
+			if (op.op !== 'update') continue;
+			try {
+				await this.withRetry(() =>
+					this.notion.blocks.update({
+						block_id: op.existingId,
+						[op.existingType]: op.newContent,
+					} as any)
+				);
+				applied++;
+			} catch (e: any) {
+				this.logger.warn({ event: 'patch_update_failed', blockId: op.existingId, error: e?.message });
+				failed++;
+			}
+		}
+
+		// ── Step 2: Inserts (batched by afterId) ─────────────────────────────
+		// Collect all inserts and group consecutive ones with the same afterId
+		// into batches of up to 100.
+		const insertOps = diff.operations.filter((o): o is Extract<EditOperation, { op: 'insert' }> => o.op === 'insert');
+		let k = 0;
+		while (k < insertOps.length) {
+			const anchor = insertOps[k].afterId;
+			const batch: any[] = [];
+
+			while (k < insertOps.length && insertOps[k].afterId === anchor && batch.length < 100) {
+				batch.push(insertOps[k].block);
+				k++;
+			}
+
+			try {
+				const appendParams: any = {
+					block_id: pageId,
+					children: batch,
+				};
+				if (anchor !== null) {
+					appendParams.after = anchor;
+				}
+				await this.withRetry(() => this.notion.blocks.children.append(appendParams));
+				applied += batch.length;
+			} catch (e: any) {
+				this.logger.warn({
+					event: 'patch_insert_failed',
+					afterId: anchor,
+					batchSize: batch.length,
+					error: e?.message,
+				});
+				failed += batch.length;
+			}
+		}
+
+		// ── Step 3: Replaces (insert new, then delete old) ───────────────────
+		for (const op of diff.operations) {
+			if (op.op !== 'replace') continue;
+			try {
+				// Insert the new block after the one being replaced.
+				await this.withRetry(() =>
+					this.notion.blocks.children.append({
+						block_id: pageId,
+						children: [op.newBlock],
+						after: op.existingId,
+					} as any)
+				);
+				// Now soft-delete the old block.
+				await this.withRetry(() =>
+					this.notion.blocks.delete({ block_id: op.existingId })
+				);
+				applied += 2;
+			} catch (e: any) {
+				this.logger.warn({ event: 'patch_replace_failed', blockId: op.existingId, error: e?.message });
+				failed++;
+			}
+		}
+
+		// ── Step 4: Deletes ──────────────────────────────────────────────────
+		for (const op of diff.operations) {
+			if (op.op !== 'delete') continue;
+			try {
+				await this.withRetry(() =>
+					this.notion.blocks.delete({ block_id: op.existingId })
+				);
+				applied++;
+			} catch (e: any) {
+				// 404 means the block was already deleted — safe to ignore.
+				if (e?.status !== 404) {
+					this.logger.warn({ event: 'patch_delete_failed', blockId: op.existingId, error: e?.message });
+					failed++;
+				}
+			}
+		}
+
+		this.logger.debug({ event: 'patch_page_blocks_done', pageId, applied, failed });
+		return { applied, failed };
 	}
 
 	/**
@@ -439,15 +608,24 @@ export class NotionClient {
 	}
 
 	/**
-	 * Get raw blocks from a Notion page.
+	 * Get raw blocks from a Notion page (paginated — fetches all blocks).
 	 * Returns BlockObjectResponse[] for content:preprocess hook.
 	 */
 	async getBlocks(pageId: string): Promise<any[]> {
 		this.logger.debug({ event: 'fetch_blocks', pageId });
 
 		try {
-			const response = await this.notion.blocks.children.list({ block_id: pageId });
-			return response.results as any[];
+			const allBlocks: any[] = [];
+			let cursor: string | undefined;
+			do {
+				const response = await this.notion.blocks.children.list({
+					block_id: pageId,
+					start_cursor: cursor,
+				});
+				allBlocks.push(...(response.results as any[]));
+				cursor = response.has_more ? (response.next_cursor ?? undefined) : undefined;
+			} while (cursor);
+			return allBlocks;
 		} catch (error: any) {
 			if (error.code === 'unauthorized' || error.status === 401) {
 				throw new Error(

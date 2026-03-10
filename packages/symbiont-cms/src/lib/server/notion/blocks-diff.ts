@@ -170,3 +170,226 @@ export function blocksAreEquivalent(existingBlocks: any[], newBlocks: any[]): bo
 
 	return JSON.stringify(normalizedExisting) === JSON.stringify(normalizedNew);
 }
+
+// ── Diff types ──────────────────────────────────────────────────────────────
+
+/**
+ * A lightweight fingerprint of a single block used for diffing.
+ *
+ * Existing blocks (from Notion API) have an `id`; desired blocks (generated
+ * from markdown) do not.
+ */
+export type BlockFingerprint = {
+	id?: string;
+	type: string;
+	normalized: any;
+	hasChildren: boolean;
+	raw: any;
+};
+
+/**
+ * A single operation in the edit script produced by `diffBlocks()`.
+ */
+export type EditOperation =
+	| { op: 'keep';    existingId: string }
+	| { op: 'update';  existingId: string; existingType: string; newContent: any }
+	| { op: 'insert';  afterId: string | null; block: any }
+	| { op: 'delete';  existingId: string }
+	| { op: 'replace'; existingId: string; newBlock: any };
+
+/**
+ * The full result of a `diffBlocks()` call.
+ *
+ * `forceFullReplace` is `true` when the diff is so large that a surgical
+ * patch is no cheaper than the nuke-and-repave fallback.
+ */
+export type DiffResult = {
+	operations: EditOperation[];
+	stats: {
+		kept:     number;
+		updated:  number;
+		inserted: number;
+		deleted:  number;
+		replaced: number;
+	};
+	forceFullReplace: boolean;
+};
+
+// ── Diff algorithm ──────────────────────────────────────────────────────────
+
+/** How many positions ahead to look when resolving a type mismatch. */
+const LOOKAHEAD = 3;
+
+/**
+ * Build a `BlockFingerprint` for `block`.
+ *
+ * For existing blocks (returned by the Notion API) pass the block as-is —
+ * `block.id` will be present.  For desired blocks (generated from markdown)
+ * `id` will be `undefined`.
+ */
+export function fingerprintBlock(block: any): BlockFingerprint {
+	return {
+		id:          block?.id,
+		type:        block?.type ?? 'unknown',
+		normalized:  normalizeBlockForDiff(block),
+		hasChildren: block?.has_children === true,
+		raw:         block,
+	};
+}
+
+/**
+ * Compute a minimal edit script that transforms `existing` into `desired`.
+ *
+ * Algorithm: single forward pass with a bounded lookahead window.
+ * - Same-type blocks at the same position are kept or updated in-place.
+ * - On a type mismatch a short lookahead decides whether to emit a delete
+ *   (existing has an extra block) or an insert (desired has a new block).
+ * - If neither lookahead matches, emit a replace (delete + insert) and
+ *   advance both pointers.
+ *
+ * When the fraction of changed blocks exceeds `forceFullReplaceThreshold`
+ * the result has `forceFullReplace: true` and the caller should fall back to
+ * `updatePageBlocks()`.
+ *
+ * @param existing               - Blocks currently in Notion (must have `.id`).
+ * @param desired                - Blocks generated from markdown (no `.id`).
+ * @param forceFullReplaceThreshold - 0–1 fraction; default 0.6.
+ */
+export function diffBlocks(
+	existing: any[],
+	desired: any[],
+	forceFullReplaceThreshold = 0.6,
+): DiffResult {
+	const ops: EditOperation[] = [];
+	const stats = { kept: 0, updated: 0, inserted: 0, deleted: 0, replaced: 0 };
+
+	const ef = existing.map(fingerprintBlock);
+	const df = desired.map(fingerprintBlock);
+
+	let i = 0; // pointer into ef (existing)
+	let j = 0; // pointer into df (desired)
+
+	// Track the last "anchored" existing block ID so inserts can reference it.
+	let lastAnchorId: string | null = null;
+
+	while (i < ef.length && j < df.length) {
+		const e = ef[i];
+		const d = df[j];
+
+		if (e.type === d.type) {
+			// Same type — keep or update in-place.
+			const identical =
+				!e.hasChildren &&
+				e.normalized !== null &&
+				d.normalized !== null &&
+				!e.normalized._file &&
+				!e.normalized._unknown &&
+				!d.normalized._file &&
+				!d.normalized._unknown &&
+				JSON.stringify(e.normalized) === JSON.stringify(d.normalized);
+
+			if (identical) {
+				ops.push({ op: 'keep', existingId: e.id! });
+				stats.kept++;
+			} else {
+				// Content changed — update the existing block in-place.
+				// If the existing block has children OR the normalized form has
+				// a sentinel, fall back to a replace so we don't leave stale
+				// children behind.
+				if (e.hasChildren || e.normalized?._file || e.normalized?._unknown) {
+					ops.push({ op: 'replace', existingId: e.id!, newBlock: d.raw });
+					stats.replaced++;
+				} else {
+					const typeContent = d.raw[d.type];
+					ops.push({
+						op:          'update',
+						existingId:  e.id!,
+						existingType: e.type,
+						newContent:  typeContent,
+					});
+					stats.updated++;
+				}
+			}
+			lastAnchorId = e.id!;
+			i++;
+			j++;
+			continue;
+		}
+
+		// Type mismatch — look ahead to decide what happened.
+		// We compare by content (normalized form) to accurately identify whether
+		// a future existing block is the same as the current desired block (→ insert),
+		// or a future desired block is the same as the current existing block (→ delete).
+		let matchInExisting = -1;
+		let matchInDesired  = -1;
+
+		for (let k = 1; k <= LOOKAHEAD; k++) {
+			if (matchInExisting === -1 && i + k < ef.length) {
+				const en = ef[i + k].normalized;
+				const dn = d.normalized;
+				const sameContent = en && dn &&
+					!en._file && !en._unknown && !dn._file && !dn._unknown &&
+					ef[i + k].type === d.type &&
+					JSON.stringify(en) === JSON.stringify(dn);
+				if (sameContent) matchInExisting = k;
+			}
+			if (matchInDesired === -1 && j + k < df.length) {
+				const en = e.normalized;
+				const dn = df[j + k].normalized;
+				const sameContent = en && dn &&
+					!en._file && !en._unknown && !dn._file && !dn._unknown &&
+					e.type === df[j + k].type &&
+					JSON.stringify(en) === JSON.stringify(dn);
+				if (sameContent) matchInDesired = k;
+			}
+			if (matchInExisting !== -1 && matchInDesired !== -1) break;
+		}
+
+		if (matchInExisting !== -1 && (matchInDesired === -1 || matchInExisting <= matchInDesired)) {
+			// Existing has extra blocks → delete them.
+			for (let k = 0; k < matchInExisting; k++) {
+				ops.push({ op: 'delete', existingId: ef[i + k].id! });
+				stats.deleted++;
+			}
+			i += matchInExisting;
+		} else if (matchInDesired !== -1) {
+			// Desired has new blocks → insert them before the existing block.
+			for (let k = 0; k < matchInDesired; k++) {
+				ops.push({ op: 'insert', afterId: lastAnchorId, block: df[j + k].raw });
+				stats.inserted++;
+				// Subsequent inserts with no anchor will be appended to the end of the page.
+			}
+			j += matchInDesired;
+		} else {
+			// Neither lookahead found a content match — replace both.
+			ops.push({ op: 'replace', existingId: e.id!, newBlock: d.raw });
+			stats.replaced++;
+			lastAnchorId = e.id!;
+			i++;
+			j++;
+		}
+	}
+
+	// Drain leftover existing blocks (delete them).
+	while (i < ef.length) {
+		ops.push({ op: 'delete', existingId: ef[i].id! });
+		stats.deleted++;
+		i++;
+	}
+
+	// Drain leftover desired blocks (append them).
+	while (j < df.length) {
+		ops.push({ op: 'insert', afterId: lastAnchorId, block: df[j].raw });
+		stats.inserted++;
+		lastAnchorId = null; // subsequent drain inserts go to end (afterId=null)
+		j++;
+	}
+
+	// Decide whether surgical patching is worthwhile.
+	const total     = Math.max(existing.length, desired.length);
+	const changed   = stats.updated + stats.inserted + stats.deleted + stats.replaced;
+	const fraction  = total === 0 ? 0 : changed / total;
+	const forceFullReplace = fraction > forceFullReplaceThreshold;
+
+	return { operations: ops, stats, forceFullReplace };
+}

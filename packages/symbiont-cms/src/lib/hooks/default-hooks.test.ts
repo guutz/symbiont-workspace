@@ -32,14 +32,16 @@ describe('Default Hooks (Extractor Pattern)', () => {
 	});
 
 	describe('defaultPublishCheckHook', () => {
-		it('should always return true by default', async () => {
-			const ctx = createMockContext({});
+		it('should return false when no notionClient is available', async () => {
+			// Hook uses Notion Status property to gate publishing (opt-in model).
+			// Without a notionClient it defaults to false.
+			const ctx = createMockContext({ services: {} });
 			const result = await defaultPublishCheckHook.fn(ctx);
-			expect(result).toBe(true);
+			expect(result).toBe(false);
 		});
 
 		it('should have correct metadata', () => {
-			expect(defaultPublishCheckHook.name).toBe('symbiont:publish:check:default');
+			expect(defaultPublishCheckHook.name).toBe('symbiont:publish:check');
 			expect(defaultPublishCheckHook.event).toBe('publish:check');
 			// Priority is undefined (default level) for built-in hooks
 		});
@@ -59,7 +61,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 		});
 
 		it('should have correct metadata', () => {
-			expect(defaultPublishDateHook.name).toBe('symbiont:publish:date:default');
+			expect(defaultPublishDateHook.name).toBe('symbiont:publish:date');
 			expect(defaultPublishDateHook.event).toBe('publish:date');
 			// Priority is undefined (default level) for built-in hooks
 		});
@@ -73,7 +75,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 		});
 
 		it('should have correct metadata', () => {
-			expect(defaultSlugExtractHook.name).toBe('symbiont:slug:extract:default');
+			expect(defaultSlugExtractHook.name).toBe('symbiont:slug:extract');
 			expect(defaultSlugExtractHook.event).toBe('slug:extract');
 			// Priority is undefined (default level) for built-in hooks
 		});
@@ -85,6 +87,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 				page: {
 					properties: {
 						Title: {
+							type: 'title',
 							title: [{ plain_text: 'Test Title With Spaces' }]
 						}
 					}
@@ -100,6 +103,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 				page: {
 					properties: {
 						Name: {
+							type: 'title',
 							title: [{ plain_text: 'Another Test' }]
 						}
 					}
@@ -110,7 +114,9 @@ describe('Default Hooks (Extractor Pattern)', () => {
 			expect(result).toBe('another-test');
 		});
 
-		it('should return untitled if no title property', async () => {
+		it('should return null if no title property exists', async () => {
+			// Hook abstains (returns null) when there is no title — downstream
+			// hooks or the title extractor will handle the missing value.
 			const ctx = createMockContext({
 				page: {
 					properties: {}
@@ -118,11 +124,11 @@ describe('Default Hooks (Extractor Pattern)', () => {
 			});
 
 			const result = await defaultSlugGenerateHook.fn(ctx);
-			expect(result).toBe('untitled');
+			expect(result).toBeNull();
 		});
 
 		it('should have correct metadata', () => {
-			expect(defaultSlugGenerateHook.name).toBe('symbiont:slug:generate:default');
+			expect(defaultSlugGenerateHook.name).toBe('symbiont:slug:generate');
 			expect(defaultSlugGenerateHook.event).toBe('slug:generate');
 			// Priority is undefined (default level) for built-in hooks
 		});
@@ -305,13 +311,15 @@ describe('Default Hooks (Extractor Pattern)', () => {
 			expect(result).toBe('This is a summary.');
 		});
 
-		it('should return empty string if no summary configured', async () => {
+		it('should return null if no summary property is configured', async () => {
+			// Hook abstains (returns null) when no property is configured —
+			// consistent with the FirstWins composition strategy.
 			const ctx = createMockContext({
 				config: {} as any
 			});
 
 			const result = await defaultSummaryExtractHook.fn(ctx);
-			expect(result).toBe('');
+			expect(result).toBeNull();
 		});
 	});
 
@@ -323,7 +331,7 @@ describe('Default Hooks (Extractor Pattern)', () => {
 		});
 
 		it('should have correct metadata', () => {
-			expect(defaultCustomMetadataHook.name).toBe('symbiont:metadata:custom:default');
+			expect(defaultCustomMetadataHook.name).toBe('symbiont:metadata:custom');
 			expect(defaultCustomMetadataHook.event).toBe('metadata:custom');
 			// Priority is undefined (default level) for built-in hooks
 		});

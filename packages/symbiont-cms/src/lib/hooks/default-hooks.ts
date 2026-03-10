@@ -2,7 +2,7 @@ import type { Hook, MdBlock } from './types.js';
 import { createSlug } from '../server/utils/slug.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../server/bucket/image-upload.js';
 import { convertMarkdownToNotionBlocks } from '../server/notion/markdown-to-blocks.js';
-import { blocksAreEquivalent } from '../server/notion/blocks-diff.js';
+import { diffBlocks } from '../server/notion/blocks-diff.js';
 import { NotionToMarkdown } from 'notion-to-md';
 
 /**
@@ -525,32 +525,57 @@ export const defaultContentSyncHook: Hook<void> = {
 			return null;
 		}
 
+		const syncStrategy         = ctx.config.syncStrategy ?? 'patch';
+		const forceFullThreshold   = ctx.config.forceFullReplaceThreshold ?? 0.6;
+
 		try {
 			// Convert markdown to Notion blocks
 			const newBlocks = convertMarkdownToNotionBlocks(finalContent);
 
-			// Fetch what's already in Notion so we can diff
+			// Fetch what's already in Notion (now fully paginated)
 			const existingBlocks = await notionClient.getBlocks(ctx.page.id);
 
-			// Skip the expensive delete-all → re-append cycle when nothing changed.
-			// blocksAreEquivalent() is conservative: it returns false (i.e. "needs
-			// update") for file images, nested blocks, or unknown block types.
-			if (blocksAreEquivalent(existingBlocks, newBlocks)) {
+			// Compute diff
+			const diff = diffBlocks(existingBlocks, newBlocks, forceFullThreshold);
+
+			// Nothing changed — skip entirely
+			if (
+				diff.stats.updated  === 0 &&
+				diff.stats.inserted === 0 &&
+				diff.stats.deleted  === 0 &&
+				diff.stats.replaced === 0
+			) {
 				ctx.logger.debug({
 					event: 'content_sync_skipped_no_change',
 					pageId: ctx.page.id,
-					blockCount: newBlocks.length
+					blockCount: newBlocks.length,
 				});
 				return null;
 			}
 
-			// Blocks differ — update Notion page
-			await notionClient.updatePageBlocks(ctx.page.id, newBlocks);
+			if (syncStrategy === 'replace' || diff.forceFullReplace) {
+				// Full nuke-and-repave fallback
+				ctx.logger.info({
+					event: 'content_sync_full_replace',
+					pageId: ctx.page.id,
+					reason: syncStrategy === 'replace' ? 'config' : 'threshold',
+					...diff.stats,
+				});
+				await notionClient.updatePageBlocks(ctx.page.id, newBlocks);
+			} else {
+				// Surgical patch
+				ctx.logger.info({
+					event: 'content_sync_patch',
+					pageId: ctx.page.id,
+					...diff.stats,
+				});
+				await notionClient.patchPageBlocks(ctx.page.id, diff);
+			}
 
 			ctx.logger.debug({
 				event: 'content_synced_to_notion',
 				pageId: ctx.page.id,
-				blockCount: newBlocks.length
+				blockCount: newBlocks.length,
 			});
 		} catch (error) {
 			ctx.logger.warn({

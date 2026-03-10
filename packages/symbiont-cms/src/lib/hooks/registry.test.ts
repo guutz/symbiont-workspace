@@ -67,7 +67,9 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			expect(registered[2].name).toBe('hook3'); // priority 70
 		});
 
-		it('should default priority to 50 if not specified', () => {
+		it('should store hooks without priority as undefined (numeric default is 50 internally)', () => {
+			// The registry maps 'override'→40, undefined→50, 'fallback'→60 for sorting,
+			// but stores the original priority value on the hook object.
 			const hook: Hook = {
 				name: 'test:hook',
 				event: 'publish:check',
@@ -77,7 +79,7 @@ describe('HookRegistry (Extractor Pattern)', () => {
 			registry.register(hook);
 
 			const hooks = registry.getHooks('publish:check');
-			expect(hooks[0].priority).toBe(50);
+			expect(hooks[0].priority).toBeUndefined();
 		});
 	});
 
