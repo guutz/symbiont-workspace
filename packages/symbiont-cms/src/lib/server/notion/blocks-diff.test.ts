@@ -5,6 +5,7 @@ import {
 	blocksAreEquivalent,
 	normalizeBlockForDiff,
 } from './blocks-diff.js';
+import { sanitizeContentForUpdate } from './client.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -498,5 +499,138 @@ describe('normalizeBlockForDiff', () => {
 	it('normalizes equation', () => {
 		const result = normalizeBlockForDiff({ type: 'equation', equation: { expression: 'x^2' } });
 		expect(result).toEqual({ type: 'equation', equation: { expression: 'x^2' } });
+	});
+});
+
+// ── diffBlocks — desired block has children ───────────────────────────────────
+
+describe('diffBlocks — desired block has children', () => {
+	function makeQuoteWithChildren(children: any[], id?: string): any {
+		return {
+			...(id ? { id } : {}),
+			type: 'quote',
+			quote: {
+				rich_text: [],
+				children,
+			},
+			has_children: false,
+		};
+	}
+
+	function makeCalloutWithChildren(children: any[], id?: string): any {
+		return {
+			...(id ? { id } : {}),
+			type: 'callout',
+			callout: {
+				rich_text: [{ type: 'text', text: { content: 'Note' }, annotations: {} }],
+				icon: { type: 'emoji', emoji: '📘' },
+				children,
+			},
+			has_children: false,
+		};
+	}
+
+	it('emits replace (not update) when desired quote block has non-empty children and existing has has_children: false', () => {
+		const existing = [makeQuoteWithChildren([], 'id1')];
+		const desired  = [makeQuoteWithChildren([makeParagraph('Quoted text')])];
+
+		const result = diffBlocks(existing, desired);
+		expect(result.stats.replaced).toBe(1);
+		expect(result.stats.updated).toBe(0);
+		expect(result.operations[0].op).toBe('replace');
+	});
+
+	it('emits replace (not update) when desired callout block has non-empty children and existing has has_children: false', () => {
+		const existing = [makeCalloutWithChildren([], 'id1')];
+		const desired  = [makeCalloutWithChildren([makeParagraph('Callout body')])];
+
+		const result = diffBlocks(existing, desired);
+		expect(result.stats.replaced).toBe(1);
+		expect(result.stats.updated).toBe(0);
+	});
+
+	it('still emits update when desired block has an empty children array', () => {
+		// Empty children should not trigger replace — they produce no nesting
+		const existing = [makeQuoteWithChildren([], 'id1')];
+		const desired  = [{
+			type: 'quote',
+			quote: {
+				rich_text: [{ type: 'text', text: { content: 'New' }, annotations: {} }],
+				children: [],  // empty — no children
+			},
+			has_children: false,
+		}];
+
+		const result = diffBlocks(existing, desired);
+		// Content changed (rich_text differs) → update, not replace
+		expect(result.stats.updated + result.stats.replaced).toBe(1);
+		// The key assertion: it should NOT replace purely due to empty children
+		// (it may update or replace for content reasons, but not the children guard)
+		expect(result.stats.replaced).toBe(0); // empty children don't force replace
+	});
+});
+
+// ── sanitizeContentForUpdate ──────────────────────────────────────────────────
+
+describe('sanitizeContentForUpdate', () => {
+	it('strips children from quote block content', () => {
+		const content = {
+			rich_text: [{ type: 'text', text: { content: 'Hello' }, annotations: {} }],
+			children: [{ type: 'paragraph', paragraph: { rich_text: [] } }],
+		};
+		const result = sanitizeContentForUpdate('quote', content);
+		expect(result).not.toHaveProperty('children');
+		expect(result).toHaveProperty('rich_text');
+	});
+
+	it('strips children from callout block content', () => {
+		const content = {
+			rich_text: [],
+			icon: { type: 'emoji', emoji: '📘' },
+			children: [{ type: 'paragraph', paragraph: { rich_text: [] } }],
+			color: 'blue_background',
+		};
+		const result = sanitizeContentForUpdate('callout', content);
+		expect(result).not.toHaveProperty('children');
+		expect(result).toHaveProperty('icon');
+		expect(result).toHaveProperty('color');
+	});
+
+	it('strips type from image block content', () => {
+		const content = {
+			type: 'external',
+			external: { url: 'https://example.com/img.png' },
+			caption: [],
+		};
+		const result = sanitizeContentForUpdate('image', content);
+		expect(result).not.toHaveProperty('type');
+		expect(result).toHaveProperty('external');
+		expect(result.external.url).toBe('https://example.com/img.png');
+	});
+
+	it('strips both type and children from image block content (if both present)', () => {
+		const content = {
+			type: 'external',
+			external: { url: 'https://example.com/img.png' },
+			children: [],
+		};
+		const result = sanitizeContentForUpdate('image', content);
+		expect(result).not.toHaveProperty('type');
+		expect(result).not.toHaveProperty('children');
+	});
+
+	it('does not strip type from non-image block content', () => {
+		// paragraph content doesn't have a `type` field, but even if another block
+		// type had one we should not remove it (only image is special-cased)
+		const content = {
+			rich_text: [{ type: 'text', text: { content: 'x' }, annotations: {} }],
+		};
+		const result = sanitizeContentForUpdate('paragraph', content);
+		expect(result).toHaveProperty('rich_text');
+	});
+
+	it('handles null/undefined content gracefully', () => {
+		expect(sanitizeContentForUpdate('paragraph', null)).toBeNull();
+		expect(sanitizeContentForUpdate('paragraph', undefined)).toBeUndefined();
 	});
 });

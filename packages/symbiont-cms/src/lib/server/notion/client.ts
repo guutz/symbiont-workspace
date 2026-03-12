@@ -4,6 +4,31 @@ import type { DiffResult, EditOperation } from './blocks-diff.js';
 import { blocksToMarkdown, setBlockTransformer, clearBlockTransformers } from '../notion-md/blocks-to-markdown.js';
 import type { BlockTransformerFn } from '../notion-md/types.js';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Strip fields from block content that the Notion `blocks.update` endpoint
+ * does not accept (but that `blocks.children.append` / create does accept).
+ *
+ * Two concrete constraints:
+ * 1. `children` — child blocks are separate API resources; they cannot be
+ *    modified via a block update.  Any block type can carry children when
+ *    created, but the update endpoint always rejects them.
+ * 2. `image.type` — image blocks carry a discriminant `type: "external"` field
+ *    that is only accepted during creation; the update endpoint rejects it.
+ */
+export function sanitizeContentForUpdate(blockType: string, content: any): any {
+	if (!content) return content;
+	// Drop `children` unconditionally.
+	const { children: _c, ...rest } = content;
+	// For image blocks, also drop the `type` discriminant.
+	if (blockType === 'image') {
+		const { type: _t, ...imageRest } = rest;
+		return imageRest;
+	}
+	return rest;
+}
+
 /**
  * NotionClient - Pure Notion API interactions
  *
@@ -379,7 +404,7 @@ export class NotionClient {
 				await this.withRetry(() =>
 					this.notion.blocks.update({
 						block_id: op.existingId,
-						[op.existingType]: op.newContent,
+						[op.existingType]: sanitizeContentForUpdate(op.existingType, op.newContent),
 					} as any)
 				);
 				applied++;
