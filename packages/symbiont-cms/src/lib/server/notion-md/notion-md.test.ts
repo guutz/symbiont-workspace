@@ -281,3 +281,93 @@ describe('blocksToMarkdown (blocks-to-markdown)', () => {
 		expect(eqItem.equation.expression).toBe('E=mc^2');
 	});
 });
+
+describe('notion://page sentinel round-trips', () => {
+	const CLEAN_ID = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4';
+	const UUID = 'a1b2c3d4-e5f6-a1b2-c3d4-e5f6a1b2c3d4';
+
+	// ── Fix 2a: standalone link_to_page ──────────────────────────────────────
+
+	it('converts a standalone notion:// sentinel paragraph to a link_to_page block', () => {
+		const md = `[Page link](notion://page/${CLEAN_ID})`;
+		const blocks = convertMarkdownToNotionBlocks(md);
+		expect(blocks).toHaveLength(1);
+		expect(blocks[0].type).toBe('link_to_page');
+		expect(blocks[0].link_to_page.type).toBe('page_id');
+		expect(blocks[0].link_to_page.page_id).toBe(UUID);
+	});
+
+	it('round-trips a link_to_page block via markdown', async () => {
+		const notionBlocks = [{
+			id: 'blk1',
+			type: 'link_to_page',
+			link_to_page: { type: 'page_id', page_id: UUID },
+			has_children: false,
+		}];
+		const noChildren = async (_: string) => [];
+		const md = await blocksToMarkdown(notionBlocks as any, noChildren);
+		// Should produce the sentinel
+		expect(md).toContain(`notion://page/${CLEAN_ID}`);
+		// Round-trip back to Notion
+		const converted = convertMarkdownToNotionBlocks(md);
+		expect(converted).toHaveLength(1);
+		expect(converted[0].type).toBe('link_to_page');
+		expect(converted[0].link_to_page.page_id).toBe(UUID);
+	});
+
+	// ── Fix 2b: inline page mention ──────────────────────────────────────────
+
+	it('converts an inline notion:// sentinel link to a mention rich_text', () => {
+		const md = `See [My Page](notion://page/${CLEAN_ID}) for details.`;
+		const blocks = convertMarkdownToNotionBlocks(md);
+		expect(blocks).toHaveLength(1);
+		expect(blocks[0].type).toBe('paragraph');
+		const rt = blocks[0].paragraph.rich_text;
+		const mention = rt.find((r: any) => r.type === 'mention');
+		expect(mention).toBeDefined();
+		expect(mention.mention.type).toBe('page');
+		expect(mention.mention.page.id).toBe(UUID);
+	});
+
+	it('round-trips an inline page mention via markdown', async () => {
+		const notionBlocks = [{
+			id: 'blk1',
+			type: 'paragraph',
+			paragraph: {
+				rich_text: [
+					{ type: 'text', text: { content: 'See ' }, annotations: {} },
+					{
+						type: 'mention',
+						plain_text: 'My Page',
+						mention: { type: 'page', page: { id: UUID } },
+						annotations: {},
+					},
+					{ type: 'text', text: { content: ' for details.' }, annotations: {} },
+				],
+			},
+			has_children: false,
+		}];
+		const noChildren = async (_: string) => [];
+		const md = await blocksToMarkdown(notionBlocks as any, noChildren);
+		// Should produce the sentinel inline
+		expect(md).toContain(`notion://page/${CLEAN_ID}`);
+		// Round-trip back to Notion
+		const converted = convertMarkdownToNotionBlocks(md);
+		expect(converted).toHaveLength(1);
+		expect(converted[0].type).toBe('paragraph');
+		const rt = converted[0].paragraph.rich_text;
+		const mention = rt.find((r: any) => r.type === 'mention');
+		expect(mention).toBeDefined();
+		expect(mention.mention.page.id).toBe(UUID);
+	});
+
+	// ── Mix: notion:// sentinel should not interfere with normal https links ──
+
+	it('does not affect normal https links', () => {
+		const blocks = convertMarkdownToNotionBlocks('[example](https://example.com)');
+		expect(blocks[0].type).toBe('paragraph');
+		const rt = blocks[0].paragraph.rich_text;
+		expect(rt[0].type).toBe('text');
+		expect(rt[0].text.link?.url).toBe('https://example.com');
+	});
+});

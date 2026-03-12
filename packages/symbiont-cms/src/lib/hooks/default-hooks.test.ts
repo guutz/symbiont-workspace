@@ -9,7 +9,8 @@ import {
 	defaultTagsExtractHook,
 	defaultAuthorsExtractHook,
 	defaultSummaryExtractHook,
-	defaultCustomMetadataHook
+	defaultCustomMetadataHook,
+	defaultContentPostprocessHook,
 } from './default-hooks.js';
 import type { HookContext } from './types.js';
 
@@ -336,6 +337,100 @@ describe('Default Hooks (Extractor Pattern)', () => {
 			expect(defaultCustomMetadataHook.name).toBe('symbiont:metadata:custom');
 			expect(defaultCustomMetadataHook.event).toBe('metadata:custom');
 			// Priority is undefined (default level) for built-in hooks
+		});
+	});
+
+	describe('defaultContentPostprocessHook (resolveNotionPageLinks)', () => {
+		const CLEAN_ID = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4';
+		const UUID = 'a1b2c3d4-e5f6-a1b2-c3d4-e5f6a1b2c3d4';
+
+		/** Build a mock Supabase client that returns the given rows for a `pages` query */
+		const mockSupabase = (rows: Array<{ page_id: string; slug: string | null }>) => ({
+			from: () => ({
+				select: () => ({
+					in: () => Promise.resolve({ data: rows, error: null }),
+				}),
+			}),
+		});
+
+		it('returns content unchanged when supabase is not available', async () => {
+			const content = `See [A Page](notion://page/${CLEAN_ID}) here.`;
+			const ctx = createMockContext({ input: content, services: {} });
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe(content);
+		});
+
+		it('returns content unchanged when there are no notion:// sentinels', async () => {
+			const content = 'No page links here.';
+			const ctx = createMockContext({
+				input: content,
+				services: { supabase: mockSupabase([]) as any },
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe(content);
+		});
+
+		it('resolves a found page sentinel to /{slug}', async () => {
+			const content = `See [My Article](notion://page/${CLEAN_ID}) for details.`;
+			const ctx = createMockContext({
+				input: content,
+				services: {
+					supabase: mockSupabase([{ page_id: UUID, slug: 'my-article' }]) as any,
+				},
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe('See [My Article](/my-article) for details.');
+		});
+
+		it('strips an unresolvable sentinel to plain text', async () => {
+			const content = `See [Unknown Page](notion://page/${CLEAN_ID}) here.`;
+			const ctx = createMockContext({
+				input: content,
+				services: { supabase: mockSupabase([]) as any },
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe('See Unknown Page here.');
+		});
+
+		it('strips a sentinel whose DB row has null slug to plain text', async () => {
+			const content = `Check [Draft Page](notion://page/${CLEAN_ID}).`;
+			const ctx = createMockContext({
+				input: content,
+				services: {
+					supabase: mockSupabase([{ page_id: UUID, slug: null }]) as any,
+				},
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe('Check Draft Page.');
+		});
+
+		it('resolves multiple different sentinels in one pass', async () => {
+			const CLEAN_ID_2 = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+			const UUID_2 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+			const content = `[Page A](notion://page/${CLEAN_ID}) and [Page B](notion://page/${CLEAN_ID_2}).`;
+			const ctx = createMockContext({
+				input: content,
+				services: {
+					supabase: mockSupabase([
+						{ page_id: UUID, slug: 'page-a' },
+						{ page_id: UUID_2, slug: 'page-b' },
+					]) as any,
+				},
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe('[Page A](/page-a) and [Page B](/page-b).');
+		});
+
+		it('resolves duplicate sentinels (same ID used twice)', async () => {
+			const content = `[A](notion://page/${CLEAN_ID}) and [A](notion://page/${CLEAN_ID}).`;
+			const ctx = createMockContext({
+				input: content,
+				services: {
+					supabase: mockSupabase([{ page_id: UUID, slug: 'page-a' }]) as any,
+				},
+			});
+			const result = await defaultContentPostprocessHook.fn(ctx);
+			expect(result).toBe('[A](/page-a) and [A](/page-a).');
 		});
 	});
 });

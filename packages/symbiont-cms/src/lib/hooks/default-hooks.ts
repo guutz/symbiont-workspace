@@ -505,8 +505,62 @@ export const defaultContentPostprocessHook: Hook<string> = {
 	name: 'symbiont:content:postprocess',
 	event: 'content:postprocess',
 	fn: async (ctx) => {
-		// Pass-through by default
-		return ctx.input as string;
+		const content = ctx.input as string;
+		const supabase = ctx.services.supabase;
+
+		if (!supabase || !content) {
+			return content;
+		}
+
+		// Collect all sentinel occurrences and unique page IDs
+		const sentinelMatches = Array.from(
+			content.matchAll(/\[([^\]]+)\]\(notion:\/\/page\/([0-9a-f]{32})\)/gi),
+		);
+		if (sentinelMatches.length === 0) {
+			return content;
+		}
+
+		const uniqueCleanIds = [...new Set(sentinelMatches.map(m => m[2].toLowerCase()))];
+
+		// Re-format cleanId → UUID (insert dashes) for the Supabase query.
+		// Our DB stores page_id in UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
+		const uuids = uniqueCleanIds.map(c =>
+			`${c.slice(0, 8)}-${c.slice(8, 12)}-${c.slice(12, 16)}-${c.slice(16, 20)}-${c.slice(20)}`,
+		);
+
+		const { data: pages, error } = await supabase
+			.from('pages')
+			.select('page_id, slug')
+			.in('page_id', uuids);
+
+		if (error) {
+			ctx.logger.warn({
+				event: 'resolve_notion_page_links_failed',
+				pageId: ctx.page.id,
+				error: error.message,
+			});
+			return content;
+		}
+
+		// Build cleanId → slug lookup map
+		const slugMap = new Map<string, string | null>();
+		for (const page of pages ?? []) {
+			if (page.page_id) {
+				slugMap.set(page.page_id.replace(/-/g, ''), page.slug ?? null);
+			}
+		}
+
+		// Single-pass replace — the regex captures cleanId in group 2, so we can
+		// look up the slug from the map directly without a per-ID loop or per-ID
+		// regex construction. String.replace() with a global regex always starts
+		// from position 0 regardless of lastIndex.
+		return content.replace(
+			/\[([^\]]+)\]\(notion:\/\/page\/([0-9a-f]{32})\)/gi,
+			(_, label: string, cleanId: string) => {
+				const slug = slugMap.get(cleanId.toLowerCase()) ?? null;
+				return slug ? `[${label}](/${slug})` : label;
+			},
+		);
 	}
 };
 

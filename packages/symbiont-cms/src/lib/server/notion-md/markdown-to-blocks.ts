@@ -84,6 +84,43 @@ function splitBySentinel(
 	return parts;
 }
 
+// ── Notion page sentinel helpers ─────────────────────────────────────────────
+// `notion://page/{cleanId}` sentinels are written by blocks-to-markdown (link_to_page
+// blocks) and rich-text.ts (inline page/database mention items). On write-back they must
+// be converted back to the appropriate native Notion type — not left as broken URLs.
+//
+// A standalone `[label](notion://page/{id})` paragraph → link_to_page block.
+// An inline `[label](notion://page/{id})` surrounded by other text → mention rich_text.
+
+const NOTION_SENTINEL_RE = /^notion:\/\/page\/([0-9a-f]{32})$/i;
+
+/**
+ * Extracts and formats the page UUID from a `notion://page/{cleanId}` sentinel URL.
+ * Returns the ID in standard UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx),
+ * or null if the URL is not a sentinel.
+ */
+function extractNotionPageId(url: string): string | null {
+	const m = url.match(NOTION_SENTINEL_RE);
+	if (!m) return null;
+	const c = m[1].toLowerCase();
+	return `${c.slice(0, 8)}-${c.slice(8, 12)}-${c.slice(12, 16)}-${c.slice(16, 20)}-${c.slice(20)}`;
+}
+
+function linkToPageBlock(pageId: string): any {
+	return {
+		object: 'block',
+		type: 'link_to_page',
+		link_to_page: { type: 'page_id', page_id: pageId },
+	};
+}
+
+function mentionPageRichText(pageId: string): any {
+	return {
+		type: 'mention',
+		mention: { type: 'page', page: { id: pageId } },
+	};
+}
+
 // ── Block / RichText helpers ─────────────────────────────────────────────────
 
 function divider(): any {
@@ -266,10 +303,15 @@ function parseInline(node: any, options: InlineOptions, expressions: string[]): 
 				parseInline(child, { ...copy, annotations: { ...copy.annotations, bold: true } }, expressions),
 			);
 
-		case 'link':
+		case 'link': {
+			const notionPageId = extractNotionPageId(node.url as string ?? '');
+			if (notionPageId) {
+				return [mentionPageRichText(notionPageId)];
+			}
 			return (node.children as any[]).flatMap(child =>
 				parseInline(child, { ...copy, url: node.url as string }, expressions),
 			);
+		}
 
 		case 'inlineCode':
 			return [richText(node.value as string, { ...copy, annotations: { ...copy.annotations, code: true } })];
@@ -316,6 +358,12 @@ function parseParagraph(node: any, options: BlocksOptions, expressions: string[]
 		if (idx !== null) {
 			return [equationBlock(expressions[idx] ?? '')];
 		}
+	}
+
+	// Sole child is a notion:// page sentinel link → link_to_page block
+	if (children.length === 1 && children[0].type === 'link') {
+		const pageId = extractNotionPageId(children[0].url as string ?? '');
+		if (pageId) return [linkToPageBlock(pageId)];
 	}
 
 	// Extract inline images into separate blocks
