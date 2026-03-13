@@ -278,8 +278,19 @@ export function diffBlocks(
 
 		if (e.type === d.type) {
 			// Same type — keep or update in-place.
+
+			// Check whether the desired block carries non-empty children.
+			// The Notion blocks.update endpoint rejects a `children` field, so any
+			// desired block with children must be written via a replace (delete + append)
+			// rather than an update.  It also means the normalized-form comparison must
+			// treat "existing has no children, desired has children" as non-identical.
+			const desiredContent = (d.raw[d.type] as any);
+			const desiredHasChildren =
+				Array.isArray(desiredContent?.children) && desiredContent.children.length > 0;
+
 			const identical =
 				!e.hasChildren &&
+				!desiredHasChildren &&
 				e.normalized !== null &&
 				d.normalized !== null &&
 				!e.normalized._file &&
@@ -293,10 +304,11 @@ export function diffBlocks(
 				stats.kept++;
 			} else {
 				// Content changed — update the existing block in-place.
-				// If the existing block has children OR the normalized form has
-				// a sentinel, fall back to a replace so we don't leave stale
-				// children behind.
-				if (e.hasChildren || e.normalized?._file || e.normalized?._unknown) {
+				// If the existing block has children, or the desired block has children,
+				// or the normalized form has a sentinel, fall back to a replace so we
+				// don't leave stale children behind and to avoid the update-endpoint
+				// constraint on the `children` field.
+				if (e.hasChildren || desiredHasChildren || e.normalized?._file || e.normalized?._unknown) {
 					ops.push({ op: 'replace', existingId: e.id!, newBlock: d.raw });
 					stats.replaced++;
 				} else {

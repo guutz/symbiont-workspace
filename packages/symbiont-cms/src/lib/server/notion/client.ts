@@ -1,22 +1,62 @@
 import { Client, type PageObjectResponse } from '@notionhq/client';
-import { NotionToMarkdown } from 'notion-to-md';
 import { createLogger } from '../utils/logger.js';
 import type { DiffResult, EditOperation } from './blocks-diff.js';
+import { blocksToMarkdown, setBlockTransformer, clearBlockTransformers } from '../notion-md/blocks-to-markdown.js';
+import type { BlockTransformerFn } from '../notion-md/types.js';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Strip fields from block content that the Notion `blocks.update` endpoint
+ * does not accept (but that `blocks.children.append` / create does accept).
+ *
+ * Two concrete constraints:
+ * 1. `children` — child blocks are separate API resources; they cannot be
+ *    modified via a block update.  Any block type can carry children when
+ *    created, but the update endpoint always rejects them.
+ * 2. `image.type` — image blocks carry a discriminant `type: "external"` field
+ *    that is only accepted during creation; the update endpoint rejects it.
+ */
+export function sanitizeContentForUpdate(blockType: string, content: any): any {
+	if (!content) return content;
+	// Drop `children` unconditionally.
+	const { children: _c, ...rest } = content;
+	// For image blocks, also drop the `type` discriminant.
+	if (blockType === 'image') {
+		const { type: _t, ...imageRest } = rest;
+		return imageRest;
+	}
+	return rest;
+}
 
 /**
  * NotionClient - Pure Notion API interactions
- * 
+ *
  * Responsibilities:
  * - Talk to Notion API (query databases, fetch pages, update properties)
- * - Convert Notion pages to markdown
+ * - Convert Notion pages to markdown via the built-in notion-md module
  * - Extract property values from Notion pages
- * 
+ *
  * Does NOT contain business logic - just API calls and data extraction.
  */
 export class NotionClient {
 	private logger = createLogger({ operation: 'notion_client' });
 
-	constructor(private notion: Client, public n2m: NotionToMarkdown) {}
+	constructor(private notion: Client) {}
+
+	/**
+	 * Register a custom block transformer.
+	 * The transformer receives the raw Notion block and a fetchChildren callback.
+	 * Return a markdown string to override default behavior, or `false` to use default.
+	 */
+	setBlockTransformer(type: string, fn: BlockTransformerFn): void {
+		setBlockTransformer(type, fn);
+	}
+
+	/** Remove all registered custom block transformers. */
+	clearBlockTransformers(): void {
+		clearBlockTransformers();
+	}
 
 	// ── Rate-limit-aware retry wrapper ──────────────────────────────────────
 
@@ -364,7 +404,7 @@ export class NotionClient {
 				await this.withRetry(() =>
 					this.notion.blocks.update({
 						block_id: op.existingId,
-						[op.existingType]: op.newContent,
+						[op.existingType]: sanitizeContentForUpdate(op.existingType, op.newContent),
 					} as any)
 				);
 				applied++;
@@ -518,17 +558,16 @@ export class NotionClient {
 	}
 
 	/**
-	 * Convert Notion page content to markdown
+	 * Convert a Notion page's blocks to markdown.
+	 * Uses the built-in notion-md module; respects registered custom block transformers.
 	 */
 	async pageToMarkdown(pageId: string): Promise<string> {
 		this.logger.debug({ event: 'convert_to_markdown', pageId });
 
 		try {
-			const mdblocks = await this.n2m.pageToMarkdown(pageId);
-			const mdResult = this.n2m.toMarkdownString(mdblocks);
-			return typeof mdResult === 'string' ? mdResult : mdResult?.parent ?? '';
+			const topBlocks = await this.getBlocks(pageId);
+			return await blocksToMarkdown(topBlocks, (blockId) => this.getBlocks(blockId));
 		} catch (error: any) {
-			// Check for authentication errors
 			if (error.code === 'unauthorized' || error.status === 401) {
 				throw new Error(
 					`Notion API authentication failed: Invalid or expired token. ` +

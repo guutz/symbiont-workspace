@@ -1,5 +1,4 @@
 import { Client } from '@notionhq/client';
-import { NotionToMarkdown } from 'notion-to-md';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseBlueprint } from '../../types.js';
 import type { Database } from '../../database.types.js';
@@ -12,12 +11,12 @@ import { NotionToDatabaseSync } from './notion-to-database-sync.js';
 
 /**
  * Factory function to create a fully-wired NotionToDatabaseSync coordinator
- * 
+ *
  * This handles all the dependency injection:
  * - Notion client initialization (with token resolution)
  * - Database client setup
  * - Class instantiation in the correct order
- * 
+ *
  * **Supabase Client Pattern**:
  * - User's SymbiontClient contains a public/anon Supabase client (read-only)
  * - Coordinator creates a service role Supabase client (admin, write access)
@@ -25,13 +24,13 @@ import { NotionToDatabaseSync } from './notion-to-database-sync.js';
  *   - Image uploads to storage
  *   - Database mutations (upsert/delete pages)
  *   - Sync operations requiring write access
- * 
+ *
  * @param client - Symbiont client instance (contains public Supabase client)
  * @param config - Database configuration blueprint
  * @param adminSupabase - Optional pre-created service role Supabase client.
  *   Pass this when the caller already holds an admin client (e.g. syncFromNotion)
  *   to avoid creating redundant client instances.
- * 
+ *
  * @example
  * const sync = createNotionToDatabaseSyncCoordinator(client, dbConfig);
  * await sync.syncDataSource({ syncAll: true });
@@ -42,26 +41,24 @@ export function createNotionToDatabaseSyncCoordinator(
 	adminSupabase?: SupabaseClient<Database>
 ): NotionToDatabaseSync {
 	const notionToken = requireEnvVar("NOTION_TOKEN");
-	
-	// Initialize Notion client with resolved token
-	const notion = new Client({ auth: notionToken });
-	// Note: Type assertion needed because notion-to-md types expect older @notionhq/client version
-	// The runtime API is compatible, it's just a TypeScript version mismatch
-	const n2m = new NotionToMarkdown({ notionClient: notion as any });
 
-	// Custom transformer: Use empty alt text when image has no caption
-	// This prevents notion-to-md from using the filename as alt text
-	n2m.setCustomTransformer('image', async (block: any) => {
+	// Initialize Notion API client
+	const notion = new Client({ auth: notionToken });
+
+	// Create NotionClient (wraps Notion API + built-in MD conversion)
+	const notionClient = new NotionClient(notion);
+
+	// Custom transformer: use caption as alt text, empty string when no caption.
+	// This prevents the default behavior of using the filename as alt text.
+	notionClient.setBlockTransformer('image', async (block: any) => {
 		const { image } = block;
 		if (!image?.type) return false; // use default behavior
 
-		// Get caption from Notion block
 		const caption = image.caption
 			?.map((item: any) => item.plain_text)
 			.join('')
 			.trim();
 
-		// Get image URL
 		let url = '';
 		if (image.type === 'external') {
 			url = image.external?.url || '';
@@ -69,18 +66,13 @@ export function createNotionToDatabaseSyncCoordinator(
 			url = image.file?.url || '';
 		}
 
-		if (!url) return false; // use default behavior if no URL
+		if (!url) return false;
 
-		// Use caption if provided, otherwise empty string (no alt text)
 		const altText = caption || '';
 		return `![${altText}](${url})`;
 	});
 
-	// Create Notion client layer (Notion API)
-	const notionClient = new NotionClient(notion, n2m);
-
 	// Use the provided admin client, or create one if not supplied.
-	// Admin client has service role access for storage writes and DB mutations.
 	const supabase: SupabaseClient<Database> = adminSupabase ?? createClient<Database>(
 		client.config.supabase.url,
 		requireEnvVar("SUPABASE_SERVICE_ROLE_KEY"),
@@ -93,11 +85,8 @@ export function createNotionToDatabaseSyncCoordinator(
 		}
 	);
 
-	// Create page CRUD layer (Database) with service role client
 	const pageCrud = new DatabasePageCRUD(supabase);
 
-	// Create transformation layer (Notion page to website page)
-	// Receives admin Supabase client for image uploads
 	const transformer = new NotionPageToDatabasePageTransformer(
 		config,
 		notionClient,
@@ -105,7 +94,6 @@ export function createNotionToDatabaseSyncCoordinator(
 		supabase
 	);
 
-	// Create sync coordinator (coordination layer)
 	const sync = new NotionToDatabaseSync(
 		notionClient,
 		transformer,
