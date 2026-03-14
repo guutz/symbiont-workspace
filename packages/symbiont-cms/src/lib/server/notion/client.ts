@@ -41,8 +41,48 @@ export function sanitizeContentForUpdate(blockType: string, content: any): any {
  */
 export class NotionClient {
 	private logger = createLogger({ operation: 'notion_client' });
+	private writePolicy = {
+		content: true,
+		properties: true,
+	};
 
 	constructor(private notion: Client) {}
+
+	setWritesEnabled(enabled: boolean): void {
+		this.setWritePolicy({
+			content: enabled,
+			properties: enabled,
+		});
+	}
+
+	setWritePolicy(policy: { content?: boolean; properties?: boolean }): void {
+		this.writePolicy = {
+			content: policy.content ?? true,
+			properties: policy.properties ?? true,
+		};
+		this.logger.info({
+			event: 'notion_write_mode_changed',
+			writePolicy: this.writePolicy,
+		});
+	}
+
+	private shouldSkipWrite(
+		channel: 'content' | 'properties',
+		operation: string,
+		metadata: Record<string, unknown>
+	): boolean {
+		if (this.writePolicy[channel]) {
+			return false;
+		}
+
+		this.logger.info({
+			event: 'notion_write_skipped',
+			channel,
+			operation,
+			...metadata,
+		});
+		return true;
+	}
 
 	/**
 	 * Register a custom block transformer.
@@ -168,6 +208,10 @@ export class NotionClient {
 		propertyName: string,
 		value: string
 	): Promise<void> {
+		if (this.shouldSkipWrite('properties', 'updateProperty', { pageId, propertyName })) {
+			return;
+		}
+
 		this.logger.debug({ 
 			event: 'update_property', 
 			pageId, 
@@ -217,6 +261,10 @@ export class NotionClient {
 		propertyName: string,
 		url: string
 	): Promise<void> {
+		if (this.shouldSkipWrite('properties', 'updateUrlProperty', { pageId, propertyName })) {
+			return;
+		}
+
 		this.logger.debug({
 			event: 'update_url_property',
 			pageId,
@@ -257,6 +305,58 @@ export class NotionClient {
 	}
 
 	/**
+	 * Update a number property on a Notion page.
+	 * Used for derived metrics like word counts.
+	 */
+	async updateNumberProperty(
+		pageId: string,
+		propertyName: string,
+		value: number | null
+	): Promise<void> {
+		if (this.shouldSkipWrite('properties', 'updateNumberProperty', { pageId, propertyName })) {
+			return;
+		}
+
+		this.logger.debug({
+			event: 'update_number_property',
+			pageId,
+			propertyName,
+			value
+		});
+
+		try {
+			await this.notion.pages.update({
+				page_id: pageId,
+				properties: {
+					[propertyName]: {
+						number: value
+					}
+				}
+			});
+			this.logger.info({
+				event: 'number_property_updated',
+				pageId,
+				propertyName,
+				value
+			});
+		} catch (error: any) {
+			if (error.code === 'unauthorized' || error.status === 401) {
+				throw new Error(
+					`Notion API authentication failed: Invalid or expired token. ` +
+					`Please check your notionToken configuration. Original error: ${error.message}`
+				);
+			}
+
+			this.logger.warn({
+				event: 'update_number_property_failed',
+				pageId,
+				propertyName,
+				error: error?.message
+			});
+		}
+	}
+
+	/**
 	 * Update a file property on a Notion page with an external URL
 	 * Used to sync uploaded image URLs (Supabase/Nhost) back to Notion
 	 */
@@ -265,6 +365,10 @@ export class NotionClient {
 		propertyName: string,
 		url: string
 	): Promise<void> {
+		if (this.shouldSkipWrite('properties', 'updateFileProperty', { pageId, propertyName })) {
+			return;
+		}
+
 		this.logger.debug({ 
 			event: 'update_file_property', 
 			pageId, 
@@ -322,6 +426,10 @@ export class NotionClient {
 		pageId: string,
 		blocks: any[]
 	): Promise<void> {
+		if (this.shouldSkipWrite('content', 'updatePageBlocks', { pageId, blockCount: blocks.length })) {
+			return;
+		}
+
 		this.logger.debug({ 
 			event: 'update_page_blocks', 
 			pageId, 
@@ -388,6 +496,10 @@ export class NotionClient {
 		pageId: string,
 		diff: DiffResult,
 	): Promise<{ applied: number; failed: number }> {
+		if (this.shouldSkipWrite('content', 'patchPageBlocks', { pageId, ...diff.stats })) {
+			return { applied: 0, failed: 0 };
+		}
+
 		this.logger.debug({
 			event: 'patch_page_blocks',
 			pageId,

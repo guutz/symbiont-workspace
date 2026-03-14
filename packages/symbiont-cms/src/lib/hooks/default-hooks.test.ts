@@ -181,6 +181,25 @@ describe('Default Hooks (Extractor Pattern)', () => {
 			expect(result).toBe('My Page Name');
 		});
 
+		it('should concatenate multi-part title rich_text segments', async () => {
+			const ctx = createMockContext({
+				page: {
+					properties: {
+						Title: {
+							title: [
+								{ plain_text: 'Part One' },
+								{ plain_text: ' — ' },
+								{ plain_text: 'Part Two' }
+							]
+						}
+					}
+				} as any
+			});
+
+			const result = await defaultTitleExtractHook.fn(ctx);
+			expect(result).toBe('Part One — Part Two');
+		});
+
 		it('should return "Untitled" if no title', async () => {
 			const ctx = createMockContext({
 				page: {

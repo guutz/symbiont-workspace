@@ -331,7 +331,8 @@ export const defaultTitleExtractHook: Hook<string> = {
 		const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
 		
 		if (titleProp && 'title' in titleProp) {
-			return (titleProp as any).title?.[0]?.plain_text || 'Untitled';
+			const title = (titleProp as any).title?.map((t: any) => t.plain_text ?? '').join('').trim() || '';
+			return title || 'Untitled';
 		}
 		
 		return 'Untitled';

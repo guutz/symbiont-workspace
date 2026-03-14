@@ -81,6 +81,7 @@ export class NotionPageToDatabasePageTransformer {
 			page_id: page.id,
 			datasource_id: this.config.dataSourceId,
 			datasource_alias: this.config.alias,
+			publish_at: null,
 			updated_at: page.last_edited_time
 		};
 

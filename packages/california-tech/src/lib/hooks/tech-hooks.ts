@@ -4,6 +4,36 @@ import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser
 import { pdf } from 'pdf-to-img';
 import { createHash } from 'crypto';
 
+function isPrintOnlyOrAdvertisement(ctx: HookContext): boolean {
+	const tags = ctx.page.properties.Tags as any;
+	return tags?.multi_select?.some((tag: any) => {
+		const name = String(tag?.name ?? '').trim().toLowerCase();
+		return name === 'print only' || name === 'advertisement';
+	}) ?? false;
+}
+
+function countWordsFromMarkdown(markdown: string): number {
+	if (!markdown.trim()) {
+		return 0;
+	}
+
+	const plainText = markdown
+		.replace(/```[\s\S]*?```/g, ' ')
+		.replace(/`([^`]+)`/g, '$1')
+		.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '$1')
+		.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/[>#*_~\-]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	if (!plainText) {
+		return 0;
+	}
+
+	return plainText.split(/\s+/).filter(token => /[\p{L}\p{N}]/u.test(token)).length;
+}
+
 /**
  * Render the first page of a remote PDF as a PNG buffer.
  * Uses pdf-to-img which runs fully in-process (no external tools needed).
@@ -28,48 +58,60 @@ async function generateThumbnailBuffer(pdfUrl: string): Promise<Buffer> {
  * California Tech custom hooks for Symbiont CMS.
  * 
  * These hooks customize page processing for the California Tech newspaper:
- * - Exclude Print Only and Advertisement articles from sync
+ * - Exclude Print Only and Advertisement articles from Supabase
  * - Only publish articles with Status = "Published"
  * - Parse dates from Issue property with PST timezone
  * - Extract custom slug from Website Slug property
+ * - Sync derived metadata like Word Count back to Notion
  */
 
-/**
- * Exclude pages with "Print Only" or "Advertisement" tags from sync.
- * These articles should not appear on the website.
- * 
- * Uses page:should-sync event (AndAll strategy):
- * - Return false to exclude the page from sync
- * - Return true to allow sync
- * - Return null for no opinion
- */
-export const excludePrintOnlyHook: Hook<boolean> = {
-	name: 'tech:exclude:print-only',
+export const excludeAndDeletePrintOnlyHook: Hook<boolean> = {
+	name: 'tech:exclude-and-delete:print-only',
 	event: 'page:should-sync',
 	priority: 'override',
 	fn: async (ctx: HookContext) => {
-		const tags = ctx.page.properties.Tags as any;
-		const shouldExclude = tags?.multi_select?.some(
-			(tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement'
-		) ?? false;
-
-		if (shouldExclude) {
-			ctx.logger.info({
-				event: 'page_excluded',
-				pageId: ctx.page.id,
-				reason: 'Print Only or Advertisement tag'
-			});
-			return false; // Don't sync this page
+		if (!isPrintOnlyOrAdvertisement(ctx)) {
+			return true;
 		}
 
-		return true; // Allow sync
+		const supabase = ctx.services.supabase;
+		if (supabase) {
+			const { error } = await supabase
+				.from('pages')
+				.delete()
+				.eq('page_id', ctx.page.id)
+				.eq('datasource_id', ctx.config.dataSourceId);
+
+			if (error) {
+				ctx.logger.error({
+					event: 'print_only_delete_failed',
+					pageId: ctx.page.id,
+					datasourceId: ctx.config.dataSourceId,
+					error: error.message
+				});
+			} else {
+				ctx.logger.info({
+					event: 'print_only_deleted_from_supabase',
+					pageId: ctx.page.id,
+					datasourceId: ctx.config.dataSourceId
+				});
+			}
+		}
+
+		ctx.logger.info({
+			event: 'page_excluded_from_sync',
+			pageId: ctx.page.id,
+			reason: 'Print Only or Advertisement tag'
+		});
+
+		return false;
 	}
 };
 
 /**
  * Check if page should be published based on Status property.
  * Only pages with Status = "Published" are public.
- * Also excludes Print Only and Advertisement articles.
+ * Print Only and Advertisement articles are excluded via page:should-sync.
  * 
  * Uses publish:check event (AndAll strategy):
  * - Return false to prevent publishing (page syncs but publish_at is null)
@@ -82,13 +124,9 @@ export const publishCheckHook: Hook<boolean> = {
 	priority: 'override',
 	fn: async (ctx: HookContext) => {
 		const status = ctx.page.properties.Status as any;
-		const tags = ctx.page.properties.Tags as any;
 
 		const isPublished = status?.status?.name === 'Published';
-
-		const hasPrintOnlyTag = tags?.multi_select?.some(
-			(tag: any) => tag.name === 'Print Only' || tag.name === 'Advertisement'
-		) ?? false;
+		const hasPrintOnlyTag = isPrintOnlyOrAdvertisement(ctx);
 
 		const shouldPublish = isPublished && !hasPrintOnlyTag;
 
@@ -102,6 +140,47 @@ export const publishCheckHook: Hook<boolean> = {
 		}
 
 		return shouldPublish;
+	}
+};
+
+export const wordCountSyncHook: Hook<void> = {
+	name: 'tech:content:sync:word-count',
+	event: 'content:sync',
+	priority: 'after',
+	continueOnError: true,
+	fn: async (ctx: HookContext) => {
+		const notionClient = ctx.services.notionClient;
+		const content = ctx.output.content;
+
+		if (!notionClient || typeof content !== 'string') {
+			return null;
+		}
+
+		const wordCount = countWordsFromMarkdown(content);
+		const wordCountProp = ctx.page.properties['Word Count'] as any;
+		const existingWordCount =
+			typeof wordCountProp?.number === 'number'
+				? String(wordCountProp.number)
+				: (wordCountProp?.rich_text?.map((rt: any) => rt.plain_text).join('') ?? '').trim();
+		const nextWordCount = String(wordCount);
+
+		if (existingWordCount === nextWordCount) {
+			ctx.logger.debug({
+				event: 'word_count_sync_skipped_no_change',
+				pageId: ctx.page.id,
+				wordCount
+			});
+			return null;
+		}
+
+		await notionClient.updateProperty(ctx.page.id, 'Word Count', nextWordCount);
+		ctx.logger.debug({
+			event: 'word_count_synced_to_notion',
+			pageId: ctx.page.id,
+			wordCount
+		});
+
+		return null;
 	}
 };
 
@@ -496,7 +575,8 @@ export const websitePagesHooks: Hook[] = [
  * Exported as default export for backwards compatibility.
  */
 export const techHooks: Hook[] = [
-	excludePrintOnlyHook,
+	excludeAndDeletePrintOnlyHook,
 	publishCheckHook,
-	publishDateHook
+	publishDateHook,
+	wordCountSyncHook
 ];

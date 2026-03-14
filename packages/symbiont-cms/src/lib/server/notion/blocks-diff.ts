@@ -19,21 +19,71 @@
  * we never set when uploading blocks.
  */
 function normalizeRichText(rt: any): any {
+	const annotations = {
+		bold:          rt?.annotations?.bold          ?? false,
+		italic:        rt?.annotations?.italic        ?? false,
+		strikethrough: rt?.annotations?.strikethrough ?? false,
+		underline:     rt?.annotations?.underline     ?? false,
+		code:          rt?.annotations?.code          ?? false,
+		color:         rt?.annotations?.color         ?? 'default',
+	};
+
+	if (rt?.type === 'equation') {
+		return {
+			type: 'equation',
+			equation: {
+				expression: rt?.equation?.expression ?? '',
+			},
+			annotations,
+		};
+	}
+
+	if (rt?.type === 'mention') {
+		return {
+			type: 'mention',
+			mention: normalizeMention(rt?.mention),
+			annotations,
+		};
+	}
+
 	return {
 		type: rt?.type ?? 'text',
 		text: {
 			content: rt?.text?.content ?? '',
 			link: rt?.text?.link ?? null,
 		},
-		annotations: {
-			bold:          rt?.annotations?.bold          ?? false,
-			italic:        rt?.annotations?.italic        ?? false,
-			strikethrough: rt?.annotations?.strikethrough ?? false,
-			underline:     rt?.annotations?.underline     ?? false,
-			code:          rt?.annotations?.code          ?? false,
-			color:         rt?.annotations?.color         ?? 'default',
-		},
+		annotations,
 	};
+}
+
+function normalizeMention(mention: any): any {
+	const type = mention?.type ?? 'unknown';
+
+	switch (type) {
+		case 'page':
+			return { type, page: { id: mention?.page?.id ?? '' } };
+		case 'database':
+			return { type, database: { id: mention?.database?.id ?? '' } };
+		case 'date':
+			return {
+				type,
+				date: {
+					start: mention?.date?.start ?? '',
+					end: mention?.date?.end ?? null,
+				},
+			};
+		case 'link_preview':
+			return {
+				type,
+				link_preview: { url: mention?.link_preview?.url ?? '' },
+			};
+		case 'template_mention':
+			return { type, template_mention: mention?.template_mention ?? null };
+		case 'user':
+			return { type, user: { id: mention?.user?.id ?? '' } };
+		default:
+			return { type };
+	}
 }
 
 function normalizeRichTextArray(rts: any[] | undefined): any[] {

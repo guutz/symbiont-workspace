@@ -174,8 +174,10 @@ export type HookFunction<TOutput = any> = (
  * Associates a function with an event and priority.
  * 
  * Priority values:
- * - 'override': Runs before Symbiont's defaults (wins for first-wins events)
- * - 'fallback': Runs after Symbiont's defaults (only reached if defaults return null)
+ * - 'before': Runs before Symbiont's defaults
+ * - 'after': Runs after Symbiont's defaults
+ * - 'override': Alias of 'before' (kept for backwards compatibility)
+ * - 'fallback': Alias of 'after' (kept for backwards compatibility)
  * - omitted: Same order as built-in defaults
  */
 export interface Hook<TOutput = any> {
@@ -187,11 +189,13 @@ export interface Hook<TOutput = any> {
 
 	/**
 	 * Priority for execution order.
-	 * - 'override': Runs before defaults
-	 * - 'fallback': Runs after defaults
+	 * - 'before': Runs before defaults
+	 * - 'after': Runs after defaults
+	 * - 'override': Alias of 'before'
+	 * - 'fallback': Alias of 'after'
 	 * - omitted: Same level as defaults
 	 */
-	priority?: 'override' | 'fallback';
+	priority?: 'before' | 'after' | 'override' | 'fallback';
 
 	/**
 	 * Whether to continue execution if this hook throws an error.

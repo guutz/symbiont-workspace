@@ -596,9 +596,9 @@ export class HookRegistry {
 	/**
 	 * Map named priority to number.
 	 */
-	private mapPriority(priority: 'override' | 'fallback' | undefined): number {
-		if (priority === 'override') return 40;
-		if (priority === 'fallback') return 60;
+	private mapPriority(priority: 'before' | 'after' | 'override' | 'fallback' | undefined): number {
+		if (priority === 'before' || priority === 'override') return 40;
+		if (priority === 'after' || priority === 'fallback') return 60;
 		return 50; // default
 	}
 

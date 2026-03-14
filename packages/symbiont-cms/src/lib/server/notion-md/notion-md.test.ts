@@ -180,6 +180,19 @@ describe('richTextToMarkdown (rich-text)', () => {
 		}];
 		expect(richTextToMarkdown(rt as any)).toBe('[link](https://example.com)');
 	});
+
+	it('serializes link preview mentions as markdown links', () => {
+		const rt = [{
+			type: 'mention',
+			plain_text: 'https://example.com/story',
+			mention: {
+				type: 'link_preview',
+				link_preview: { url: 'https://example.com/story' }
+			},
+			annotations: {}
+		}];
+		expect(richTextToMarkdown(rt as any)).toBe('[https://example.com/story](https://example.com/story)');
+	});
 });
 
 describe('blocksToMarkdown (blocks-to-markdown)', () => {
@@ -369,5 +382,15 @@ describe('notion://page sentinel round-trips', () => {
 		const rt = blocks[0].paragraph.rich_text;
 		expect(rt[0].type).toBe('text');
 		expect(rt[0].text.link?.url).toBe('https://example.com');
+	});
+
+	it('round-trips link preview mentions via markdown', () => {
+		const blocks = convertMarkdownToNotionBlocks('[https://example.com/story](https://example.com/story)');
+		expect(blocks).toHaveLength(1);
+		expect(blocks[0].type).toBe('paragraph');
+		const rt = blocks[0].paragraph.rich_text;
+		expect(rt[0].type).toBe('mention');
+		expect(rt[0].mention.type).toBe('link_preview');
+		expect(rt[0].mention.link_preview.url).toBe('https://example.com/story');
 	});
 });

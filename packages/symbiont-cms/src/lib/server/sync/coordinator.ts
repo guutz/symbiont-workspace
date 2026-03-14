@@ -47,6 +47,14 @@ export function createNotionToDatabaseSyncCoordinator(
 
 	// Create NotionClient (wraps Notion API + built-in MD conversion)
 	const notionClient = new NotionClient(notion);
+	if (typeof config.syncBackToNotion === 'boolean' || config.syncBackToNotion === undefined) {
+		notionClient.setWritesEnabled(config.syncBackToNotion ?? true);
+	} else {
+		notionClient.setWritePolicy({
+			content: config.syncBackToNotion.content ?? true,
+			properties: config.syncBackToNotion.properties ?? true,
+		});
+	}
 
 	// Custom transformer: use caption as alt text, empty string when no caption.
 	// This prevents the default behavior of using the filename as alt text.

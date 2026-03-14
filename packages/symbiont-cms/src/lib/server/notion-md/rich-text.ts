@@ -43,6 +43,10 @@ function serializeRichText(rt: NotionRichText): string {
 			const label = rt.plain_text ?? 'Database link';
 			return `[${label}](notion://page/${cleanId})`;
 		}
+		if (mention.type === 'link_preview' && mention.link_preview?.url) {
+			const url = mention.link_preview.url;
+			return `[${rt.plain_text ?? url}](${url})`;
+		}
 
 		// All other mention types (user, date, link_preview, template_mention):
 		// fall back to the plain_text the API always provides.

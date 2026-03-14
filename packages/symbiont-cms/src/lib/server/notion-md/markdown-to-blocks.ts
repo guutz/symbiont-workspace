@@ -121,6 +121,13 @@ function mentionPageRichText(pageId: string): any {
 	};
 }
 
+function mentionLinkPreviewRichText(url: string): any {
+	return {
+		type: 'mention',
+		mention: { type: 'link_preview', link_preview: { url } },
+	};
+}
+
 // ── Block / RichText helpers ─────────────────────────────────────────────────
 
 function divider(): any {
@@ -267,6 +274,22 @@ interface InlineOptions {
 	url?: string;
 }
 
+function getInlinePlainText(node: any): string {
+	switch (node?.type) {
+		case 'text':
+		case 'inlineCode':
+		case 'html':
+			return String(node.value ?? '');
+		case 'delete':
+		case 'emphasis':
+		case 'strong':
+		case 'link':
+			return (node.children as any[] ?? []).map(getInlinePlainText).join('');
+		default:
+			return '';
+	}
+}
+
 function parseInlineText(text: string, options: InlineOptions, expressions: string[]): any[] {
 	const parts = splitBySentinel(text, expressions);
 	return parts.flatMap(part => {
@@ -308,6 +331,11 @@ function parseInline(node: any, options: InlineOptions, expressions: string[]): 
 			if (notionPageId) {
 				return [mentionPageRichText(notionPageId)];
 			}
+			const url = node.url as string ?? '';
+			const label = getInlinePlainText(node);
+			if (isValidHttpUrl(url) && label === url) {
+				return [mentionLinkPreviewRichText(url)];
+			}
 			return (node.children as any[]).flatMap(child =>
 				parseInline(child, { ...copy, url: node.url as string }, expressions),
 			);
@@ -323,6 +351,10 @@ function parseInline(node: any, options: InlineOptions, expressions: string[]): 
 		default:
 			return [];
 	}
+}
+
+function isValidHttpUrl(url: string): boolean {
+	return /^https?:\/\/.+/i.test(url);
 }
 
 // ── Image helper ─────────────────────────────────────────────────────────────

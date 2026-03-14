@@ -228,6 +228,28 @@ export interface DatabaseBlueprint {
      * Range: 0–1. Default: 0.6.
      */
     forceFullReplaceThreshold?: number;
+
+    /**
+     * Whether Notion -> DB syncs are allowed to write changes back to Notion.
+     *
+     * Boolean form:
+     * - true: allow all write-backs (default)
+     * - false: disable both content and property write-backs
+     *
+     * Object form allows granular control:
+     * - content: controls block updates (`content:sync`)
+     * - properties: controls property/file/url/number updates (`slug:sync`,
+     *   cover sync, PDF URL sync, Word Count sync, and custom property hooks)
+     *
+     * This only affects Notion -> DB sync runs. Explicit DB -> Notion publish
+     * flows are not affected.
+     *
+     * Default: true.
+     */
+    syncBackToNotion?: boolean | {
+        content?: boolean;
+        properties?: boolean;
+    };
 }
 
 /**

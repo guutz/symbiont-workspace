@@ -31,6 +31,11 @@ export const symbiont = createSymbiontClient({
 			alias: 'tech-article-staging',
 			dataSourceId: '6cc3888f-d9fa-4075-add9-b596e6fc44f3',
 
+			syncBackToNotion: {
+				content: false,
+				properties: true,
+			},
+
 			hooks: techHooks,
 
 			slugProperty: 'Website Slug',
