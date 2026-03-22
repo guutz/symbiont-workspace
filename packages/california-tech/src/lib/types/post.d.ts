@@ -4,7 +4,6 @@ export namespace Post {
   export type Post = {
     slug: string;
     title: string;
-    language: string;
     description: string;
     authors?: Array<string>;
     summary?: string;
@@ -19,6 +18,9 @@ export namespace Post {
     coverInPost?: boolean;
     coverCaption?: string;
     coverStyle: CoverStyle;
+    previewLayout?: PreviewLayoutFormat;
+    showPreviewSummary?: boolean;
+    layoutWeight?: number;
     options?: Array<string>;
     series_tag?: string;
     series_title?: string;
@@ -36,4 +38,6 @@ export namespace Post {
     IN = 'IN',
     NONE = 'NONE',
   }
+
+  export type PreviewLayoutFormat = 'compact' | 'standard' | 'feature';
 }

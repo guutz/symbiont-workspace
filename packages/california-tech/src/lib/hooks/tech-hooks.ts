@@ -1,8 +1,42 @@
 import type { Hook, HookContext } from 'symbiont-cms';
-import { uploadFileToSupabase, uploadBufferToSupabase, createSlug } from 'symbiont-cms/server';
+import {
+	uploadFileToSupabase,
+	uploadBufferToSupabase,
+	getPropertyNamedValue,
+	getPropertyNumberValue,
+} from 'symbiont-cms/server';
 import { parseTechIssueDate, parseWebsitePublishDate } from './utils/date-parser.js';
 import { pdf } from 'pdf-to-img';
 import { createHash } from 'crypto';
+
+const WEB_LAYOUT_FORMAT_PROPERTY_NAME = 'Web Layout Format';
+const LAYOUT_WEIGHT_PROPERTY_NAME = 'Layout Weight';
+
+const HTML_FENCE_PATTERN = /(^|\n)```html[^\n]*\n([\s\S]*?)\n```(?=\n|$)/g;
+
+function normalizeWebLayoutFormat(value: string | null): 'compact' | 'standard' | 'feature' | null {
+	if (!value) {
+		return null;
+	}
+
+	const normalized = value.trim().toLowerCase();
+	if (normalized === 'compact' || normalized === 'standard' || normalized === 'feature') {
+		return normalized;
+	}
+
+	return null;
+}
+
+function expandHtmlCodeBlocks(content: string): string {
+	return content.replace(HTML_FENCE_PATTERN, (match, prefix, html) => {
+		const trimmedHtml = html.trim();
+		if (!trimmedHtml) {
+			return match;
+		}
+
+		return `${prefix}${trimmedHtml}\n\n`;
+	});
+}
 
 function isPrintOnlyOrAdvertisement(ctx: HookContext): boolean {
 	const tags = ctx.page.properties.Tags as any;
@@ -181,6 +215,46 @@ export const wordCountSyncHook: Hook<void> = {
 		});
 
 		return null;
+	}
+};
+
+export const articlePreviewMetadataHook: Hook<Record<string, unknown>> = {
+	name: 'tech:metadata:preview-display',
+	event: 'metadata:custom',
+	priority: 'override',
+	fn: async (ctx: HookContext) => {
+		const webLayoutFormat = normalizeWebLayoutFormat(
+			getPropertyNamedValue(ctx.page.properties[WEB_LAYOUT_FORMAT_PROPERTY_NAME])
+		);
+		const layoutWeight = getPropertyNumberValue(ctx.page.properties[LAYOUT_WEIGHT_PROPERTY_NAME]);
+
+		const metadata: Record<string, unknown> = {};
+		if (webLayoutFormat) {
+			metadata.webLayoutFormat = webLayoutFormat;
+			metadata.coverStyle = webLayoutFormat === 'feature' ? 'TOP' : 'NONE';
+			metadata.showPreviewSummary = webLayoutFormat !== 'compact';
+		}
+
+		if (layoutWeight !== null) {
+			metadata.layoutWeight = layoutWeight;
+		}
+
+		return Object.keys(metadata).length > 0 ? metadata : null;
+	}
+};
+
+export const htmlCodeEmbedHook: Hook<string> = {
+	name: 'tech:content:postprocess:html-embeds',
+	event: 'content:postprocess',
+	priority: 'after',
+	fn: async (ctx: HookContext) => {
+		const content = typeof ctx.input === 'string' ? ctx.input : '';
+		if (!content.includes('```html')) {
+			return null;
+		}
+
+		const expandedContent = expandHtmlCodeBlocks(content);
+		return expandedContent === content ? null : expandedContent;
 	}
 };
 
@@ -470,6 +544,7 @@ export const archiveIssueHooks: Hook[] = [
  * Handles static pages, redirects, and page status (Live/Draft/Not shown).
  */
 export const websitePagesHooks: Hook[] = [
+	htmlCodeEmbedHook,
 	// Exclude "Draft" pages - don't sync at all, keeps previous live version
 	{
 		name: 'pages:exclude:draft',
@@ -578,5 +653,7 @@ export const techHooks: Hook[] = [
 	excludeAndDeletePrintOnlyHook,
 	publishCheckHook,
 	publishDateHook,
+	articlePreviewMetadataHook,
+	htmlCodeEmbedHook,
 	wordCountSyncHook
 ];

@@ -1,7 +1,7 @@
 // packages/california-tech/src/routes/+page.server.ts
 import { symbiont } from '$lib/symbiont';
-import { symbiontToQwerPost } from '$lib/utils/post-converter';
-import type { Post } from '$lib/types/post';
+import { symbiontToTechArticle } from '$lib/utils/post-converter';
+import { sortByPublishDayThenLayoutWeightDesc } from '$lib/utils/post-sorting';
 import type { Tags } from '$lib/types/tags';
 
 // ISR config - enable SvelteKit's ISR caching
@@ -21,7 +21,9 @@ export async function load({ fetch, url, cookies }) {
     // Client will progressively load more for filtering
     const INITIAL_LIMIT = query || tag ? 1000 : 30; // Full search if filtered, else fast initial load
     const postsFromDb = await symbiont.getAllPages({ fetch, limit: INITIAL_LIMIT });
-    const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+    const allPosts = postsFromDb
+      .map((post) => symbiontToTechArticle(post))
+      .sort(sortByPublishDayThenLayoutWeightDesc);
 
     // Build tags from all posts for consistent tag cloud
     const tagMap = new Map<string, Set<string>>();

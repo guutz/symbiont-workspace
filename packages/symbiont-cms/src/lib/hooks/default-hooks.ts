@@ -3,6 +3,7 @@ import { createSlug } from '../server/utils/slug.js';
 import { uploadImageToSupabase, needsUploadToSupabase } from '../server/bucket/image-upload.js';
 import { convertMarkdownToNotionBlocks } from '../server/notion-md/markdown-to-blocks.js';
 import { diffBlocks } from '../server/notion/blocks-diff.js';
+import { getPropertyNamedValue, getPropertyPlainText } from '../server/notion/property-utils.js';
 
 /**
  * Default hooks implementing Symbiont's opinionated behavior.
@@ -138,15 +139,7 @@ export const defaultSlugExtractHook: Hook<string> = {
 		}
 
 		const slugProp = ctx.page.properties[slugProperty];
-		
-		// Handle rich_text property
-		if (slugProp && 'rich_text' in slugProp) {
-			const richText = (slugProp as any).rich_text;
-			const extractedSlug = richText?.map((rt: any) => rt.plain_text).join('') || null;
-			return extractedSlug || null;
-		}
-
-		return null;
+		return getPropertyNamedValue(slugProp);
 	}
 };
 
@@ -288,9 +281,7 @@ export const defaultSlugSyncHook: Hook<void> = {
 		// The page object was fetched at sync time and already contains the current
 		// property values, so we can compare in-memory without an extra API call.
 		const existingSlugProp = ctx.page.properties[slugProperty];
-		const existingSlug = existingSlugProp && 'rich_text' in existingSlugProp
-			? (existingSlugProp as any).rich_text?.map((rt: any) => rt.plain_text).join('')
-			: null;
+		const existingSlug = getPropertyNamedValue(existingSlugProp);
 
 		if (existingSlug === finalSlug) {
 			ctx.logger.debug({
@@ -329,13 +320,8 @@ export const defaultTitleExtractHook: Hook<string> = {
 	event: 'metadata:title',
 	fn: async (ctx) => {
 		const titleProp = ctx.page.properties.Title || ctx.page.properties.Name;
-		
-		if (titleProp && 'title' in titleProp) {
-			const title = (titleProp as any).title?.map((t: any) => t.plain_text ?? '').join('').trim() || '';
-			return title || 'Untitled';
-		}
-		
-		return 'Untitled';
+		const title = getPropertyPlainText(titleProp);
+		return title || 'Untitled';
 	}
 };
 
@@ -392,14 +378,7 @@ export const defaultSummaryExtractHook: Hook<string> = {
 		}
 		
 		const summaryProp = ctx.page.properties[summaryProperty];
-		
-		// Handle rich_text property
-		if (summaryProp && 'rich_text' in summaryProp) {
-			const richText = (summaryProp as any).rich_text;
-			return richText?.map((rt: any) => rt.plain_text).join('') || null;
-		}
-		
-		return null;
+		return getPropertyPlainText(summaryProp);
 	}
 };
 

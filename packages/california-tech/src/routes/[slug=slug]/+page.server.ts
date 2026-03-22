@@ -14,7 +14,7 @@
 
 import { symbiont } from '$lib/symbiont';
 import { renderMarkdownToHtml } from 'symbiont-cms/server';
-import { symbiontToQwerPost } from '$lib/utils/post-converter';
+import { symbiontToTechArticle } from '$lib/utils/post-converter';
 import { error, redirect } from '@sveltejs/kit';
 
 // ISR config - enable SvelteKit's ISR caching
@@ -46,17 +46,19 @@ export const load = async (event: any) => {
 	if (!post) {
 		throw error(404, 'Post not found');
 	}
+
+	const metadata = post.meta ?? {};
 	
 	// Handle redirect-type pages
-	if (post.metadata?.pageType === 'Redirect') {
+	if (metadata.pageType === 'Redirect') {
 		// Redirect to external link if available
-		if (post.metadata.redirectLink) {
-			throw redirect(302, post.metadata.redirectLink);
+		if (metadata.redirectLink) {
+			throw redirect(302, metadata.redirectLink as string);
 		}
 		
 		// Serve file if available
-		if (post.metadata.file?.url) {
-			throw redirect(302, post.metadata.file.url);
+		if ((metadata.file as { url?: string } | undefined)?.url) {
+			throw redirect(302, (metadata.file as { url: string }).url);
 		}
 		
 		// No redirect target configured
@@ -72,7 +74,7 @@ export const load = async (event: any) => {
 	const { html, toc } = await renderMarkdownToHtml(post.content, symbiont.config.markdown);
 	
 	// Convert Symbiont post to QWER format
-	const qwerPost = symbiontToQwerPost(post, html, toc);
+	const qwerPost = symbiontToTechArticle(post, html, toc);
 	
 	// Set cache headers for client-side navigation
 	event.setHeaders({

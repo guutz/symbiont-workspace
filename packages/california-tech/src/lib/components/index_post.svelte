@@ -7,6 +7,7 @@
 	const { data, index } = $props<{ data: Post.Post; index: number }>();
 
 	const numberPostsEager = 3;
+	const showPreviewSummary = $derived(data.showPreviewSummary ?? true);
 
 </script>
 
@@ -62,11 +63,11 @@
 							</p>
 						{/if}
 					</div>
-					{#if data.summary_html}
+					{#if showPreviewSummary && data.summary_html}
 						<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
 							{@html data.summary_html}
 						</p>
-					{:else if data.summary}
+					{:else if showPreviewSummary && data.summary}
 						<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
 					{/if}
 				</div>
@@ -100,11 +101,11 @@
 								</p>
 							{/if}
 						</div>
-						{#if data.summary_html}
+						{#if showPreviewSummary && data.summary_html}
 							<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
 								{@html data.summary_html}
 							</p>
-						{:else if data.summary}
+						{:else if showPreviewSummary && data.summary}
 							<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
 						{/if}
 					</div>
@@ -129,11 +130,11 @@
 						</p>
 					{/if}
 				</div>
-				{#if data.summary_html}
+				{#if showPreviewSummary && data.summary_html}
 					<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">
 						{@html data.summary_html}
 					</p>
-				{:else if data.summary}
+				{:else if showPreviewSummary && data.summary}
 					<p class="summary line-clamp-3 whitespace-pre-line" itemprop="description">{data.summary}</p>
 				{/if}
 			</div>

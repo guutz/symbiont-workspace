@@ -1,6 +1,6 @@
 // packages/california-tech/src/routes/categories/+page.server.ts
 import { symbiont } from '$lib/symbiont';
-import { symbiontToQwerPost } from '$lib/utils/post-converter';
+import { symbiontToTechArticle } from '$lib/utils/post-converter';
 import type { Tags } from '$lib/types/tags';
 
 export const prerender = false;
@@ -8,7 +8,7 @@ export const prerender = false;
 export async function load({ fetch }) {
 	try {
 		const postsFromDb = await symbiont.getAllPages({ fetch, limit: 1000 });
-		const allPosts = postsFromDb.map((post) => symbiontToQwerPost(post));
+		const allPosts = postsFromDb.map((post) => symbiontToTechArticle(post));
 
 		// Build tag statistics
 		const tagCounts = new Map<string, number>();

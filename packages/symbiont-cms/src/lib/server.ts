@@ -37,3 +37,12 @@ export { convertMarkdownToNotionBlocks } from './server/notion-md/markdown-to-bl
 
 // Markdown image utilities
 export { extractImageUrls, replaceImageUrls } from './server/markdown/image-url-extractor.js';
+
+// Notion property helpers
+export {
+	getPropertyByName,
+	getFirstPropertyByName,
+	getPropertyPlainText,
+	getPropertyNamedValue,
+	getPropertyNumberValue,
+} from './server/notion/property-utils.js';
