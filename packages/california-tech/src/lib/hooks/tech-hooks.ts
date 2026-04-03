@@ -321,6 +321,16 @@ export const publishDateHook: Hook<string | Date> = {
  */
 export const archiveIssueHooks: Hook[] = [
 	{
+		name: 'archives:publish:check',
+		event: 'publish:check',
+		priority: 'override',
+		fn: async () => {
+			// Archive rows are intentionally public so issue cards can always read
+			// their cover/PDF metadata from the public pages API.
+			return true;
+		}
+	},
+	{
 		// Skip duplicate archive issues: if this date's slug already belongs to a
 		// different Notion page, it's a duplicate entry — don't sync it.
 		name: 'archives:dedup',

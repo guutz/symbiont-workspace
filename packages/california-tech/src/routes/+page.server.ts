@@ -2,6 +2,7 @@
 import { symbiont } from '$lib/symbiont';
 import { symbiontToTechArticle } from '$lib/utils/post-converter';
 import { sortByPublishDayThenLayoutWeightDesc } from '$lib/utils/post-sorting';
+import { getIssueBoundedEndIndex, parsePositiveInt } from '$lib/utils/post-pagination';
 import type { Tags } from '$lib/types/tags';
 
 // ISR config - enable SvelteKit's ISR caching
@@ -12,15 +13,26 @@ export const config = {
 
 export const prerender = false;
 
+const PAGE_BATCH_SIZE = 30;
+const MAX_FETCH_LIMIT = 1000;
+
+function postHasTag(post: { tags?: unknown[] }, tag: string): boolean {
+	return (post.tags ?? []).some((postTag) => {
+		if (typeof postTag === 'string') return postTag === tag;
+		if (typeof postTag === 'object' && postTag !== null) {
+			return Object.values(postTag).flat().some((tagValue) => String(tagValue) === tag);
+		}
+		return false;
+	});
+}
+
 export async function load({ fetch, url, cookies }) {
   try {
     const query = url.searchParams.get('q')?.toLowerCase() || '';
     const tag = url.searchParams.get('tag') || '';
+    const requestedCount = parsePositiveInt(url.searchParams.get('count'), PAGE_BATCH_SIZE);
 
-    // For initial page load: fetch enough for tag cloud + initial display
-    // Client will progressively load more for filtering
-    const INITIAL_LIMIT = query || tag ? 1000 : 30; // Full search if filtered, else fast initial load
-    const postsFromDb = await symbiont.getAllPages({ fetch, limit: INITIAL_LIMIT });
+    const postsFromDb = await symbiont.getAllPages({ fetch, limit: MAX_FETCH_LIMIT });
     const allPosts = postsFromDb
       .map((post) => symbiontToTechArticle(post))
       .sort(sortByPublishDayThenLayoutWeightDesc);
@@ -60,13 +72,7 @@ export async function load({ fetch, url, cookies }) {
     let filteredPosts = allPosts;
 
     if (tag) {
-      filteredPosts = filteredPosts.filter(post => (post.tags ?? []).some(postTag => {
-        if (typeof postTag === 'string') return postTag === tag;
-        if (typeof postTag === 'object' && postTag !== null) {
-          return Object.values(postTag).flat().some(t => String(t) === tag);
-        }
-        return false;
-      }));
+      filteredPosts = filteredPosts.filter((post) => postHasTag(post, tag));
     }
 
     if (query) {
@@ -76,20 +82,37 @@ export async function load({ fetch, url, cookies }) {
       );
     }
 
+    const boundedCount = getIssueBoundedEndIndex(filteredPosts, requestedCount);
+    const nextCount = getIssueBoundedEndIndex(filteredPosts, boundedCount + PAGE_BATCH_SIZE);
+
     // Strip content/html from filtered results (keep summary for display)
-    const posts = filteredPosts.slice(0, 30).map(({ content, html, ...post }) => post);
+    const posts = filteredPosts.slice(0, boundedCount).map(({ content, html, ...post }) => post);
 
     return {
       posts,         // Initial posts for fast FCP/LCP
       allTags,       // Tag cloud data
       query,
       tag,
-      hasMore: filteredPosts.length > 30, // Signal that more results exist
+      hasMore: boundedCount < filteredPosts.length,
+      shownCount: boundedCount,
+      nextCount,
+      batchSize: PAGE_BATCH_SIZE,
       totalCount: filteredPosts.length,   // Total matching posts
       theme: cookies.get('theme') || 'light',
     };
   } catch (error) {
     console.error('[+page.server.ts] Error loading page data:', error);
-    return { posts: [], allTags: [], query: '', tag: '', hasMore: false, totalCount: 0, theme: 'light' };
+    return {
+		posts: [],
+		allTags: [],
+		query: '',
+		tag: '',
+		hasMore: false,
+		shownCount: 0,
+		nextCount: PAGE_BATCH_SIZE,
+		batchSize: PAGE_BATCH_SIZE,
+		totalCount: 0,
+		theme: 'light'
+	};
   }
 }

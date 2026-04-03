@@ -1,4 +1,3 @@
-<!-- packages/california-tech/src/routes/+page.svelte -->
 <script lang="ts">
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
@@ -12,7 +11,6 @@
 		getActiveIssueDateFromRoot,
 		observeInfiniteScroll
 	} from '$lib/utils/feed-client';
-	import { getPacificDateKey } from '$lib/utils/post-sorting';
 
 	import IndexPosts from '$lib/components/index_posts.svelte';
 
@@ -30,12 +28,13 @@
 	const query = $derived(page.url.searchParams.get('q') || '');
 	const activeTag = $derived(page.url.searchParams.get('tag') || '');
 	const batchSize = $derived(data.batchSize ?? 30);
+	const issueDate = $derived(data.issueDate ?? '');
 	const isFilterMode = $derived(Boolean(query || activeTag));
 	const renderedPosts = $derived.by(() => (hasInitializedFromServer ? posts : serverPosts));
 
 	const loadMoreHref = $derived.by(() => {
 		return buildCountLoadMoreHref({
-			basePath: '/',
+			basePath: `/issues/${issueDate}`,
 			hasMore,
 			searchParams: page.url.searchParams,
 			nextCountHint: data.nextCount,
@@ -44,8 +43,6 @@
 			batchSize
 		});
 	});
-
-	const firstIssueDate = $derived(renderedPosts.length > 0 ? getPacificDateKey(renderedPosts[0]?.published) : '');
 
 	async function loadMorePosts() {
 		if (!browser || isLoadingMore || !hasMore) return;
@@ -56,13 +53,14 @@
 				offset: nextOffset,
 				limit: batchSize,
 				query,
-				tag: activeTag
+				tag: activeTag,
+				beforeDate: issueDate
 			});
 			posts = mergeUniqueBy(posts, payload.posts, (post) => post.slug);
 			nextOffset = payload.nextOffset;
 			hasMore = payload.hasMore;
 		} catch (error) {
-			console.error('Failed to load more posts:', error);
+			console.error('Failed to load more issue posts:', error);
 		} finally {
 			isLoadingMore = false;
 		}
@@ -85,17 +83,14 @@
 		const root = issueFeedRoot;
 
 		let ticking = false;
-
 		const updateIssueUrl = () => {
 			ticking = false;
-			const activeIssueDate = getActiveIssueDateFromRoot(root, '');
+			const activeIssueDate = getActiveIssueDateFromRoot(root, issueDate);
 
 			if (!activeIssueDate) return;
-
 			const params = page.url.searchParams.toString();
-			const targetPath = activeIssueDate === firstIssueDate ? '/' : `/issues/${activeIssueDate}`;
+			const targetPath = `/issues/${activeIssueDate}`;
 			const targetUrl = params ? `${targetPath}?${params}` : targetPath;
-
 			const currentPathAndQuery = `${window.location.pathname}${window.location.search}`;
 			if (currentPathAndQuery !== targetUrl) {
 				replaceState(targetUrl, page.state);
@@ -116,7 +111,6 @@
 			window.removeEventListener('resize', onScrollOrResize);
 		};
 	});
-
 </script>
 
 <div

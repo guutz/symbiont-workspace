@@ -332,6 +332,27 @@ describe('HookRegistry (Extractor Pattern)', () => {
 	});
 
 	describe('control flow', () => {
+		it('should return false for publish:check when all hooks abstain', async () => {
+			const hooks: Hook[] = [
+				{
+					name: 'abstain:hook1',
+					event: 'publish:check',
+					priority: 'override',
+					fn: async () => null
+				},
+				{
+					name: 'abstain:hook2',
+					event: 'publish:check',
+					fn: async () => null
+				}
+			];
+
+			registry.registerMany(hooks);
+
+			const result = await registry.execute('publish:check', {}, {} as any);
+			expect(result).toBe(false);
+		});
+
 		it('should return null if no hooks registered', async () => {
 			const result = await registry.execute('publish:check', {}, {} as any);
 

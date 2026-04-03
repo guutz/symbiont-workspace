@@ -55,8 +55,8 @@ export const defaultPublishCheckHook: Hook<boolean> = {
 	fn: async (ctx) => {
 		const notionClient = ctx.services.notionClient;
 		if (!notionClient) {
-			// No Notion client available - default to false (opt-in)
-			return false;
+			// No Notion client available - abstain and let custom hooks vote.
+			return null;
 		}
 
 		const dataSourceId = ctx.config.dataSourceId;
@@ -73,8 +73,8 @@ export const defaultPublishCheckHook: Hook<boolean> = {
 					dataSourceId,
 					error: error instanceof Error ? error.message : String(error)
 				});
-				// Default to false if can't fetch schema
-				return false;
+				// If schema can't be fetched, abstain and let custom hooks vote.
+				return null;
 			}
 		}
 
@@ -86,8 +86,8 @@ export const defaultPublishCheckHook: Hook<boolean> = {
 		);
 
 		if (!statusProp) {
-			// No status property - default to false (opt-in)
-			return false;
+			// No status property - abstain and let custom hooks vote.
+			return null;
 		}
 
 		const [statusPropName, statusPropDef] = statusProp as [string, any];
@@ -98,8 +98,8 @@ export const defaultPublishCheckHook: Hook<boolean> = {
 		);
 
 		if (!completeGroup) {
-			// No Complete group - default to false
-			return false;
+			// No Complete group - abstain and let custom hooks vote.
+			return null;
 		}
 
 		// Check if page's status option is in the Complete group

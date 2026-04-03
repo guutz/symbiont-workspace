@@ -182,7 +182,15 @@ export class HookRegistry {
 				result = await this.executeOrAll(hooks, output, page, input, state, abort);
 				break;
 			case CompositionStrategy.AndAll:
-				result = await this.executeAndAll(hooks, output, page, input, state, abort);
+				result = await this.executeAndAll(
+					hooks,
+					output,
+					page,
+					input,
+					state,
+					abort,
+					event === 'publish:check'
+				);
 				break;
 			case CompositionStrategy.RunAll:
 				result = await this.executeRunAll(hooks, output, page, input, state, abort);
@@ -390,9 +398,11 @@ export class HookRegistry {
 		page: PageObjectResponse,
 		input: unknown,
 		state: HookExecutionState,
-		abort: (reason: string) => void
+		abort: (reason: string) => void,
+		requireExplicitTrueVote = false
 	): Promise<boolean> {
 		let hasFalse = false;
+		let hasTrue = false;
 
 		for (const hook of hooks) {
 			if (state.aborted) {
@@ -414,6 +424,7 @@ export class HookRegistry {
 						hookName: hook.name
 					});
 				} else if (result === true) {
+					hasTrue = true;
 					this.logger.debug({
 						event: 'hook_voted_true',
 						hookName: hook.name
@@ -429,6 +440,10 @@ export class HookRegistry {
 					throw error;
 				}
 			}
+		}
+
+		if (requireExplicitTrueVote) {
+			return !hasFalse && hasTrue;
 		}
 
 		return !hasFalse;

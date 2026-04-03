@@ -35,12 +35,12 @@ describe('Default Hooks (Extractor Pattern)', () => {
 	});
 
 	describe('defaultPublishCheckHook', () => {
-		it('should return false when no notionClient is available', async () => {
-			// Hook uses Notion Status property to gate publishing (opt-in model).
-			// Without a notionClient it defaults to false.
+		it('should return null when no notionClient is available', async () => {
+			// Without a notionClient, the default hook abstains and allows
+			// datasource-specific hooks to provide explicit publish votes.
 			const ctx = createMockContext({ services: {} });
 			const result = await defaultPublishCheckHook.fn(ctx);
-			expect(result).toBe(false);
+			expect(result).toBeNull();
 		});
 
 		it('should have correct metadata', () => {

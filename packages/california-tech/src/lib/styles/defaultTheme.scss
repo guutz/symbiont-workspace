@@ -137,7 +137,7 @@
 }
 
 .dark {
-  --qwer-bg-color: #202020;
+  --qwer-bg-color: black;
   --qwer-text-color: white;
   --qwer-btn-hover-color: #e1e3dd90;
   --qwer-border-color: #404040;
@@ -187,7 +187,7 @@
   }
 
   .index-post {
-    --qwer-bg-color: #171717;
+    --qwer-bg-color: black;
     --qwer-text-color: inherit;
     --qwer-title-color: inherit;
     --qwer-title-hover-color: black;
@@ -201,11 +201,11 @@
   }
 
   #post {
-    --qwer-bg-color: #171717;
+    --qwer-bg-color: black;
   }
 
   #post-bottom {
-    --qwer-bg-color: #171717;
+    --qwer-bg-color: black;
   }
 
   .prose {

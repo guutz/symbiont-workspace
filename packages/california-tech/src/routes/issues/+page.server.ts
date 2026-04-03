@@ -1,6 +1,5 @@
-import { symbiont } from '$lib/symbiont';
-import { symbiontToTechArticle } from '$lib/utils/post-converter';
-import { sortByPublishDayThenLayoutWeightDesc } from '$lib/utils/post-sorting';
+import { parsePositiveInt } from '$lib/utils/post-pagination';
+import { buildIssueCards } from '$lib/utils/issues';
 
 export const config = {
 	maxage: 60,
@@ -9,54 +8,36 @@ export const config = {
 
 export const prerender = false;
 
-export async function load({ fetch, url, cookies }) {
+const ISSUE_PAGE_BATCH_SIZE = 24;
+
+export async function load({ fetch, cookies, url }) {
 	try {
-		const query = url.searchParams.get('q')?.toLowerCase() || '';
-		const tag = url.searchParams.get('tag') || '';
-		const initialLimit = query || tag ? 1000 : 30;
-		const postsFromDb = await symbiont.getAllPages({
-			fetch,
-			limit: initialLimit,
-			alias: 'tech-archives'
-		});
-		const allPosts = postsFromDb
-			.map((post) => symbiontToTechArticle(post))
-			.sort(sortByPublishDayThenLayoutWeightDesc);
+		const requestedCount = parsePositiveInt(url.searchParams.get('count'), ISSUE_PAGE_BATCH_SIZE);
+		const issues = await buildIssueCards(fetch);
 
-		let filteredPosts = allPosts;
-
-		if (tag) {
-			filteredPosts = filteredPosts.filter((post) =>
-				(post.tags ?? []).some((postTag) => {
-					if (typeof postTag === 'string') return postTag === tag;
-					if (typeof postTag === 'object' && postTag !== null) {
-						return Object.values(postTag).flat().some((value) => String(value) === tag);
-					}
-					return false;
-				})
-			);
-		}
-
-		if (query) {
-			filteredPosts = filteredPosts.filter((post) =>
-				post.title.toLowerCase().includes(query) ||
-				(post.summary ?? '').toLowerCase().includes(query)
-			);
-		}
-
-		const posts = filteredPosts.slice(0, 30).map(({ content, html, ...post }) => post);
+		const shownCount = Math.min(requestedCount, issues.length);
+		const pagedIssues = issues.slice(0, shownCount);
+		const nextCount = Math.min(shownCount + ISSUE_PAGE_BATCH_SIZE, issues.length);
 
 		return {
-			posts,
-			allTags: [],
-			query,
-			tag,
-			hasMore: filteredPosts.length > 30,
-			totalCount: filteredPosts.length,
+			issues: pagedIssues,
+			hasMore: shownCount < issues.length,
+			shownCount,
+			nextCount,
+			batchSize: ISSUE_PAGE_BATCH_SIZE,
+			totalCount: issues.length,
 			theme: cookies.get('theme') || 'light'
 		};
 	} catch (error) {
 		console.error('[issues/+page.server.ts] Error loading issue index:', error);
-		return { posts: [], allTags: [], query: '', tag: '', hasMore: false, totalCount: 0, theme: 'light' };
+		return {
+			issues: [],
+			hasMore: false,
+			shownCount: 0,
+			nextCount: ISSUE_PAGE_BATCH_SIZE,
+			batchSize: ISSUE_PAGE_BATCH_SIZE,
+			totalCount: 0,
+			theme: 'light'
+		};
 	}
 }

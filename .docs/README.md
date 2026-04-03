@@ -2,13 +2,13 @@
 
 This folder is the living knowledge base for the Symbiont CMS workspace. The docs are grouped by intent so you can dive straight to architecture, implementation, or roadmap notes without wading through repetition.
 
-**Note:** All documentation files now use date-prefixed naming (YYYY-MM-DD) for consistency and chronological organization.
+**Note:** Most documentation files use date-prefixed naming (YYYY-MM-DD). The implementation status tracker is intentionally undated because it is continuously updated.
 
 ## Core Concepts
 
 - **`2025-10-01-symbiont-cms-reference.md`** – System overview, architecture, configuration, and package API surface
 - **`2025-09-01-zero-rebuild-cms-vision.md`** – The product vision and phased roadmap toward a zero-rebuild CMS
-- **`2026-02-03-implementation-status.md`** – **⭐ Living doc:** Honest tracker of what's shipped vs. designed vs. conceptual
+- **`implementation-status.md`** – **⭐ Living doc:** Honest tracker of what's shipped vs. designed vs. conceptual
 
 ## Implementation Guides
 
@@ -100,7 +100,7 @@ This folder is the living knowledge base for the Symbiont CMS workspace. The doc
   - Deleted deprecated documents
   - Updated feature-detection-architecture.md with partial implementation status
   - Updated markdown-compatibility.md with current implementation status  
-  - Created `2026-02-03-implementation-status.md` for transparent tracking
+  - Created the living `implementation-status.md` tracker for transparent status reporting
   - Updated all strategy docs with implementation status banners
   - Clarified Phase 2-3 are designed but not yet implemented
   - Identified gaps: testing, observability, Storage config

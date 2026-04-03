@@ -31,6 +31,7 @@
 		{ name: 'Sports', href: '/?tag=Sports' },
 		{ name: 'Opinion', href: '/?tag=Opinion' },
 		{ name: 'Features', href: '/?tag=Features' },
+		{ name: 'All Tech Issues', href: '/issues', emphasizeTech: true },
 		{ name: 'All Categories', href: '/categories' },
 	];
 </script>
@@ -43,9 +44,14 @@
 				href={section.href}
 				class="px-3 py-2 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
 				class:font-bold={$page.url.searchParams.get('tag') === section.name || 
-				                  ($page.url.pathname === '/categories' && section.href === '/categories')}
+				                  ($page.url.pathname === '/categories' && section.href === '/categories') ||
+				                  ($page.url.pathname.startsWith('/issues') && section.href === '/issues')}
 			>
-				{section.name}
+				{#if section.emphasizeTech}
+					All <em>Tech</em> Issues
+				{:else}
+					{section.name}
+				{/if}
 			</a>
 		{/each}
 	</nav>
@@ -60,9 +66,13 @@
 				<a
 					href={section.href}
 					class="block px-4 py-2 hover:bg-black/10 dark:hover:bg-white/10 first:rounded-t-lg last:rounded-b-lg"
-					class:font-bold={$page.url.searchParams.get('tag') === section.name}
+					class:font-bold={$page.url.searchParams.get('tag') === section.name || ($page.url.pathname.startsWith('/issues') && section.href === '/issues')}
 				>
-					{section.name}
+					{#if section.emphasizeTech}
+						All <em>Tech</em> Issues
+					{:else}
+						{section.name}
+					{/if}
 				</a>
 			{/each}
 		</div>

@@ -3,6 +3,10 @@ export type SortablePostLike = {
 	layoutWeight?: number;
 };
 
+export function compareStringDesc(a: string, b: string): number {
+	return b.localeCompare(a);
+}
+
 export function getPacificDateKey(isoDateString?: string): string {
 	const date = new Date(isoDateString ?? '');
 	if (Number.isNaN(date.getTime())) {
@@ -16,7 +20,7 @@ export function sortByPublishDayThenLayoutWeightDesc<T extends SortablePostLike>
 	const dateKeyA = getPacificDateKey(a.published);
 	const dateKeyB = getPacificDateKey(b.published);
 	if (dateKeyA !== dateKeyB) {
-		return dateKeyB.localeCompare(dateKeyA);
+		return compareStringDesc(dateKeyA, dateKeyB);
 	}
 
 	const weightA = a.layoutWeight ?? 0;

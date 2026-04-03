@@ -1420,4 +1420,4 @@ Build the fastest, most secure, most accessible blog possible while staying simp
 
 ---
 
-**Ready to implement?** Check `2026-02-03-implementation-status.md` for the current build plan.
+**Ready to implement?** Check `implementation-status.md` for the current build plan.
